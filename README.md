@@ -1,2 +1,67 @@
-# runtrail
-journals for agents 
+# Runtrail
+
+Runtrail is a self-hosted, LAN/VPN-accessible activity ledger for coding agents and scripts. It stores structured activity in SQLite and exposes it through an HTTP API and CLI.
+
+The MVP is agent-first: structured runs, events, open loops, decisions, and compact context retrieval. Human-readable UI and deployment automation come later.
+
+## Local Development
+
+Install dependencies:
+
+```sh
+pnpm install
+```
+
+Start the service:
+
+```sh
+pnpm dev
+```
+
+Check health:
+
+```sh
+curl http://127.0.0.1:8787/health
+pnpm cli health
+```
+
+Validate:
+
+```sh
+pnpm typecheck
+pnpm test
+```
+
+## Configuration
+
+Runtrail uses YAML for non-secret config and environment variables for secrets.
+
+Default config path:
+
+```sh
+config/runtrail.example.yaml
+```
+
+Override config path:
+
+```sh
+RUNTRAIL_CONFIG=/etc/runtrail/config.yaml
+```
+
+Supported environment overrides:
+
+```sh
+RUNTRAIL_HOST=0.0.0.0
+RUNTRAIL_PORT=8787
+RUNTRAIL_DB_PATH=./data/runtrail.sqlite
+RUNTRAIL_LOG_DIR=./data/logs
+RUNTRAIL_TOKEN=change-me-to-a-long-random-secret
+RUNTRAIL_URL=http://127.0.0.1:8787
+DISCORD_WEBHOOK_URL=
+```
+
+Do not commit real tokens or webhook URLs.
+
+## LAN/VPN Assumption
+
+Runtrail is intended for trusted LAN/VPN access. The example config binds to `0.0.0.0` so other machines on the trusted network can reach it during development.

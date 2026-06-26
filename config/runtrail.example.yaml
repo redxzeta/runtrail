@@ -1,0 +1,18 @@
+server:
+  host: "0.0.0.0"
+  port: 8787
+
+storage:
+  dbPath: "./data/runtrail.sqlite"
+  logDir: "./data/logs"
+
+security:
+  authRequired: true
+
+notifications:
+  discord:
+    enabled: false
+
+agentContext:
+  defaultLimit: 10
+  minImportance: 3
