@@ -25,6 +25,31 @@ curl http://127.0.0.1:8787/health
 pnpm cli health
 ```
 
+Create a run:
+
+```sh
+curl -X POST http://127.0.0.1:8787/runs \
+  -H "authorization: Bearer $RUNTRAIL_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"source":"codex","project":"runtrail","task":"implement runs API"}'
+```
+
+Attach an event:
+
+```sh
+curl -X POST http://127.0.0.1:8787/events \
+  -H "authorization: Bearer $RUNTRAIL_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"runId":"run_abc123","type":"progress","message":"added tests","importance":4}'
+```
+
+Fetch recent runs:
+
+```sh
+curl -H "authorization: Bearer $RUNTRAIL_TOKEN" \
+  "http://127.0.0.1:8787/runs?project=runtrail"
+```
+
 Validate:
 
 ```sh
