@@ -1,0 +1,47 @@
+{
+  "name": "runtrail",
+  "version": "0.1.0",
+  "description": "Self-hosted agent activity ledger",
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@11.5.2",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "biome check . && knip",
+    "format": "biome check --write .",
+    "release": "semantic-release",
+    "cli": "tsx src/cli/index.ts"
+  },
+  "bin": {
+    "rt": "dist/cli/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "better-sqlite3": "^12.5.0",
+    "commander": "^14.0.2",
+    "hono": "^4.10.7",
+    "nanoid": "^5.1.6",
+    "yaml": "^2.8.2",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.8",
+    "@semantic-release/npm": "^13.1.5",
+    "@semantic-release/release-notes-generator": "^14.1.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.0.3",
+    "knip": "^6.18.0",
+    "semantic-release": "^25.0.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.15"
+  }
+}

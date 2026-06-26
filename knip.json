@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "project": ["src/**/*.ts", "test/**/*.ts"],
+  "ignore": ["src/shared/ids.ts"],
+  "ignoreDependencies": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/github",
+    "@semantic-release/npm",
+    "@semantic-release/release-notes-generator",
+    "nanoid"
+  ],
+  "ignoreExportsUsedInFile": true
+}
