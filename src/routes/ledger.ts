@@ -3,10 +3,15 @@ import { Hono } from "hono";
 import type { RuntrailConfig } from "../config.js";
 import { LedgerRepository } from "../db/ledger.js";
 import {
+  createDecisionRequestSchema,
   createEventRequestSchema,
+  createOpenLoopRequestSchema,
   createRunRequestSchema,
+  listDecisionsQuerySchema,
   listEventsQuerySchema,
+  listOpenLoopsQuerySchema,
   listRunsQuerySchema,
+  updateOpenLoopRequestSchema,
   updateRunRequestSchema
 } from "../shared/schemas.js";
 
@@ -112,6 +117,69 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     }
 
     return c.json({ events: ledger.listEvents(parsed.data) });
+  });
+
+  route.post("/open-loops", async (c) => {
+    const body = await readJson(c.req.raw);
+    const parsed = createOpenLoopRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    return c.json({ openLoop: ledger.createOpenLoop(parsed.data) }, 201);
+  });
+
+  route.get("/open-loops", (c) => {
+    const parsed = listOpenLoopsQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams)
+    );
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    return c.json({ openLoops: ledger.listOpenLoops(parsed.data) });
+  });
+
+  route.patch("/open-loops/:id", async (c) => {
+    const body = await readJson(c.req.raw);
+    const parsed = updateOpenLoopRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    const openLoop = ledger.updateOpenLoop(c.req.param("id"), parsed.data);
+
+    if (!openLoop) {
+      return c.json({ error: "Open loop not found" }, 404);
+    }
+
+    return c.json({ openLoop });
+  });
+
+  route.post("/decisions", async (c) => {
+    const body = await readJson(c.req.raw);
+    const parsed = createDecisionRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    return c.json({ decision: ledger.createDecision(parsed.data) }, 201);
+  });
+
+  route.get("/decisions", (c) => {
+    const parsed = listDecisionsQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams)
+    );
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    return c.json({ decisions: ledger.listDecisions(parsed.data) });
   });
 
   return route;

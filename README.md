@@ -50,6 +50,33 @@ curl -H "authorization: Bearer $RUNTRAIL_TOKEN" \
   "http://127.0.0.1:8787/runs?project=runtrail"
 ```
 
+Create an open loop:
+
+```sh
+curl -X POST http://127.0.0.1:8787/open-loops \
+  -H "authorization: Bearer $RUNTRAIL_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"type":"blocked","project":"runtrail","title":"choose retention policy"}'
+```
+
+Resolve an open loop:
+
+```sh
+curl -X PATCH http://127.0.0.1:8787/open-loops/loop_abc123 \
+  -H "authorization: Bearer $RUNTRAIL_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"status":"resolved","resolution":"keep structured data in SQLite"}'
+```
+
+Record a decision:
+
+```sh
+curl -X POST http://127.0.0.1:8787/decisions \
+  -H "authorization: Bearer $RUNTRAIL_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"project":"runtrail","title":"SQLite remains source of truth","decision":"Markdown is export-only"}'
+```
+
 Validate:
 
 ```sh

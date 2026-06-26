@@ -161,6 +161,163 @@ describe("ledger routes", () => {
     expect(missingRun.status).toBe(404);
     expect(await missingRun.json()).toEqual({ error: "Run not found" });
   });
+
+  it("creates, lists, and resolves open loops", async () => {
+    const app = createTestApp();
+    const createdResponse = await postJson(app, "/open-loops", {
+      type: "blocked",
+      project: "runtrail",
+      title: "Need API decision",
+      description: "Choose the lifecycle shape",
+      createdAt: "2026-06-26T10:00:00.000Z"
+    });
+
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as {
+      openLoop: { id: string; status: string; type: string; project: string };
+    };
+    expect(created.openLoop.id).toMatch(/^loop_/);
+    expect(created.openLoop.status).toBe("open");
+    expect(created.openLoop.type).toBe("blocked");
+    expect(created.openLoop.project).toBe("runtrail");
+
+    const openListResponse = await app.request("/open-loops?project=runtrail", {
+      headers: authHeaders()
+    });
+    const openList = (await openListResponse.json()) as {
+      openLoops: Array<{ id: string; status: string }>;
+    };
+
+    expect(openListResponse.status).toBe(200);
+    expect(openList.openLoops).toEqual([
+      expect.objectContaining({
+        id: created.openLoop.id,
+        status: "open"
+      })
+    ]);
+
+    const resolvedResponse = await app.request(`/open-loops/${created.openLoop.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: "resolved",
+        resolution: "Use open/resolved lifecycle",
+        resolvedAt: "2026-06-26T10:15:00.000Z"
+      }),
+      headers: authHeaders()
+    });
+    const resolved = (await resolvedResponse.json()) as {
+      openLoop: { id: string; status: string; resolution: string; resolvedAt: string };
+    };
+
+    expect(resolvedResponse.status).toBe(200);
+    expect(resolved.openLoop.status).toBe("resolved");
+    expect(resolved.openLoop.resolution).toBe("Use open/resolved lifecycle");
+    expect(resolved.openLoop.resolvedAt).toBe("2026-06-26T10:15:00.000Z");
+
+    const defaultList = (await (
+      await app.request("/open-loops?project=runtrail", {
+        headers: authHeaders()
+      })
+    ).json()) as { openLoops: unknown[] };
+    const resolvedList = (await (
+      await app.request("/open-loops?project=runtrail&status=resolved", {
+        headers: authHeaders()
+      })
+    ).json()) as { openLoops: Array<{ id: string }> };
+
+    expect(defaultList.openLoops).toEqual([]);
+    expect(resolvedList.openLoops).toEqual([
+      expect.objectContaining({
+        id: created.openLoop.id
+      })
+    ]);
+  });
+
+  it("records and lists project and global decisions", async () => {
+    const app = createTestApp();
+    const globalResponse = await postJson(app, "/decisions", {
+      title: "Store Markdown as exports only",
+      decision: "SQLite remains the source of truth",
+      rationale: "Agents need structured state",
+      createdAt: "2026-06-26T10:00:00.000Z"
+    });
+    const projectResponse = await postJson(app, "/decisions", {
+      project: "runtrail",
+      title: "Use Hono route modules",
+      decision: "Keep ledger routes in the existing API module",
+      createdAt: "2026-06-26T10:05:00.000Z"
+    });
+
+    expect(globalResponse.status).toBe(201);
+    expect(projectResponse.status).toBe(201);
+
+    const global = (await globalResponse.json()) as {
+      decision: { id: string; project?: string; title: string };
+    };
+    const project = (await projectResponse.json()) as {
+      decision: { id: string; project: string; title: string };
+    };
+
+    expect(global.decision.id).toMatch(/^dec_/);
+    expect(global.decision.project).toBeUndefined();
+    expect(project.decision.id).toMatch(/^dec_/);
+    expect(project.decision.project).toBe("runtrail");
+
+    const withGlobalResponse = await app.request("/decisions?project=runtrail", {
+      headers: authHeaders()
+    });
+    const withGlobal = (await withGlobalResponse.json()) as {
+      decisions: Array<{ id: string; title: string }>;
+    };
+
+    expect(withGlobal.decisions.map((decision) => decision.id)).toEqual([
+      project.decision.id,
+      global.decision.id
+    ]);
+
+    const projectOnlyResponse = await app.request(
+      "/decisions?project=runtrail&includeGlobal=false",
+      {
+        headers: authHeaders()
+      }
+    );
+    const projectOnly = (await projectOnlyResponse.json()) as {
+      decisions: Array<{ id: string }>;
+    };
+
+    expect(projectOnly.decisions).toEqual([
+      expect.objectContaining({
+        id: project.decision.id
+      })
+    ]);
+  });
+
+  it("validates open loop and decision payloads", async () => {
+    const app = createTestApp();
+    const invalidLoop = await postJson(app, "/open-loops", {
+      type: "todo",
+      project: "runtrail",
+      title: "Invalid"
+    });
+    const missingLoop = await app.request("/open-loops/loop_missing", {
+      method: "PATCH",
+      body: JSON.stringify({ status: "resolved" }),
+      headers: authHeaders()
+    });
+    const invalidDecision = await postJson(app, "/decisions", {
+      title: "Missing decision"
+    });
+
+    expect(invalidLoop.status).toBe(400);
+    expect(await invalidLoop.json()).toEqual(
+      expect.objectContaining({
+        error: "Invalid request"
+      })
+    );
+    expect(missingLoop.status).toBe(404);
+    expect(await missingLoop.json()).toEqual({ error: "Open loop not found" });
+    expect(invalidDecision.status).toBe(400);
+  });
 });
 
 function createTestApp(

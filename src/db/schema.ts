@@ -38,5 +38,33 @@ export const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_agent_events_run_id_created_at
     ON agent_events (run_id, created_at ASC)`,
   `CREATE INDEX IF NOT EXISTS idx_agent_events_created_at
-    ON agent_events (created_at DESC)`
+    ON agent_events (created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS open_loops (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    project TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL,
+    resolution TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    resolved_at TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_open_loops_project_status_updated_at
+    ON open_loops (project, status, updated_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_open_loops_status_updated_at
+    ON open_loops (status, updated_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS decisions (
+    id TEXT PRIMARY KEY,
+    project TEXT,
+    title TEXT NOT NULL,
+    decision TEXT NOT NULL,
+    rationale TEXT,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_decisions_project_created_at
+    ON decisions (project, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_decisions_created_at
+    ON decisions (created_at DESC)`
 ] as const;
