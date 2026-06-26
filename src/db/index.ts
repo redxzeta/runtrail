@@ -9,6 +9,7 @@ export function openDatabase(config: RuntrailConfig): Database.Database {
   mkdirSync(config.storage.logDir, { recursive: true });
 
   const db = new Database(config.storage.dbPath);
+  db.pragma("foreign_keys = ON");
   migrate(db);
   return db;
 }

@@ -16,9 +16,17 @@ describe("database", () => {
     const migration = db.prepare("SELECT name FROM schema_migrations WHERE id = ?").get(1) as
       | { name: string }
       | undefined;
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+      .all() as Array<{ name: string }>;
     db.close();
 
     expect(existsSync(config.storage.dbPath)).toBe(true);
     expect(migration?.name).toBe("001_initial_schema");
+    expect(tables.map((table) => table.name)).toEqual([
+      "agent_events",
+      "agent_runs",
+      "schema_migrations"
+    ]);
   });
 });
