@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/redxzeta/runtrail/compare/v1.1.0...v1.2.0) (2026-06-26)
+
+
+### Features
+
+* **api:** add open loops and decisions ([#17](https://github.com/redxzeta/runtrail/issues/17)) ([d0a114d](https://github.com/redxzeta/runtrail/commit/d0a114d15f7b7e74affd6ed4b8e87ccdfe5ef9ab))
+
 # [1.1.0](https://github.com/redxzeta/runtrail/compare/v1.0.0...v1.1.0) (2026-06-26)
 
 
