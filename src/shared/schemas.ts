@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+const queryBooleanSchema = z
+  .union([z.boolean(), z.enum(["true", "false"])])
+  .transform((value) => value === true || value === "true");
+
 export const healthResponseSchema = z.object({
   ok: z.literal(true),
   service: z.literal("runtrail")
@@ -33,6 +37,16 @@ export const eventTypeSchema = z.enum([
   "blocked",
   "cancelled"
 ]);
+
+export const openLoopTypeSchema = z.enum([
+  "blocked",
+  "needs_review",
+  "decision_required",
+  "follow_up",
+  "risk"
+]);
+
+export const openLoopStatusSchema = z.enum(["open", "resolved"]);
 
 export const createRunRequestSchema = z.object({
   source: z.string().trim().min(1).max(80),
@@ -80,13 +94,61 @@ export const listEventsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(100)
 });
 
+export const createOpenLoopRequestSchema = z.object({
+  type: openLoopTypeSchema,
+  project: z.string().trim().min(1).max(120),
+  title: z.string().trim().min(1).max(240),
+  description: z.string().trim().min(1).max(4000).optional(),
+  createdAt: z.string().datetime().optional()
+});
+
+export const updateOpenLoopRequestSchema = z
+  .object({
+    status: openLoopStatusSchema.optional(),
+    title: z.string().trim().min(1).max(240).optional(),
+    description: z.string().trim().min(1).max(4000).nullable().optional(),
+    resolution: z.string().trim().min(1).max(4000).nullable().optional(),
+    resolvedAt: z.string().datetime().nullable().optional()
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required"
+  });
+
+export const listOpenLoopsQuerySchema = z.object({
+  project: z.string().trim().min(1).max(120).optional(),
+  status: openLoopStatusSchema.default("open"),
+  type: openLoopTypeSchema.optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50)
+});
+
+export const createDecisionRequestSchema = z.object({
+  project: z.string().trim().min(1).max(120).optional(),
+  title: z.string().trim().min(1).max(240),
+  decision: z.string().trim().min(1).max(4000),
+  rationale: z.string().trim().min(1).max(4000).optional(),
+  createdAt: z.string().datetime().optional()
+});
+
+export const listDecisionsQuerySchema = z.object({
+  project: z.string().trim().min(1).max(120).optional(),
+  includeGlobal: queryBooleanSchema.default(true),
+  limit: z.coerce.number().int().positive().max(100).default(50)
+});
+
 export type RunStatus = z.infer<typeof runStatusSchema>;
 export type EventType = z.infer<typeof eventTypeSchema>;
+export type OpenLoopType = z.infer<typeof openLoopTypeSchema>;
+export type OpenLoopStatus = z.infer<typeof openLoopStatusSchema>;
 export type CreateRunRequest = z.infer<typeof createRunRequestSchema>;
 export type UpdateRunRequest = z.infer<typeof updateRunRequestSchema>;
 export type CreateEventRequest = z.infer<typeof createEventRequestSchema>;
 export type ListRunsQuery = z.infer<typeof listRunsQuerySchema>;
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;
+export type CreateOpenLoopRequest = z.infer<typeof createOpenLoopRequestSchema>;
+export type UpdateOpenLoopRequest = z.infer<typeof updateOpenLoopRequestSchema>;
+export type ListOpenLoopsQuery = z.infer<typeof listOpenLoopsQuerySchema>;
+export type CreateDecisionRequest = z.infer<typeof createDecisionRequestSchema>;
+export type ListDecisionsQuery = z.infer<typeof listDecisionsQuerySchema>;
 
 export type AgentRun = {
   id: string;
@@ -113,5 +175,27 @@ export type AgentEvent = {
   message: string;
   importance: number;
   data?: unknown;
+  createdAt: string;
+};
+
+export type OpenLoop = {
+  id: string;
+  type: OpenLoopType;
+  project: string;
+  title: string;
+  description?: string;
+  status: OpenLoopStatus;
+  resolution?: string;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string;
+};
+
+export type Decision = {
+  id: string;
+  project?: string;
+  title: string;
+  decision: string;
+  rationale?: string;
   createdAt: string;
 };

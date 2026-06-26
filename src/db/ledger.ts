@@ -3,10 +3,17 @@ import { createId } from "../shared/ids.js";
 import type {
   AgentEvent,
   AgentRun,
+  CreateDecisionRequest,
   CreateEventRequest,
+  CreateOpenLoopRequest,
   CreateRunRequest,
+  Decision,
+  ListDecisionsQuery,
   ListEventsQuery,
+  ListOpenLoopsQuery,
   ListRunsQuery,
+  OpenLoop,
+  UpdateOpenLoopRequest,
   UpdateRunRequest
 } from "../shared/schemas.js";
 import { nowIso } from "../shared/time.js";
@@ -36,6 +43,28 @@ type EventRow = {
   message: string;
   importance: number;
   data_json: string | null;
+  created_at: string;
+};
+
+type OpenLoopRow = {
+  id: string;
+  type: OpenLoop["type"];
+  project: string;
+  title: string;
+  description: string | null;
+  status: OpenLoop["status"];
+  resolution: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+};
+
+type DecisionRow = {
+  id: string;
+  project: string | null;
+  title: string;
+  decision: string;
+  rationale: string | null;
   created_at: string;
 };
 
@@ -265,6 +294,187 @@ export class LedgerRepository {
 
     return rows.map(mapEventRow);
   }
+
+  createOpenLoop(input: CreateOpenLoopRequest): OpenLoop {
+    const timestamp = input.createdAt ?? nowIso();
+    const openLoop: OpenLoop = {
+      id: createId("loop"),
+      type: input.type,
+      project: input.project,
+      title: input.title,
+      description: input.description,
+      status: "open",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+
+    this.db
+      .prepare(
+        `INSERT INTO open_loops (
+          id,
+          type,
+          project,
+          title,
+          description,
+          status,
+          resolution,
+          created_at,
+          updated_at,
+          resolved_at
+        ) VALUES (
+          @id,
+          @type,
+          @project,
+          @title,
+          @description,
+          @status,
+          @resolution,
+          @createdAt,
+          @updatedAt,
+          @resolvedAt
+        )`
+      )
+      .run({ ...openLoop, resolution: null, resolvedAt: null });
+
+    return openLoop;
+  }
+
+  updateOpenLoop(id: string, input: UpdateOpenLoopRequest): OpenLoop | undefined {
+    const existing = this.getOpenLoop(id);
+
+    if (!existing) {
+      return undefined;
+    }
+
+    const updated: OpenLoop = {
+      ...existing,
+      status: input.status ?? existing.status,
+      title: input.title ?? existing.title,
+      description:
+        input.description === undefined ? existing.description : (input.description ?? undefined),
+      resolution:
+        input.resolution === undefined ? existing.resolution : (input.resolution ?? undefined),
+      resolvedAt:
+        input.resolvedAt === undefined
+          ? deriveResolvedAt(existing, input)
+          : (input.resolvedAt ?? undefined),
+      updatedAt: nowIso()
+    };
+
+    this.db
+      .prepare(
+        `UPDATE open_loops
+        SET status = @status,
+            title = @title,
+            description = @description,
+            resolution = @resolution,
+            updated_at = @updatedAt,
+            resolved_at = @resolvedAt
+        WHERE id = @id`
+      )
+      .run(updated);
+
+    return updated;
+  }
+
+  listOpenLoops(query: ListOpenLoopsQuery): OpenLoop[] {
+    const filters: string[] = ["status = @status"];
+    const params: Record<string, string | number> = {
+      status: query.status,
+      limit: query.limit
+    };
+
+    if (query.project) {
+      filters.push("project = @project");
+      params.project = query.project;
+    }
+
+    if (query.type) {
+      filters.push("type = @type");
+      params.type = query.type;
+    }
+
+    const rows = this.db
+      .prepare(
+        `SELECT *
+        FROM open_loops
+        WHERE ${filters.join(" AND ")}
+        ORDER BY updated_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as OpenLoopRow[];
+
+    return rows.map(mapOpenLoopRow);
+  }
+
+  getOpenLoop(id: string): OpenLoop | undefined {
+    const row = this.db.prepare("SELECT * FROM open_loops WHERE id = ?").get(id) as
+      | OpenLoopRow
+      | undefined;
+    return row ? mapOpenLoopRow(row) : undefined;
+  }
+
+  createDecision(input: CreateDecisionRequest): Decision {
+    const decision: Decision = {
+      id: createId("dec"),
+      project: input.project,
+      title: input.title,
+      decision: input.decision,
+      rationale: input.rationale,
+      createdAt: input.createdAt ?? nowIso()
+    };
+
+    this.db
+      .prepare(
+        `INSERT INTO decisions (
+          id,
+          project,
+          title,
+          decision,
+          rationale,
+          created_at
+        ) VALUES (
+          @id,
+          @project,
+          @title,
+          @decision,
+          @rationale,
+          @createdAt
+        )`
+      )
+      .run(decision);
+
+    return decision;
+  }
+
+  listDecisions(query: ListDecisionsQuery): Decision[] {
+    const params: Record<string, string | number> = {
+      limit: query.limit
+    };
+    let whereClause = "";
+
+    if (query.project && query.includeGlobal) {
+      whereClause = "WHERE project = @project OR project IS NULL";
+      params.project = query.project;
+    } else if (query.project) {
+      whereClause = "WHERE project = @project";
+      params.project = query.project;
+    } else if (!query.includeGlobal) {
+      whereClause = "WHERE project IS NOT NULL";
+    }
+
+    const rows = this.db
+      .prepare(
+        `SELECT *
+        FROM decisions
+        ${whereClause}
+        ORDER BY created_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as DecisionRow[];
+
+    return rows.map(mapDecisionRow);
+  }
 }
 
 function deriveCompletedAt(existing: AgentRun, input: UpdateRunRequest): string | undefined {
@@ -273,6 +483,18 @@ function deriveCompletedAt(existing: AgentRun, input: UpdateRunRequest): string 
   }
 
   return existing.completedAt;
+}
+
+function deriveResolvedAt(existing: OpenLoop, input: UpdateOpenLoopRequest): string | undefined {
+  if (input.status === "resolved") {
+    return existing.resolvedAt ?? nowIso();
+  }
+
+  if (input.status === "open") {
+    return undefined;
+  }
+
+  return existing.resolvedAt;
 }
 
 function mapRunRow(row: RunRow): AgentRun {
@@ -303,6 +525,32 @@ function mapEventRow(row: EventRow): AgentEvent {
     message: row.message,
     importance: row.importance,
     data: row.data_json ? JSON.parse(row.data_json) : undefined,
+    createdAt: row.created_at
+  };
+}
+
+function mapOpenLoopRow(row: OpenLoopRow): OpenLoop {
+  return {
+    id: row.id,
+    type: row.type,
+    project: row.project,
+    title: row.title,
+    description: row.description ?? undefined,
+    status: row.status,
+    resolution: row.resolution ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    resolvedAt: row.resolved_at ?? undefined
+  };
+}
+
+function mapDecisionRow(row: DecisionRow): Decision {
+  return {
+    id: row.id,
+    project: row.project ?? undefined,
+    title: row.title,
+    decision: row.decision,
+    rationale: row.rationale ?? undefined,
     createdAt: row.created_at
   };
 }
