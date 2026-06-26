@@ -14,6 +14,7 @@ export function startServer(): void {
   const config = loadConfig();
   const db = openDatabase(config);
   const app = createApp();
+  let shuttingDown = false;
 
   serve(
     {
@@ -26,10 +27,18 @@ export function startServer(): void {
     }
   );
 
-  process.on("SIGINT", () => {
+  const shutdown = (): void => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
     db.close();
     process.exit(0);
-  });
+  };
+
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -16,6 +16,7 @@ Runtrail is an agent-first activity ledger. Keep changes small, structured, and 
 Before claiming completion, run:
 
 ```sh
+pnpm lint
 pnpm typecheck
 pnpm test
 ```

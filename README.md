@@ -28,6 +28,7 @@ pnpm cli health
 Validate:
 
 ```sh
+pnpm lint
 pnpm typecheck
 pnpm test
 ```

@@ -6,11 +6,7 @@ import { healthResponseSchema } from "../shared/schemas.js";
 export async function runCli(argv = process.argv): Promise<void> {
   const program = new Command();
 
-  program
-    .name("rt")
-    .description("Runtrail CLI")
-    .showHelpAfterError()
-    .exitOverride();
+  program.name("rt").description("Runtrail CLI").showHelpAfterError().exitOverride();
 
   program.command("health").description("Check Runtrail service health").action(health);
 

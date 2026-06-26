@@ -13,9 +13,9 @@ describe("database", () => {
     config.storage.logDir = path.join(dir, "logs");
 
     const db = openDatabase(config);
-    const migration = db
-      .prepare("SELECT name FROM schema_migrations WHERE id = ?")
-      .get(1) as { name: string } | undefined;
+    const migration = db.prepare("SELECT name FROM schema_migrations WHERE id = ?").get(1) as
+      | { name: string }
+      | undefined;
     db.close();
 
     expect(existsSync(config.storage.dbPath)).toBe(true);
