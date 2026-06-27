@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/redxzeta/runtrail/compare/v1.5.0...v1.6.0) (2026-06-27)
+
+
+### Features
+
+* **ui:** add server-rendered context pages ([#21](https://github.com/redxzeta/runtrail/issues/21)) ([334366d](https://github.com/redxzeta/runtrail/commit/334366d050ee4972f9162b3a41e1e9639dcfcb5f))
+
 # [1.5.0](https://github.com/redxzeta/runtrail/compare/v1.4.0...v1.5.0) (2026-06-27)
 
 
