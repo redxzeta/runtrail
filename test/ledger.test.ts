@@ -318,6 +318,71 @@ describe("ledger routes", () => {
     expect(await missingLoop.json()).toEqual({ error: "Open loop not found" });
     expect(invalidDecision.status).toBe(400);
   });
+
+  it("returns compact agent context for a project", async () => {
+    const app = createTestApp();
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+
+    await postJson(app, "/events", {
+      runId: run.run.id,
+      type: "progress",
+      message: "low noise",
+      importance: 1,
+      createdAt: "2026-06-26T10:00:00.000Z"
+    });
+    await postJson(app, "/events", {
+      runId: run.run.id,
+      type: "blocked",
+      message: "needs operator input",
+      importance: 7,
+      createdAt: "2026-06-26T10:05:00.000Z"
+    });
+    await postJson(app, "/open-loops", {
+      type: "blocked",
+      project: "ice-council",
+      title: "Confirm live host path"
+    });
+    await postJson(app, "/decisions", {
+      title: "Global retention policy",
+      decision: "Keep durable structured state",
+      createdAt: "2026-06-26T10:01:00.000Z"
+    });
+    await postJson(app, "/decisions", {
+      project: "ice-council",
+      title: "Use concise context",
+      decision: "Agents read compact context first",
+      createdAt: "2026-06-26T10:06:00.000Z"
+    });
+
+    const response = await app.request("/agent/context?project=ice-council&min_importance=4", {
+      headers: authHeaders()
+    });
+    const context = (await response.json()) as {
+      project: string;
+      recent_runs: Array<{ id: string }>;
+      recent_events: Array<{ message: string }>;
+      open_loops: Array<{ title: string }>;
+      decisions: Array<{ title: string }>;
+      next_actions: string[];
+    };
+
+    expect(response.status).toBe(200);
+    expect(context.project).toBe("ice-council");
+    expect(context.recent_runs).toEqual([expect.objectContaining({ id: run.run.id })]);
+    expect(context.recent_events).toEqual([
+      expect.objectContaining({ message: "needs operator input" })
+    ]);
+    expect(context.open_loops).toEqual([
+      expect.objectContaining({ title: "Confirm live host path" })
+    ]);
+    expect(context.decisions.map((decision) => decision.title)).toEqual([
+      "Use concise context",
+      "Global retention policy"
+    ]);
+    expect(context.next_actions).toEqual(["Confirm live host path"]);
+  });
 });
 
 function createTestApp(

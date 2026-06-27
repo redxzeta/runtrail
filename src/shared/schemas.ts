@@ -135,6 +135,12 @@ export const listDecisionsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(50)
 });
 
+export const agentContextQuerySchema = z.object({
+  project: z.string().trim().min(1).max(120),
+  limit: z.coerce.number().int().positive().max(50).default(10),
+  min_importance: z.coerce.number().int().min(0).max(10).default(4)
+});
+
 export type RunStatus = z.infer<typeof runStatusSchema>;
 export type EventType = z.infer<typeof eventTypeSchema>;
 export type OpenLoopType = z.infer<typeof openLoopTypeSchema>;
@@ -149,6 +155,7 @@ export type UpdateOpenLoopRequest = z.infer<typeof updateOpenLoopRequestSchema>;
 export type ListOpenLoopsQuery = z.infer<typeof listOpenLoopsQuerySchema>;
 export type CreateDecisionRequest = z.infer<typeof createDecisionRequestSchema>;
 export type ListDecisionsQuery = z.infer<typeof listDecisionsQuerySchema>;
+export type AgentContextQuery = z.infer<typeof agentContextQuerySchema>;
 
 export type AgentRun = {
   id: string;
@@ -198,4 +205,13 @@ export type Decision = {
   decision: string;
   rationale?: string;
   createdAt: string;
+};
+
+export type AgentContext = {
+  project: string;
+  recent_runs: AgentRun[];
+  recent_events: AgentEvent[];
+  open_loops: OpenLoop[];
+  decisions: Decision[];
+  next_actions: string[];
 };
