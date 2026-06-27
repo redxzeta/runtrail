@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/redxzeta/runtrail/compare/v1.7.0...v1.8.0) (2026-06-27)
+
+
+### Features
+
+* **mcp:** add Runtrail HTTP adapter ([#23](https://github.com/redxzeta/runtrail/issues/23)) ([5182d3b](https://github.com/redxzeta/runtrail/commit/5182d3bc4ba83c862cf7ae570010e7fca74fe12d))
+
 # [1.7.0](https://github.com/redxzeta/runtrail/compare/v1.6.0...v1.7.0) (2026-06-27)
 
 
