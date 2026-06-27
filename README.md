@@ -126,6 +126,17 @@ Example MCP server configuration:
 
 The MCP adapter is a thin HTTP client. It does not access SQLite directly.
 
+## Markdown Exports
+
+Markdown exports are generated from the API and are not a source of truth:
+
+```sh
+pnpm cli export daily --project runtrail --date 2026-06-27 --output runtrail-daily.md
+pnpm cli export project --project runtrail --output runtrail-project.md
+pnpm cli export decisions --project runtrail --output runtrail-decisions.md
+pnpm cli export open-loops --project runtrail --output runtrail-open-loops.md
+```
+
 Validate:
 
 ```sh

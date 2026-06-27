@@ -1,9 +1,16 @@
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../src/cli/index.js";
 
 describe("cli", () => {
   afterEach(() => {
     process.exitCode = undefined;
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true });
+      tempDir = undefined;
+    }
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -323,7 +330,54 @@ describe("cli", () => {
       })
     );
   });
+
+  it("exports project context as Markdown", async () => {
+    const fetchMock = mockFetch({
+      project: "runtrail",
+      recent_runs: [
+        {
+          id: "run_1",
+          status: "completed",
+          task: "ship exports",
+          project: "runtrail",
+          summary: "Markdown generated"
+        }
+      ],
+      open_loops: [{ id: "loop_1", type: "blocked", title: "Resolve export path" }],
+      decisions: [{ title: "SQLite source", decision: "Markdown is export-only" }],
+      next_actions: ["Review export output"]
+    });
+    const output = captureOutput();
+
+    await runCli(["node", "rt", "export", "project", "--project", "runtrail"]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL("/agent/context?project=runtrail", "http://runtrail.test"),
+      expect.any(Object)
+    );
+    expect(output.join("\n")).toContain("# runtrail project export");
+    expect(output.join("\n")).toContain("ship exports");
+    expect(output.join("\n")).toContain("Markdown is export-only");
+    expect(output.join("\n")).toContain("Review export output");
+  });
+
+  it("writes decision exports to a Markdown file", async () => {
+    mockFetch({
+      decisions: [{ title: "SQLite source", decision: "Markdown is generated from API data" }]
+    });
+    tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-cli-"));
+    const outputPath = path.join(tempDir, "decisions.md");
+    const output = captureOutput();
+
+    await runCli(["node", "rt", "export", "decisions", "--output", outputPath]);
+
+    expect(output).toEqual([`Wrote ${outputPath}`]);
+    expect(readFileSync(outputPath, "utf8")).toContain("# Decisions export");
+    expect(readFileSync(outputPath, "utf8")).toContain("Markdown is generated from API data");
+  });
 });
+
+let tempDir: string | undefined;
 
 function mockFetch(body: unknown): ReturnType<typeof vi.fn> {
   vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");

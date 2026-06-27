@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from "node:child_process";
-import { createWriteStream, mkdirSync } from "node:fs";
+import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import path from "node:path";
 import { Command } from "commander";
@@ -73,6 +73,33 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--project <project>", "Project name")
     .option("--rationale <rationale>", "Decision rationale")
     .action(addDecision);
+
+  const exportCommand = program.command("export").description("Export Markdown summaries");
+  exportCommand
+    .command("daily")
+    .description("Export a daily run summary")
+    .requiredOption("--project <project>", "Project name")
+    .option("--date <date>", "YYYY-MM-DD date", today())
+    .option("--output <path>", "Write Markdown to a file")
+    .action(exportDaily);
+  exportCommand
+    .command("project")
+    .description("Export project context")
+    .requiredOption("--project <project>", "Project name")
+    .option("--output <path>", "Write Markdown to a file")
+    .action(exportProject);
+  exportCommand
+    .command("decisions")
+    .description("Export decisions")
+    .option("--project <project>", "Project name")
+    .option("--output <path>", "Write Markdown to a file")
+    .action(exportDecisions);
+  exportCommand
+    .command("open-loops")
+    .description("Export open loops")
+    .option("--project <project>", "Project name")
+    .option("--output <path>", "Write Markdown to a file")
+    .action(exportOpenLoops);
 
   await program.parseAsync(argv);
 }
@@ -311,6 +338,64 @@ async function addDecision(options: {
   );
 }
 
+async function exportDaily(options: {
+  project: string;
+  date: string;
+  output?: string;
+}): Promise<void> {
+  const query = new URLSearchParams({
+    project: options.project,
+    limit: "100"
+  });
+  const runs = readArray(await requestJson(`/runs?${query.toString()}`), "runs").filter((run) =>
+    String(readField(run, "startedAt")).startsWith(options.date)
+  );
+
+  writeMarkdown(
+    [`# ${options.project} daily export - ${options.date}`, "", renderRuns(runs)].join("\n"),
+    options.output
+  );
+}
+
+async function exportProject(options: { project: string; output?: string }): Promise<void> {
+  const query = new URLSearchParams({ project: options.project });
+  const context = asRecord(await requestJson(`/agent/context?${query.toString()}`));
+
+  writeMarkdown(
+    [
+      `# ${options.project} project export`,
+      "",
+      renderRuns(readArray(context, "recent_runs")),
+      renderOpenLoops(readArray(context, "open_loops")),
+      renderDecisions(readArray(context, "decisions")),
+      renderNextActions(readStringArray(context, "next_actions"))
+    ].join("\n"),
+    options.output
+  );
+}
+
+async function exportDecisions(options: { project?: string; output?: string }): Promise<void> {
+  const query = new URLSearchParams();
+  appendQuery(query, "project", options.project);
+  const decisions = readArray(
+    await requestJson(`/decisions${query.toString() ? `?${query.toString()}` : ""}`),
+    "decisions"
+  );
+
+  writeMarkdown(["# Decisions export", "", renderDecisions(decisions)].join("\n"), options.output);
+}
+
+async function exportOpenLoops(options: { project?: string; output?: string }): Promise<void> {
+  const query = new URLSearchParams();
+  appendQuery(query, "project", options.project);
+  const openLoops = readArray(
+    await requestJson(`/open-loops${query.toString() ? `?${query.toString()}` : ""}`),
+    "openLoops"
+  );
+
+  writeMarkdown(["# Open loops export", "", renderOpenLoops(openLoops)].join("\n"), options.output);
+}
+
 async function requestJson(
   path: string,
   options: { method?: string; body?: Record<string, unknown> } = {}
@@ -385,6 +470,115 @@ function formatHttpError(status: number, body: unknown): string {
 
 function printJson(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
+}
+
+function writeMarkdown(markdown: string, output?: string): void {
+  if (output) {
+    writeFileSync(output, `${markdown.trimEnd()}\n`);
+    console.log(`Wrote ${output}`);
+    return;
+  }
+
+  console.log(markdown.trimEnd());
+}
+
+function renderRuns(runs: Record<string, unknown>[]): string {
+  if (runs.length === 0) {
+    return "## Runs\n\nNo runs found.\n";
+  }
+
+  return [
+    "## Runs",
+    "",
+    ...runs.map(
+      (run) =>
+        `- ${readField(run, "status")} ${readField(run, "task")} (${readField(run, "id")})` +
+        renderOptional(`project: ${readField(run, "project")}`) +
+        renderOptional(`summary: ${readField(run, "summary")}`)
+    ),
+    ""
+  ].join("\n");
+}
+
+function renderOpenLoops(openLoops: Record<string, unknown>[]): string {
+  if (openLoops.length === 0) {
+    return "## Open loops\n\nNo open loops found.\n";
+  }
+
+  return [
+    "## Open loops",
+    "",
+    ...openLoops.map(
+      (loop) =>
+        `- ${readField(loop, "type")} ${readField(loop, "title")} (${readField(loop, "id")})` +
+        renderOptional(`project: ${readField(loop, "project")}`) +
+        renderOptional(`description: ${readField(loop, "description")}`)
+    ),
+    ""
+  ].join("\n");
+}
+
+function renderDecisions(decisions: Record<string, unknown>[]): string {
+  if (decisions.length === 0) {
+    return "## Decisions\n\nNo decisions found.\n";
+  }
+
+  return [
+    "## Decisions",
+    "",
+    ...decisions.map(
+      (decision) =>
+        `- ${readField(decision, "title")}: ${readField(decision, "decision")}` +
+        renderOptional(`project: ${readField(decision, "project")}`) +
+        renderOptional(`rationale: ${readField(decision, "rationale")}`)
+    ),
+    ""
+  ].join("\n");
+}
+
+function renderNextActions(nextActions: string[]): string {
+  if (nextActions.length === 0) {
+    return "## Next actions\n\nNo next actions found.\n";
+  }
+
+  return ["## Next actions", "", ...nextActions.map((action) => `- ${String(action)}`), ""].join(
+    "\n"
+  );
+}
+
+function renderOptional(value: string): string {
+  return value.endsWith(": ") ? "" : `; ${value}`;
+}
+
+function readArray(source: unknown, key: string): Record<string, unknown>[] {
+  const value = asRecord(source)[key];
+  return Array.isArray(value) ? value.map(asRecord) : [];
+}
+
+function readStringArray(source: unknown, key: string): string[] {
+  const value = asRecord(source)[key];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function readField(source: Record<string, unknown>, key: string): string {
+  const value = source[key];
+  return typeof value === "string" && value.length > 0 ? value : "";
+}
+
+function appendQuery(query: URLSearchParams, key: string, value: string | undefined): void {
+  if (value) {
+    query.set(key, value);
+  }
+}
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function readResponseId(response: unknown, key: string): string {
