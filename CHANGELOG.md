@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/redxzeta/runtrail/compare/v1.3.0...v1.4.0) (2026-06-27)
+
+
+### Features
+
+* **cli:** add core Runtrail commands ([#19](https://github.com/redxzeta/runtrail/issues/19)) ([09e3126](https://github.com/redxzeta/runtrail/commit/09e3126514f1f31ed0a26ec9fcdcaaf2f9ea13e8))
+
 # [1.3.0](https://github.com/redxzeta/runtrail/compare/v1.2.0...v1.3.0) (2026-06-27)
 
 
