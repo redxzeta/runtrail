@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/redxzeta/runtrail/compare/v1.4.0...v1.5.0) (2026-06-27)
+
+
+### Features
+
+* **cli:** wrap commands in journaled runs ([#20](https://github.com/redxzeta/runtrail/issues/20)) ([5a9cd0f](https://github.com/redxzeta/runtrail/commit/5a9cd0f09454fa87f7ed0458306113464cd4ec52))
+
 # [1.4.0](https://github.com/redxzeta/runtrail/compare/v1.3.0...v1.4.0) (2026-06-27)
 
 
