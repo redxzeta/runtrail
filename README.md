@@ -99,6 +99,33 @@ Wrap a command and journal its result:
 pnpm cli run --source codex --project runtrail --task "fix retry logic" -- pnpm test
 ```
 
+## MCP Adapter
+
+Runtrail can expose the HTTP API to MCP-compatible agents through a separate stdio process:
+
+```sh
+RUNTRAIL_URL=http://127.0.0.1:8787 RUNTRAIL_TOKEN=change-me-to-a-long-random-secret pnpm mcp
+```
+
+Example MCP server configuration:
+
+```json
+{
+  "mcpServers": {
+    "runtrail": {
+      "command": "pnpm",
+      "args": ["mcp"],
+      "env": {
+        "RUNTRAIL_URL": "http://127.0.0.1:8787",
+        "RUNTRAIL_TOKEN": "change-me-to-a-long-random-secret"
+      }
+    }
+  }
+}
+```
+
+The MCP adapter is a thin HTTP client. It does not access SQLite directly.
+
 Validate:
 
 ```sh
