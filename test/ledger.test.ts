@@ -383,6 +383,77 @@ describe("ledger routes", () => {
     ]);
     expect(context.next_actions).toEqual(["Confirm live host path"]);
   });
+
+  it("renders server-side context recovery pages without changing JSON APIs", async () => {
+    const app = createTestApp();
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+    await postJson(app, "/events", {
+      runId: run.run.id,
+      type: "failed",
+      message: "Command failed",
+      importance: 8
+    });
+    await app.request(`/runs/${run.run.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "failed", summary: "Needs inspection" }),
+      headers: authHeaders()
+    });
+    await postJson(app, "/open-loops", {
+      type: "blocked",
+      project: "ice-council",
+      title: "Resolve production blocker"
+    });
+    await postJson(app, "/decisions", {
+      project: "ice-council",
+      title: "Keep UI simple",
+      decision: "Use server-rendered HTML"
+    });
+
+    const jsonResponse = await app.request("/runs", { headers: authHeaders() });
+    expect(jsonResponse.headers.get("content-type")).toContain("application/json");
+    expect(await jsonResponse.json()).toEqual({
+      runs: [expect.objectContaining({ id: run.run.id })]
+    });
+
+    const pages = await Promise.all(
+      [
+        "/",
+        "/runs",
+        `/runs/${run.run.id}`,
+        "/projects/ice-council",
+        "/open-loops",
+        "/decisions",
+        "/errors"
+      ].map(async (path) => {
+        const response = await app.request(path, {
+          headers: {
+            ...authHeaders(),
+            accept: "text/html"
+          }
+        });
+        return { path, response, body: await response.text() };
+      })
+    );
+
+    for (const page of pages) {
+      expect(page.response.status, page.path).toBe(200);
+      expect(page.response.headers.get("content-type"), page.path).toContain("text/html");
+      expect(page.body, page.path).toContain("<!doctype html>");
+      expect(page.body, page.path).toContain("Runtrail");
+    }
+
+    expect(pages.find((page) => page.path === "/runs")?.body).toContain("Implement the ledger API");
+    expect(pages.find((page) => page.path === `/runs/${run.run.id}`)?.body).toContain(
+      "Command failed"
+    );
+    expect(pages.find((page) => page.path === "/open-loops")?.body).toContain(
+      "Resolve production blocker"
+    );
+    expect(pages.find((page) => page.path === "/decisions")?.body).toContain("Keep UI simple");
+    expect(pages.find((page) => page.path === "/errors")?.body).toContain("Needs inspection");
+  });
 });
 
 function createTestApp(
