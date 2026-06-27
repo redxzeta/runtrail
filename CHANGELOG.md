@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/redxzeta/runtrail/compare/v1.8.0...v1.9.0) (2026-06-27)
+
+
+### Features
+
+* **cli:** export Markdown summaries ([#24](https://github.com/redxzeta/runtrail/issues/24)) ([e0cdb3c](https://github.com/redxzeta/runtrail/commit/e0cdb3ca02b90b63a86f99eae854722cff9f6f0a))
+
 # [1.8.0](https://github.com/redxzeta/runtrail/compare/v1.7.0...v1.8.0) (2026-06-27)
 
 
