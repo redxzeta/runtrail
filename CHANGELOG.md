@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/redxzeta/runtrail/compare/v1.2.0...v1.3.0) (2026-06-27)
+
+
+### Features
+
+* **api:** add compact agent context ([#18](https://github.com/redxzeta/runtrail/issues/18)) ([c5dde98](https://github.com/redxzeta/runtrail/commit/c5dde983537f1004f29655e83ceca8f3a33c48ea))
+
 # [1.2.0](https://github.com/redxzeta/runtrail/compare/v1.1.0...v1.2.0) (2026-06-26)
 
 
