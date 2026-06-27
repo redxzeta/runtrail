@@ -93,6 +93,12 @@ pnpm cli loop resolve loop_abc123 --resolution "keep structured data in SQLite"
 pnpm cli decision add --project runtrail --title "SQLite remains source of truth" --decision "Markdown is export-only"
 ```
 
+Wrap a command and journal its result:
+
+```sh
+pnpm cli run --source codex --project runtrail --task "fix retry logic" -- pnpm test
+```
+
 Validate:
 
 ```sh
