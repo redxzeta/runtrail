@@ -25,6 +25,12 @@ curl http://127.0.0.1:8787/health
 pnpm cli health
 ```
 
+Fetch compact agent context:
+
+```sh
+pnpm cli context --project runtrail --limit 5 --min-importance 4
+```
+
 Create a run:
 
 ```sh
@@ -75,6 +81,16 @@ curl -X POST http://127.0.0.1:8787/decisions \
   -H "authorization: Bearer $RUNTRAIL_TOKEN" \
   -H "content-type: application/json" \
   -d '{"project":"runtrail","title":"SQLite remains source of truth","decision":"Markdown is export-only"}'
+```
+
+CLI equivalents:
+
+```sh
+pnpm cli run create --source codex --project runtrail --task "implement CLI core"
+pnpm cli event create --run-id run_abc123 --type progress --message "added command tests" --importance 5
+pnpm cli loop add --type blocked --project runtrail --title "choose retention policy"
+pnpm cli loop resolve loop_abc123 --resolution "keep structured data in SQLite"
+pnpm cli decision add --project runtrail --title "SQLite remains source of truth" --decision "Markdown is export-only"
 ```
 
 Validate:
