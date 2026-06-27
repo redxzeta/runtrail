@@ -178,3 +178,31 @@ Do not commit real tokens or webhook URLs.
 ## LAN/VPN Assumption
 
 Runtrail is intended for trusted LAN/VPN access. The example config binds to `0.0.0.0` so other machines on the trusted network can reach it during development.
+
+## Optional Container Deployment
+
+The primary self-hosted path can still be a normal LXC/systemd service. Containers are optional for users who prefer Docker Compose or Podman Compose.
+
+Create a local env file from the non-secret template:
+
+```sh
+cp .env.example .env
+```
+
+Set `RUNTRAIL_TOKEN` in `.env` to a long random secret. Do not commit `.env`.
+
+Build and run with Docker Compose:
+
+```sh
+docker compose up --build
+```
+
+Podman users can adapt the same file:
+
+```sh
+podman compose up --build
+```
+
+The Compose example mounts the named volume `runtrail-data` at `/app/data`. SQLite is stored at `/app/data/runtrail.sqlite`, and verbose log files are written under `/app/data/logs`, so both survive container restarts.
+
+Container config still uses `config/runtrail.example.yaml` only for non-secret defaults. Secrets must come from environment variables or an ignored local env file.
