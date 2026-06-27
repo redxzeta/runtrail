@@ -134,6 +134,8 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json({ error: "Run not found" }, 404);
     }
 
+    await notifyDiscord(options.config, ledger.getRun(event.runId), event);
+
     return c.json({ event }, 201);
   });
 
@@ -433,4 +435,64 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+async function notifyDiscord(
+  config: RuntrailConfig,
+  run: AgentRun | undefined,
+  event: AgentEvent
+): Promise<void> {
+  const webhookUrl = config.notifications.discord.webhookUrl;
+
+  if (!config.notifications.discord.enabled || !webhookUrl || !isNotifiable(event.type) || !run) {
+    return;
+  }
+
+  const changedFiles = readChangedFiles(event.data);
+  const fields = [
+    `project: ${run.project}`,
+    `source: ${run.source}`,
+    `status: ${event.type}`,
+    `run: ${run.id}`
+  ];
+
+  if (run.summary) {
+    fields.push(`summary: ${run.summary}`);
+  }
+
+  if (changedFiles.length > 0) {
+    fields.push(`changed files: ${changedFiles.join(", ")}`);
+  }
+
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        content: `Runtrail ${event.type}: ${run.task}\n${fields.join("\n")}`
+      })
+    });
+  } catch {
+    // Notification delivery must never block journal writes.
+  }
+}
+
+function isNotifiable(type: AgentEvent["type"]): boolean {
+  return ["failed", "completed", "blocked", "needs_review", "decision_required"].includes(type);
+}
+
+function readChangedFiles(data: unknown): string[] {
+  if (!data || typeof data !== "object" || !("changedFiles" in data)) {
+    return [];
+  }
+
+  const changedFiles = (data as { changedFiles: unknown }).changedFiles;
+
+  if (!Array.isArray(changedFiles)) {
+    return [];
+  }
+
+  return changedFiles.filter((file): file is string => typeof file === "string");
 }

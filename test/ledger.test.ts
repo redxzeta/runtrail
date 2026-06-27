@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadConfig, type RuntrailConfig } from "../src/config.js";
 import { migrate } from "../src/db/migrate.js";
 import { createApp } from "../src/index.js";
@@ -10,6 +10,8 @@ afterEach(() => {
   while (databases.length > 0) {
     databases.pop()?.close();
   }
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("ledger routes", () => {
@@ -454,19 +456,115 @@ describe("ledger routes", () => {
     expect(pages.find((page) => page.path === "/decisions")?.body).toContain("Keep UI simple");
     expect(pages.find((page) => page.path === "/errors")?.body).toContain("Needs inspection");
   });
+
+  it("sends Discord notifications only for high-signal events", async () => {
+    const fetchMock = vi.fn(async () => new Response("", { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const app = createTestApp(
+      {},
+      {
+        notifications: {
+          discord: {
+            enabled: true,
+            webhookUrl: "https://discord.test/webhook"
+          }
+        }
+      }
+    );
+    const run = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        summary: "Investigate failing command"
+      })
+    ).json()) as { run: { id: string } };
+
+    const lowSignal = await postJson(app, "/events", {
+      runId: run.run.id,
+      type: "progress",
+      message: "Still working",
+      importance: 2
+    });
+    const failed = await postJson(app, "/events", {
+      runId: run.run.id,
+      type: "failed",
+      message: "Command failed",
+      importance: 8,
+      data: {
+        changedFiles: ["src/cli/index.ts"]
+      }
+    });
+
+    expect(lowSignal.status).toBe(201);
+    expect(failed.status).toBe(201);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://discord.test/webhook",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("src/cli/index.ts")
+      })
+    );
+  });
+
+  it("does not fail journal writes when Discord notification delivery fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network down");
+      })
+    );
+    const app = createTestApp(
+      {},
+      {
+        notifications: {
+          discord: {
+            enabled: true,
+            webhookUrl: "https://discord.test/webhook"
+          }
+        }
+      }
+    );
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+    const response = await postJson(app, "/events", {
+      runId: run.run.id,
+      type: "needs_review",
+      message: "Review required",
+      importance: 7
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      event: expect.objectContaining({
+        type: "needs_review"
+      })
+    });
+  });
 });
 
 function createTestApp(
-  security: Partial<RuntrailConfig["security"]> = {}
+  security: Partial<RuntrailConfig["security"]> = {},
+  config: Partial<RuntrailConfig> = {}
 ): ReturnType<typeof createApp> {
   const db = new Database(":memory:");
   databases.push(db);
   migrate(db);
+  const baseConfig = loadConfig();
 
   return createApp({
     db,
     config: {
-      ...loadConfig(),
+      ...baseConfig,
+      ...config,
+      notifications: {
+        ...baseConfig.notifications,
+        ...config.notifications,
+        discord: {
+          ...baseConfig.notifications.discord,
+          ...config.notifications?.discord
+        }
+      },
       security: {
         authRequired: true,
         token: "test-token",
