@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/redxzeta/runtrail/compare/v1.6.0...v1.7.0) (2026-06-27)
+
+
+### Features
+
+* **notifications:** send high-signal Discord webhooks ([#22](https://github.com/redxzeta/runtrail/issues/22)) ([424769b](https://github.com/redxzeta/runtrail/commit/424769b6f25ab61322dafdc199c761f95d183c88)), closes [hi#signal](https://github.com/hi/issues/signal)
+
 # [1.6.0](https://github.com/redxzeta/runtrail/compare/v1.5.0...v1.6.0) (2026-06-27)
 
 
