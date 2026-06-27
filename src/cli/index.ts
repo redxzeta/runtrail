@@ -1,9 +1,18 @@
 #!/usr/bin/env node
+import { execFileSync, spawn } from "node:child_process";
+import { createWriteStream, mkdirSync } from "node:fs";
+import { hostname } from "node:os";
+import path from "node:path";
 import { Command } from "commander";
 import { loadConfig } from "../config.js";
 import { healthResponseSchema } from "../shared/schemas.js";
 
 export async function runCli(argv = process.argv): Promise<void> {
+  if (argv[2] === "run" && argv[3] !== "create") {
+    await wrapRunFromArgv(argv.slice(3));
+    return;
+  }
+
   const program = new Command();
 
   program.name("rt").description("Runtrail CLI").showHelpAfterError().exitOverride();
@@ -17,7 +26,7 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--min-importance <importance>", "Minimum event importance", parseInteger)
     .action(context);
 
-  const run = program.command("run").description("Manage runs");
+  const run = program.command("run").description("Wrap a command in a Runtrail run");
   run
     .command("create")
     .description("Create a run")
@@ -110,6 +119,125 @@ async function createRun(options: {
       })
     })
   );
+}
+
+async function wrapRun(
+  command: string[],
+  options: {
+    source: string;
+    project: string;
+    task: string;
+  }
+): Promise<void> {
+  if (!options.source || !options.project || !options.task) {
+    throw new Error("Options --source, --project, and --task are required");
+  }
+
+  if (command[0] === "--") {
+    command = command.slice(1);
+  }
+
+  if (command.length === 0) {
+    throw new Error("A command is required after --");
+  }
+
+  const config = loadConfig();
+  const cwd = process.cwd();
+  const gitBefore = readGitSnapshot(cwd);
+  const created = await requestJson("/runs", {
+    method: "POST",
+    body: compact({
+      source: options.source,
+      project: options.project,
+      task: options.task,
+      hostname: hostname(),
+      cwd,
+      gitRepoPath: gitBefore.repoPath,
+      gitBranch: gitBefore.branch,
+      gitCommit: gitBefore.commit,
+      startedAt: new Date().toISOString()
+    })
+  });
+  const runId = readResponseId(created, "run");
+  const logPath = path.join(config.storage.logDir, `${runId}.log`);
+
+  mkdirSync(config.storage.logDir, { recursive: true });
+
+  const exitCode = await runCommand(command, logPath);
+  const gitAfter = readGitSnapshot(cwd);
+  const changedFiles = gitAfter.repoPath ? readChangedFiles(cwd) : [];
+  const status = exitCode === 0 ? "completed" : "failed";
+
+  await requestJson("/events", {
+    method: "POST",
+    body: {
+      runId,
+      type: status,
+      message: exitCode === 0 ? "Command completed" : `Command failed with exit code ${exitCode}`,
+      importance: exitCode === 0 ? 5 : 8,
+      data: {
+        exitCode,
+        logPath,
+        changedFiles,
+        gitBefore,
+        gitAfter
+      }
+    }
+  });
+  await requestJson(`/runs/${encodeURIComponent(runId)}`, {
+    method: "PATCH",
+    body: compact({
+      status,
+      summary: exitCode === 0 ? "Command completed" : `Command failed with exit code ${exitCode}`,
+      completedAt: new Date().toISOString(),
+      gitBranch: gitAfter.branch,
+      gitCommit: gitAfter.commit
+    })
+  });
+
+  printJson({ runId, status, exitCode, logPath });
+  process.exitCode = exitCode;
+}
+
+async function wrapRunFromArgv(args: string[]): Promise<void> {
+  const options: { source?: string; project?: string; task?: string } = {};
+  const command: string[] = [];
+  let parsingCommand = false;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+
+    if (parsingCommand) {
+      command.push(value);
+      continue;
+    }
+
+    if (value === "--") {
+      parsingCommand = true;
+      continue;
+    }
+
+    if (value === "--source" || value === "--project" || value === "--task") {
+      const next = args[index + 1];
+
+      if (!next) {
+        throw new Error(`Missing value for ${value}`);
+      }
+
+      options[value.slice(2) as keyof typeof options] = next;
+      index += 1;
+      continue;
+    }
+
+    command.push(value);
+    parsingCommand = true;
+  }
+
+  await wrapRun(command, {
+    source: options.source ?? "",
+    project: options.project ?? "",
+    task: options.task ?? ""
+  });
 }
 
 async function createEvent(options: {
@@ -257,6 +385,94 @@ function formatHttpError(status: number, body: unknown): string {
 
 function printJson(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
+}
+
+function readResponseId(response: unknown, key: string): string {
+  const envelope = response as Record<string, unknown> | undefined;
+  const value = envelope?.[key];
+
+  if (value && typeof value === "object" && "id" in value) {
+    const id = (value as { id: unknown }).id;
+
+    if (typeof id === "string") {
+      return id;
+    }
+  }
+
+  throw new Error(`API response did not include ${key}.id`);
+}
+
+async function runCommand(command: string[], logPath: string): Promise<number> {
+  const [executable, ...args] = command;
+  const log = createWriteStream(logPath, { flags: "a" });
+
+  return await new Promise((resolve, reject) => {
+    const child = spawn(executable, args, {
+      cwd: process.cwd(),
+      env: process.env,
+      shell: false
+    });
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      process.stdout.write(chunk);
+      log.write(chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      process.stderr.write(chunk);
+      log.write(chunk);
+    });
+    child.on("error", (error) => {
+      log.end();
+      reject(error);
+    });
+    child.on("close", (code) => {
+      log.end();
+      resolve(code ?? 1);
+    });
+  });
+}
+
+function readGitSnapshot(cwd: string): {
+  repoPath?: string;
+  branch?: string;
+  commit?: string;
+} {
+  const repoPath = readGitValue(cwd, ["rev-parse", "--show-toplevel"]);
+
+  if (!repoPath) {
+    return {};
+  }
+
+  return {
+    repoPath,
+    branch: readGitValue(cwd, ["branch", "--show-current"]),
+    commit: readGitValue(cwd, ["rev-parse", "HEAD"])
+  };
+}
+
+function readChangedFiles(cwd: string): string[] {
+  const status = readGitValue(cwd, ["status", "--short"]);
+
+  if (!status) {
+    return [];
+  }
+
+  return status
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function readGitValue(cwd: string, args: string[]): string | undefined {
+  try {
+    return execFileSync("git", args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+  } catch {
+    return undefined;
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

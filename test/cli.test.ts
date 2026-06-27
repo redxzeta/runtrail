@@ -3,6 +3,7 @@ import { runCli } from "../src/cli/index.js";
 
 describe("cli", () => {
   afterEach(() => {
+    process.exitCode = undefined;
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -226,6 +227,102 @@ describe("cli", () => {
     ).rejects.toThrow("Invalid JSON for --data-json");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("wraps a successful command in a completed run", async () => {
+    const fetchMock = mockRunWrapperFetch();
+    vi.stubEnv("RUNTRAIL_LOG_DIR", "./data/test-cli-logs");
+    const output = captureOutput();
+
+    await runCli([
+      "node",
+      "rt",
+      "run",
+      "--source",
+      "codex",
+      "--project",
+      "runtrail",
+      "--task",
+      "wrapper success",
+      "--",
+      process.execPath,
+      "-e",
+      "process.stdout.write('wrapped ok')"
+    ]);
+
+    expect(process.exitCode).toBe(0);
+    expect(output.join("\n")).toContain("wrapped ok");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      new URL("/runs", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"task":"wrapper success"')
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      new URL("/events", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"exitCode":0')
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      new URL("/runs/run_wrap", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "PATCH",
+        body: expect.stringContaining('"status":"completed"')
+      })
+    );
+    expect(JSON.parse(output.at(-1) ?? "{}")).toEqual(
+      expect.objectContaining({
+        runId: "run_wrap",
+        status: "completed",
+        exitCode: 0
+      })
+    );
+  });
+
+  it("wraps a failed command in a failed run and preserves exit code", async () => {
+    const fetchMock = mockRunWrapperFetch();
+    vi.stubEnv("RUNTRAIL_LOG_DIR", "./data/test-cli-logs");
+    captureOutput();
+
+    await runCli([
+      "node",
+      "rt",
+      "run",
+      "--source",
+      "codex",
+      "--project",
+      "runtrail",
+      "--task",
+      "wrapper failure",
+      "--",
+      process.execPath,
+      "-e",
+      "process.exit(7)"
+    ]);
+
+    expect(process.exitCode).toBe(7);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      new URL("/events", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"exitCode":7')
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      new URL("/runs/run_wrap", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "PATCH",
+        body: expect.stringContaining('"status":"failed"')
+      })
+    );
+  });
 });
 
 function mockFetch(body: unknown): ReturnType<typeof vi.fn> {
@@ -248,5 +345,27 @@ function captureOutput(): string[] {
   vi.spyOn(console, "log").mockImplementation((message: string) => {
     output.push(message);
   });
+  vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
+    output.push(String(chunk));
+    return true;
+  });
   return output;
+}
+
+function mockRunWrapperFetch(): ReturnType<typeof vi.fn> {
+  vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");
+  vi.stubEnv("RUNTRAIL_TOKEN", "");
+  const fetchMock = vi.fn(async (url: URL) => {
+    if (url.pathname === "/runs") {
+      return new Response(JSON.stringify({ run: { id: "run_wrap" } }), { status: 201 });
+    }
+
+    if (url.pathname === "/events") {
+      return new Response(JSON.stringify({ event: { id: "evt_wrap" } }), { status: 201 });
+    }
+
+    return new Response(JSON.stringify({ run: { id: "run_wrap" } }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
