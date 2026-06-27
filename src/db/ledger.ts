@@ -1,6 +1,8 @@
 import type Database from "better-sqlite3";
 import { createId } from "../shared/ids.js";
 import type {
+  AgentContext,
+  AgentContextQuery,
   AgentEvent,
   AgentRun,
   CreateDecisionRequest,
@@ -474,6 +476,66 @@ export class LedgerRepository {
       .all(params) as DecisionRow[];
 
     return rows.map(mapDecisionRow);
+  }
+
+  getAgentContext(query: AgentContextQuery): AgentContext {
+    const params = {
+      project: query.project,
+      limit: query.limit,
+      minImportance: query.min_importance
+    };
+
+    const recentRuns = this.db
+      .prepare(
+        `SELECT *
+        FROM agent_runs
+        WHERE project = @project
+        ORDER BY updated_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as RunRow[];
+
+    const recentEvents = this.db
+      .prepare(
+        `SELECT agent_events.*
+        FROM agent_events
+        INNER JOIN agent_runs ON agent_runs.id = agent_events.run_id
+        WHERE agent_runs.project = @project
+          AND agent_events.importance >= @minImportance
+        ORDER BY agent_events.created_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as EventRow[];
+
+    const openLoops = this.db
+      .prepare(
+        `SELECT *
+        FROM open_loops
+        WHERE project = @project
+          AND status = 'open'
+        ORDER BY updated_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as OpenLoopRow[];
+
+    const decisions = this.db
+      .prepare(
+        `SELECT *
+        FROM decisions
+        WHERE project = @project OR project IS NULL
+        ORDER BY created_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as DecisionRow[];
+
+    return {
+      project: query.project,
+      recent_runs: recentRuns.map(mapRunRow),
+      recent_events: recentEvents.map(mapEventRow),
+      open_loops: openLoops.map(mapOpenLoopRow),
+      decisions: decisions.map(mapDecisionRow),
+      next_actions: openLoops.map((loop) => loop.title)
+    };
   }
 }
 

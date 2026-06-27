@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { RuntrailConfig } from "../config.js";
 import { LedgerRepository } from "../db/ledger.js";
 import {
+  agentContextQuerySchema,
   createDecisionRequestSchema,
   createEventRequestSchema,
   createOpenLoopRequestSchema,
@@ -180,6 +181,18 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     }
 
     return c.json({ decisions: ledger.listDecisions(parsed.data) });
+  });
+
+  route.get("/agent/context", (c) => {
+    const parsed = agentContextQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams)
+    );
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    return c.json(ledger.getAgentContext(parsed.data));
   });
 
   return route;
