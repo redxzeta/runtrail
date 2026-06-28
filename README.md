@@ -113,8 +113,7 @@ Example MCP server configuration:
 {
   "mcpServers": {
     "runtrail": {
-      "command": "pnpm",
-      "args": ["mcp"],
+      "command": "runtrail-mcp",
       "env": {
         "RUNTRAIL_URL": "http://127.0.0.1:8787",
         "RUNTRAIL_TOKEN": "change-me-to-a-long-random-secret"

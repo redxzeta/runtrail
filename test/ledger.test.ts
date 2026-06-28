@@ -82,6 +82,35 @@ describe("ledger routes", () => {
     expect(fetched.events).toEqual([]);
   });
 
+  it("stores omitted run metadata as nullable SQLite values", async () => {
+    const app = createTestApp();
+    const createdResponse = await postJson(app, "/runs", {
+      source: "codex",
+      project: "runtrail",
+      task: "minimal run"
+    });
+    const created = (await createdResponse.json()) as {
+      run: { id: string; hostname?: string; gitBranch?: string };
+    };
+
+    expect(createdResponse.status).toBe(201);
+    expect(created.run.hostname).toBeUndefined();
+    expect(created.run.gitBranch).toBeUndefined();
+
+    const fetchedResponse = await app.request(`/runs/${created.run.id}`, {
+      headers: authHeaders()
+    });
+    const fetched = (await fetchedResponse.json()) as {
+      run: { hostname?: string; cwd?: string; gitBranch?: string; summary?: string };
+    };
+
+    expect(fetchedResponse.status).toBe(200);
+    expect(fetched.run).not.toHaveProperty("hostname");
+    expect(fetched.run).not.toHaveProperty("cwd");
+    expect(fetched.run).not.toHaveProperty("gitBranch");
+    expect(fetched.run).not.toHaveProperty("summary");
+  });
+
   it("creates and lists events attached to a run", async () => {
     const app = createTestApp();
     const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
@@ -384,6 +413,34 @@ describe("ledger routes", () => {
       "Global retention policy"
     ]);
     expect(context.next_actions).toEqual(["Confirm live host path"]);
+  });
+
+  it("keeps low-importance exceptional events in agent context", async () => {
+    const app = createTestApp();
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+
+    await postJson(app, "/events", {
+      runId: run.run.id,
+      type: "blocked",
+      message: "blocked with default importance"
+    });
+
+    const response = await app.request("/agent/context?project=ice-council&min_importance=4", {
+      headers: authHeaders()
+    });
+    const context = (await response.json()) as {
+      recent_events: Array<{ message: string; importance: number }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(context.recent_events).toEqual([
+      expect.objectContaining({
+        message: "blocked with default importance",
+        importance: 3
+      })
+    ]);
   });
 
   it("renders server-side context recovery pages without changing JSON APIs", async () => {

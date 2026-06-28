@@ -11,6 +11,8 @@ export type RuntrailHttpClient = {
   ): Promise<unknown>;
 };
 
+type RuntrailHttpClientConfig = Pick<RuntrailConfig, "url" | "security">;
+
 export const runtrailToolNames = [
   "journal_get_context",
   "journal_create_event",
@@ -21,7 +23,7 @@ export const runtrailToolNames = [
 ] as const;
 
 export function createRuntrailMcpServer(
-  client: RuntrailHttpClient = createHttpClient(loadConfig())
+  client: RuntrailHttpClient = createHttpClient(loadMcpHttpConfig())
 ): McpServer {
   const server = new McpServer({
     name: "runtrail",
@@ -118,7 +120,7 @@ export function createRuntrailMcpServer(
   return server;
 }
 
-export function createHttpClient(config: RuntrailConfig): RuntrailHttpClient {
+export function createHttpClient(config: RuntrailHttpClientConfig): RuntrailHttpClient {
   return {
     async requestJson(path, options = {}) {
       const headers = new Headers();
@@ -249,8 +251,28 @@ function compact(input: Record<string, unknown>): Record<string, unknown> {
 }
 
 async function start(): Promise<void> {
-  const server = createRuntrailMcpServer(createHttpClient(loadConfig()));
+  const server = createRuntrailMcpServer();
   await server.connect(new StdioServerTransport());
+}
+
+function loadMcpHttpConfig(): RuntrailHttpClientConfig {
+  const url = process.env.RUNTRAIL_URL;
+
+  if (url) {
+    return {
+      url,
+      security: {
+        authRequired: true,
+        token: emptyToUndefined(process.env.RUNTRAIL_TOKEN)
+      }
+    };
+  }
+
+  return loadConfig();
+}
+
+function emptyToUndefined(value: string | undefined): string | undefined {
+  return value && value.trim().length > 0 ? value : undefined;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

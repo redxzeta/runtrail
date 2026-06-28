@@ -343,13 +343,15 @@ async function exportDaily(options: {
   date: string;
   output?: string;
 }): Promise<void> {
+  const startedFrom = `${options.date}T00:00:00.000Z`;
+  const startedTo = new Date(Date.parse(startedFrom) + 24 * 60 * 60 * 1000).toISOString();
   const query = new URLSearchParams({
     project: options.project,
+    started_from: startedFrom,
+    started_to: startedTo,
     limit: "100"
   });
-  const runs = readArray(await requestJson(`/runs?${query.toString()}`), "runs").filter((run) =>
-    String(readField(run, "startedAt")).startsWith(options.date)
-  );
+  const runs = readArray(await requestJson(`/runs?${query.toString()}`), "runs");
 
   writeMarkdown(
     [`# ${options.project} daily export - ${options.date}`, "", renderRuns(runs)].join("\n"),
@@ -604,6 +606,7 @@ async function runCommand(command: string[], logPath: string): Promise<number> {
     const child = spawn(executable, args, {
       cwd: process.cwd(),
       env: process.env,
+      stdio: ["inherit", "pipe", "pipe"],
       shell: false
     });
 
@@ -659,11 +662,13 @@ function readChangedFiles(cwd: string): string[] {
 
 function readGitValue(cwd: string, args: string[]): string | undefined {
   try {
-    return execFileSync("git", args, {
+    const value = execFileSync("git", args, {
       cwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     }).trim();
+
+    return value.length > 0 ? value : undefined;
   } catch {
     return undefined;
   }

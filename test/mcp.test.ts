@@ -1,7 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
-import { callRuntrailTool, createRuntrailMcpServer, runtrailToolNames } from "../src/mcp/index.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  callRuntrailTool,
+  createHttpClient,
+  createRuntrailMcpServer,
+  runtrailToolNames
+} from "../src/mcp/index.js";
 
 describe("mcp adapter", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it("constructs the MCP server with the requested tool set", () => {
     const server = createRuntrailMcpServer(mockClient({ ok: true }));
 
@@ -14,6 +25,14 @@ describe("mcp adapter", () => {
       "journal_record_decision",
       "journal_search_runs"
     ]);
+  });
+
+  it("constructs the default server from env without requiring a config file", () => {
+    vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");
+    vi.stubEnv("RUNTRAIL_TOKEN", "secret-token");
+    vi.stubEnv("RUNTRAIL_CONFIG", "/tmp/runtrail-missing-config.yaml");
+
+    expect(() => createRuntrailMcpServer()).not.toThrow();
   });
 
   it("maps context and search tools to HTTP GET requests", async () => {
@@ -115,6 +134,26 @@ describe("mcp adapter", () => {
       "/decisions",
       expect.objectContaining({ method: "POST" })
     );
+  });
+
+  it("builds the HTTP client from URL and token without loading YAML", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createHttpClient({
+      url: "http://runtrail.test",
+      security: {
+        authRequired: true,
+        token: "secret-token"
+      }
+    });
+
+    await client.requestJson("/health");
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [URL, { headers: Headers }];
+    expect(fetchMock).toHaveBeenCalledWith(new URL("/health", "http://runtrail.test"), init);
+    expect(init.headers.get("authorization")).toBe("Bearer secret-token");
   });
 });
 
