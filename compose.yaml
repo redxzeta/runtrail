@@ -1,0 +1,20 @@
+services:
+  runtrail:
+    build:
+      context: .
+    image: runtrail:local
+    restart: unless-stopped
+    environment:
+      RUNTRAIL_HOST: 0.0.0.0
+      RUNTRAIL_PORT: 8787
+      RUNTRAIL_DB_PATH: /app/data/runtrail.sqlite
+      RUNTRAIL_LOG_DIR: /app/data/logs
+      RUNTRAIL_TOKEN: "${RUNTRAIL_TOKEN:?set RUNTRAIL_TOKEN in the environment or an ignored .env file}"
+      DISCORD_WEBHOOK_URL: "${DISCORD_WEBHOOK_URL:-}"
+    ports:
+      - "8787:8787"
+    volumes:
+      - runtrail-data:/app/data
+
+volumes:
+  runtrail-data:
