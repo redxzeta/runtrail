@@ -1,3 +1,10 @@
+## [1.10.1](https://github.com/redxzeta/runtrail/compare/v1.10.0...v1.10.1) (2026-06-28)
+
+
+### Bug Fixes
+
+* **review:** address post-merge findings ([#27](https://github.com/redxzeta/runtrail/issues/27)) ([54dc614](https://github.com/redxzeta/runtrail/commit/54dc6143e7c95e692ddd1d8ce26610322dd24723))
+
 # [1.10.0](https://github.com/redxzeta/runtrail/compare/v1.9.0...v1.10.0) (2026-06-28)
 
 
