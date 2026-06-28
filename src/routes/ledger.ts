@@ -134,7 +134,7 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json({ error: "Run not found" }, 404);
     }
 
-    await notifyDiscord(options.config, ledger.getRun(event.runId), event);
+    notifyDiscord(options.config, ledger.getRun(event.runId), event);
 
     return c.json({ event }, 201);
   });
@@ -437,11 +437,7 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-async function notifyDiscord(
-  config: RuntrailConfig,
-  run: AgentRun | undefined,
-  event: AgentEvent
-): Promise<void> {
+function notifyDiscord(config: RuntrailConfig, run: AgentRun | undefined, event: AgentEvent): void {
   const webhookUrl = config.notifications.discord.webhookUrl;
 
   if (!config.notifications.discord.enabled || !webhookUrl || !isNotifiable(event.type) || !run) {
@@ -464,19 +460,24 @@ async function notifyDiscord(
     fields.push(`changed files: ${changedFiles.join(", ")}`);
   }
 
-  try {
-    await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({
-        content: `Runtrail ${event.type}: ${run.task}\n${fields.join("\n")}`
-      })
-    });
-  } catch {
-    // Notification delivery must never block journal writes.
-  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2000);
+  timeout.unref?.();
+
+  void fetch(webhookUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    signal: controller.signal,
+    body: JSON.stringify({
+      content: `Runtrail ${event.type}: ${run.task}\n${fields.join("\n")}`
+    })
+  })
+    .catch(() => {
+      // Notification delivery must never block journal writes.
+    })
+    .finally(() => clearTimeout(timeout));
 }
 
 function isNotifiable(type: AgentEvent["type"]): boolean {

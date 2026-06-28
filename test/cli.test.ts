@@ -361,6 +361,42 @@ describe("cli", () => {
     expect(output.join("\n")).toContain("Review export output");
   });
 
+  it("exports daily Markdown using server-side started date filters", async () => {
+    const fetchMock = mockFetch({
+      runs: [
+        {
+          id: "run_1",
+          status: "completed",
+          task: "ship export",
+          project: "runtrail",
+          startedAt: "2026-06-27T12:00:00.000Z"
+        }
+      ]
+    });
+    const output = captureOutput();
+
+    await runCli([
+      "node",
+      "rt",
+      "export",
+      "daily",
+      "--project",
+      "runtrail",
+      "--date",
+      "2026-06-27"
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL(
+        "/runs?project=runtrail&started_from=2026-06-27T00%3A00%3A00.000Z&started_to=2026-06-28T00%3A00%3A00.000Z&limit=100",
+        "http://runtrail.test"
+      ),
+      expect.any(Object)
+    );
+    expect(output.join("\n")).toContain("# runtrail daily export - 2026-06-27");
+    expect(output.join("\n")).toContain("ship export");
+  });
+
   it("writes decision exports to a Markdown file", async () => {
     mockFetch({
       decisions: [{ title: "SQLite source", decision: "Markdown is generated from API data" }]

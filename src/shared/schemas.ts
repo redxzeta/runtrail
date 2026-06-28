@@ -86,6 +86,8 @@ export const createEventRequestSchema = z.object({
 export const listRunsQuerySchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
   status: runStatusSchema.optional(),
+  started_from: z.string().datetime().optional(),
+  started_to: z.string().datetime().optional(),
   limit: z.coerce.number().int().positive().max(100).default(50)
 });
 

@@ -70,6 +70,9 @@ type DecisionRow = {
   created_at: string;
 };
 
+const exceptionalEventTypes = ["blocked", "failed", "needs_review", "decision_required"];
+const exceptionalEventParams = exceptionalEventTypes.map((_, index) => `@exceptional${index}`);
+
 export class LedgerRepository {
   constructor(private readonly db: Database.Database) {}
 
@@ -128,7 +131,16 @@ export class LedgerRepository {
           @updatedAt
         )`
       )
-      .run({ ...run, completedAt: null });
+      .run({
+        ...run,
+        hostname: toSqlValue(run.hostname),
+        cwd: toSqlValue(run.cwd),
+        gitRepoPath: toSqlValue(run.gitRepoPath),
+        gitBranch: toSqlValue(run.gitBranch),
+        gitCommit: toSqlValue(run.gitCommit),
+        summary: toSqlValue(run.summary),
+        completedAt: null
+      });
 
     return run;
   }
@@ -166,7 +178,13 @@ export class LedgerRepository {
             updated_at = @updatedAt
         WHERE id = @id`
       )
-      .run(updated);
+      .run({
+        ...updated,
+        summary: toSqlValue(updated.summary),
+        completedAt: toSqlValue(updated.completedAt),
+        gitBranch: toSqlValue(updated.gitBranch),
+        gitCommit: toSqlValue(updated.gitCommit)
+      });
 
     return updated;
   }
@@ -185,6 +203,16 @@ export class LedgerRepository {
     if (query.status) {
       filters.push("status = @status");
       params.status = query.status;
+    }
+
+    if (query.started_from) {
+      filters.push("started_at >= @startedFrom");
+      params.startedFrom = query.started_from;
+    }
+
+    if (query.started_to) {
+      filters.push("started_at < @startedTo");
+      params.startedTo = query.started_to;
     }
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
@@ -336,7 +364,12 @@ export class LedgerRepository {
           @resolvedAt
         )`
       )
-      .run({ ...openLoop, resolution: null, resolvedAt: null });
+      .run({
+        ...openLoop,
+        description: toSqlValue(openLoop.description),
+        resolution: null,
+        resolvedAt: null
+      });
 
     return openLoop;
   }
@@ -374,7 +407,12 @@ export class LedgerRepository {
             resolved_at = @resolvedAt
         WHERE id = @id`
       )
-      .run(updated);
+      .run({
+        ...updated,
+        description: toSqlValue(updated.description),
+        resolution: toSqlValue(updated.resolution),
+        resolvedAt: toSqlValue(updated.resolvedAt)
+      });
 
     return updated;
   }
@@ -444,7 +482,11 @@ export class LedgerRepository {
           @createdAt
         )`
       )
-      .run(decision);
+      .run({
+        ...decision,
+        project: toSqlValue(decision.project),
+        rationale: toSqlValue(decision.rationale)
+      });
 
     return decision;
   }
@@ -482,7 +524,10 @@ export class LedgerRepository {
     const params = {
       project: query.project,
       limit: query.limit,
-      minImportance: query.min_importance
+      minImportance: query.min_importance,
+      ...Object.fromEntries(
+        exceptionalEventTypes.map((type, index) => [`exceptional${index}`, type])
+      )
     };
 
     const recentRuns = this.db
@@ -501,7 +546,10 @@ export class LedgerRepository {
         FROM agent_events
         INNER JOIN agent_runs ON agent_runs.id = agent_events.run_id
         WHERE agent_runs.project = @project
-          AND agent_events.importance >= @minImportance
+          AND (
+            agent_events.importance >= @minImportance
+            OR agent_events.type IN (${exceptionalEventParams.join(", ")})
+          )
         ORDER BY agent_events.created_at DESC
         LIMIT @limit`
       )
@@ -557,6 +605,10 @@ function deriveResolvedAt(existing: OpenLoop, input: UpdateOpenLoopRequest): str
   }
 
   return existing.resolvedAt;
+}
+
+function toSqlValue<T>(value: T | undefined): T | null {
+  return value === undefined ? null : value;
 }
 
 function mapRunRow(row: RunRow): AgentRun {
