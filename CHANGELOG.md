@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/redxzeta/runtrail/compare/v1.9.0...v1.10.0) (2026-06-28)
+
+
+### Features
+
+* **deploy:** add optional container deployment ([#25](https://github.com/redxzeta/runtrail/issues/25)) ([3f91d65](https://github.com/redxzeta/runtrail/commit/3f91d65a502a2364000d3d4ec5fd3b60a877375a))
+
 # [1.9.0](https://github.com/redxzeta/runtrail/compare/v1.8.0...v1.9.0) (2026-06-27)
 
 
