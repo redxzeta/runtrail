@@ -1,3 +1,10 @@
+## [1.17.1](https://github.com/redxzeta/runtrail/compare/v1.17.0...v1.17.1) (2026-07-04)
+
+
+### Performance Improvements
+
+* **db:** add query-plan-backed run status index ([#66](https://github.com/redxzeta/runtrail/issues/66)) ([bac06e9](https://github.com/redxzeta/runtrail/commit/bac06e973fd40ea2e6cea674d8611f238502cb4d))
+
 # [1.17.0](https://github.com/redxzeta/runtrail/compare/v1.16.1...v1.17.0) (2026-07-04)
 
 
