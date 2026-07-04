@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/redxzeta/runtrail/compare/v1.12.0...v1.13.0) (2026-07-04)
+
+
+### Features
+
+* **loops:** add collaboration fields ([#40](https://github.com/redxzeta/runtrail/issues/40)) ([62009b6](https://github.com/redxzeta/runtrail/commit/62009b66027b7a4be4939a2c4c549e143a2468f4))
+
 # [1.12.0](https://github.com/redxzeta/runtrail/compare/v1.11.0...v1.12.0) (2026-07-04)
 
 
