@@ -1161,6 +1161,8 @@ function searchFilters(
   if (query.status) {
     if (table === "agent_runs" || table === "open_loops") {
       filters.push(`${table}.status = @status`);
+    } else if (table === "agent_events") {
+      filters.push(`${runTable}.status = @status`);
     }
   }
 

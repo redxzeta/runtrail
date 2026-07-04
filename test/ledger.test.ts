@@ -819,10 +819,28 @@ describe("ledger routes", () => {
       headers: authHeaders()
     });
     const statusBody = (await statusResponse.json()) as {
-      results: { runs: Array<{ task: string }> };
+      results: { runs: Array<{ task: string }>; events: Array<{ message: string }> };
     };
 
     expect(statusBody.results.runs).toEqual([expect.objectContaining({ task: "needle run task" })]);
+    expect(statusBody.results.events).toEqual([
+      expect.objectContaining({ message: "needle event" })
+    ]);
+
+    await app.request(`/runs/${run.run.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "completed" }),
+      headers: authHeaders()
+    });
+
+    const failedStatusResponse = await app.request("/search?project=runtrail&status=failed", {
+      headers: authHeaders()
+    });
+    const failedStatusBody = (await failedStatusResponse.json()) as {
+      results: { events: Array<{ message: string }> };
+    };
+
+    expect(failedStatusBody.results.events).toEqual([]);
   });
 
   it("keeps low-importance exceptional events in agent context", async () => {
