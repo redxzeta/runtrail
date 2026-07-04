@@ -124,6 +124,7 @@ Example MCP server configuration:
 ```
 
 The MCP adapter is a thin HTTP client. It does not access SQLite directly.
+See [docs/mcp-safe-surface.md](docs/mcp-safe-surface.md) for the proposed safe read/write tool surface and default response limits.
 
 ## Markdown Exports
 
