@@ -163,7 +163,13 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json(formatValidationError(parsed.error), 400);
     }
 
-    return c.json({ openLoop: ledger.createOpenLoop(parsed.data) }, 201);
+    const openLoop = ledger.createOpenLoop(parsed.data);
+
+    if (!openLoop) {
+      return c.json({ error: "Source run not found" }, 404);
+    }
+
+    return c.json({ openLoop }, 201);
   });
 
   route.get("/open-loops", (c) => {

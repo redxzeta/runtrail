@@ -195,37 +195,90 @@ describe("ledger routes", () => {
 
   it("creates, lists, and resolves open loops", async () => {
     const app = createTestApp();
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
     const createdResponse = await postJson(app, "/open-loops", {
-      type: "blocked",
+      type: "ready_to_deploy",
       project: "runtrail",
       title: "Need API decision",
       description: "Choose the lifecycle shape",
+      owner: "operator",
+      source: "codex",
+      nextAction: "Review and deploy",
+      blockerRef: "PR #123",
+      sourceRunId: run.run.id,
       createdAt: "2026-06-26T10:00:00.000Z"
     });
 
     expect(createdResponse.status).toBe(201);
     const created = (await createdResponse.json()) as {
-      openLoop: { id: string; status: string; type: string; project: string };
+      openLoop: {
+        id: string;
+        status: string;
+        type: string;
+        project: string;
+        owner: string;
+        source: string;
+        nextAction: string;
+        blockerRef: string;
+        sourceRunId: string;
+      };
     };
     expect(created.openLoop.id).toMatch(/^loop_/);
     expect(created.openLoop.status).toBe("open");
-    expect(created.openLoop.type).toBe("blocked");
+    expect(created.openLoop.type).toBe("ready_to_deploy");
     expect(created.openLoop.project).toBe("runtrail");
+    expect(created.openLoop.owner).toBe("operator");
+    expect(created.openLoop.source).toBe("codex");
+    expect(created.openLoop.nextAction).toBe("Review and deploy");
+    expect(created.openLoop.blockerRef).toBe("PR #123");
+    expect(created.openLoop.sourceRunId).toBe(run.run.id);
 
-    const openListResponse = await app.request("/open-loops?project=runtrail", {
-      headers: authHeaders()
+    await postJson(app, "/open-loops", {
+      type: "blocked",
+      project: "runtrail",
+      title: "Blocked item"
     });
+    const cancelledResponse = await postJson(app, "/open-loops", {
+      type: "failed_unresolved",
+      project: "runtrail",
+      title: "Cancelled item"
+    });
+    const cancelled = (await cancelledResponse.json()) as { openLoop: { id: string } };
+
+    const openListResponse = await app.request(
+      "/open-loops?project=runtrail&type=ready_to_deploy",
+      {
+        headers: authHeaders()
+      }
+    );
     const openList = (await openListResponse.json()) as {
-      openLoops: Array<{ id: string; status: string }>;
+      openLoops: Array<{ id: string; status: string; type: string }>;
     };
 
     expect(openListResponse.status).toBe(200);
     expect(openList.openLoops).toEqual([
       expect.objectContaining({
         id: created.openLoop.id,
-        status: "open"
+        status: "open",
+        type: "ready_to_deploy"
       })
     ]);
+
+    const cancelResponse = await app.request(`/open-loops/${cancelled.openLoop.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "cancelled", resolution: "No longer needed" }),
+      headers: authHeaders()
+    });
+    const cancelBody = (await cancelResponse.json()) as {
+      openLoop: { status: string; resolution: string; resolvedAt: string };
+    };
+
+    expect(cancelResponse.status).toBe(200);
+    expect(cancelBody.openLoop.status).toBe("cancelled");
+    expect(cancelBody.openLoop.resolution).toBe("No longer needed");
+    expect(cancelBody.openLoop.resolvedAt).toEqual(expect.any(String));
 
     const resolvedResponse = await app.request(`/open-loops/${created.openLoop.id}`, {
       method: "PATCH",
@@ -255,11 +308,21 @@ describe("ledger routes", () => {
         headers: authHeaders()
       })
     ).json()) as { openLoops: Array<{ id: string }> };
+    const cancelledList = (await (
+      await app.request("/open-loops?project=runtrail&status=cancelled", {
+        headers: authHeaders()
+      })
+    ).json()) as { openLoops: Array<{ id: string }> };
 
-    expect(defaultList.openLoops).toEqual([]);
+    expect(defaultList.openLoops).toEqual([expect.objectContaining({ title: "Blocked item" })]);
     expect(resolvedList.openLoops).toEqual([
       expect.objectContaining({
         id: created.openLoop.id
+      })
+    ]);
+    expect(cancelledList.openLoops).toEqual([
+      expect.objectContaining({
+        id: cancelled.openLoop.id
       })
     ]);
   });

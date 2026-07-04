@@ -60,6 +60,11 @@ type OpenLoopRow = {
   project: string;
   title: string;
   description: string | null;
+  owner: string | null;
+  source: string | null;
+  next_action: string | null;
+  blocker_ref: string | null;
+  source_run_id: string | null;
   status: OpenLoop["status"];
   resolution: string | null;
   created_at: string;
@@ -353,7 +358,11 @@ export class LedgerRepository {
     return rows.map(mapEventRow);
   }
 
-  createOpenLoop(input: CreateOpenLoopRequest): OpenLoop {
+  createOpenLoop(input: CreateOpenLoopRequest): OpenLoop | undefined {
+    if (input.sourceRunId && !this.getRun(input.sourceRunId)) {
+      return undefined;
+    }
+
     const timestamp = input.createdAt ?? nowIso();
     const openLoop: OpenLoop = {
       id: createId("loop"),
@@ -361,6 +370,11 @@ export class LedgerRepository {
       project: input.project,
       title: input.title,
       description: input.description,
+      owner: input.owner,
+      source: input.source,
+      nextAction: input.nextAction,
+      blockerRef: input.blockerRef,
+      sourceRunId: input.sourceRunId,
       status: "open",
       createdAt: timestamp,
       updatedAt: timestamp
@@ -374,6 +388,11 @@ export class LedgerRepository {
           project,
           title,
           description,
+          owner,
+          source,
+          next_action,
+          blocker_ref,
+          source_run_id,
           status,
           resolution,
           created_at,
@@ -385,6 +404,11 @@ export class LedgerRepository {
           @project,
           @title,
           @description,
+          @owner,
+          @source,
+          @nextAction,
+          @blockerRef,
+          @sourceRunId,
           @status,
           @resolution,
           @createdAt,
@@ -395,6 +419,11 @@ export class LedgerRepository {
       .run({
         ...openLoop,
         description: toSqlValue(openLoop.description),
+        owner: toSqlValue(openLoop.owner),
+        source: toSqlValue(openLoop.source),
+        nextAction: toSqlValue(openLoop.nextAction),
+        blockerRef: toSqlValue(openLoop.blockerRef),
+        sourceRunId: toSqlValue(openLoop.sourceRunId),
         resolution: null,
         resolvedAt: null
       });
@@ -409,12 +438,24 @@ export class LedgerRepository {
       return undefined;
     }
 
+    if (input.sourceRunId && !this.getRun(input.sourceRunId)) {
+      return undefined;
+    }
+
     const updated: OpenLoop = {
       ...existing,
       status: input.status ?? existing.status,
       title: input.title ?? existing.title,
       description:
         input.description === undefined ? existing.description : (input.description ?? undefined),
+      owner: input.owner === undefined ? existing.owner : (input.owner ?? undefined),
+      source: input.source === undefined ? existing.source : (input.source ?? undefined),
+      nextAction:
+        input.nextAction === undefined ? existing.nextAction : (input.nextAction ?? undefined),
+      blockerRef:
+        input.blockerRef === undefined ? existing.blockerRef : (input.blockerRef ?? undefined),
+      sourceRunId:
+        input.sourceRunId === undefined ? existing.sourceRunId : (input.sourceRunId ?? undefined),
       resolution:
         input.resolution === undefined ? existing.resolution : (input.resolution ?? undefined),
       resolvedAt:
@@ -430,6 +471,11 @@ export class LedgerRepository {
         SET status = @status,
             title = @title,
             description = @description,
+            owner = @owner,
+            source = @source,
+            next_action = @nextAction,
+            blocker_ref = @blockerRef,
+            source_run_id = @sourceRunId,
             resolution = @resolution,
             updated_at = @updatedAt,
             resolved_at = @resolvedAt
@@ -438,6 +484,11 @@ export class LedgerRepository {
       .run({
         ...updated,
         description: toSqlValue(updated.description),
+        owner: toSqlValue(updated.owner),
+        source: toSqlValue(updated.source),
+        nextAction: toSqlValue(updated.nextAction),
+        blockerRef: toSqlValue(updated.blockerRef),
+        sourceRunId: toSqlValue(updated.sourceRunId),
         resolution: toSqlValue(updated.resolution),
         resolvedAt: toSqlValue(updated.resolvedAt)
       });
@@ -810,7 +861,7 @@ function deriveCompletedAt(existing: AgentRun, input: UpdateRunRequest): string 
 }
 
 function deriveResolvedAt(existing: OpenLoop, input: UpdateOpenLoopRequest): string | undefined {
-  if (input.status === "resolved") {
+  if (input.status === "resolved" || input.status === "cancelled") {
     return existing.resolvedAt ?? nowIso();
   }
 
@@ -875,6 +926,11 @@ function mapOpenLoopRow(row: OpenLoopRow): OpenLoop {
     project: row.project,
     title: row.title,
     description: row.description ?? undefined,
+    owner: row.owner ?? undefined,
+    source: row.source ?? undefined,
+    nextAction: row.next_action ?? undefined,
+    blockerRef: row.blocker_ref ?? undefined,
+    sourceRunId: row.source_run_id ?? undefined,
     status: row.status,
     resolution: row.resolution ?? undefined,
     createdAt: row.created_at,
