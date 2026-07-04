@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/redxzeta/runtrail/compare/v1.11.0...v1.12.0) (2026-07-04)
+
+
+### Features
+
+* **context:** include handoffs and failures ([#39](https://github.com/redxzeta/runtrail/issues/39)) ([4db2d4d](https://github.com/redxzeta/runtrail/commit/4db2d4d05dc7d3d17a6ed6837df23af3ec695284))
+
 # [1.11.0](https://github.com/redxzeta/runtrail/compare/v1.10.1...v1.11.0) (2026-07-04)
 
 
