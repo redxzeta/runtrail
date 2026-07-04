@@ -289,6 +289,8 @@ export type Handoff = {
   createdAt: string;
 };
 
+export type HandoffSummary = Omit<Handoff, "context">;
+
 export type Artifact = {
   id: string;
   runId: string;
@@ -304,7 +306,7 @@ export type AgentContext = {
   recent_runs: AgentRun[];
   failed_runs: AgentRun[];
   recent_events: Array<Omit<AgentEvent, "data">>;
-  recent_handoffs: Handoff[];
+  recent_handoffs: HandoffSummary[];
   open_loops: OpenLoop[];
   decisions: Decision[];
   next_actions: string[];
