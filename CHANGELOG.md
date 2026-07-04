@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/redxzeta/runtrail/compare/v1.13.0...v1.14.0) (2026-07-04)
+
+
+### Features
+
+* **runs:** add compact manifests ([#41](https://github.com/redxzeta/runtrail/issues/41)) ([2613b6b](https://github.com/redxzeta/runtrail/commit/2613b6bbe36eb9f70181488f2d5b8e23d29e1b5c))
+
 # [1.13.0](https://github.com/redxzeta/runtrail/compare/v1.12.0...v1.13.0) (2026-07-04)
 
 
