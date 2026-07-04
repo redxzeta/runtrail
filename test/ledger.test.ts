@@ -505,7 +505,15 @@ describe("ledger routes", () => {
       type: "blocked",
       message: "needs operator input",
       importance: 7,
-      createdAt: "2026-06-26T10:05:00.000Z"
+      createdAt: "2026-06-26T10:05:00.000Z",
+      data: {
+        largeLog: "x".repeat(1000)
+      }
+    });
+    await app.request(`/runs/${run.run.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "failed", summary: "Needs follow-up" }),
+      headers: authHeaders()
     });
     await postJson(app, "/open-loops", {
       type: "blocked",
@@ -523,6 +531,23 @@ describe("ledger routes", () => {
       decision: "Agents read compact context first",
       createdAt: "2026-06-26T10:06:00.000Z"
     });
+    await postJson(app, "/handoffs", {
+      sourceRunId: run.run.id,
+      fromSource: "codex",
+      toSource: "openclaw",
+      project: "ice-council",
+      summary: "Continue from failed API run",
+      nextAction: "Inspect failure event",
+      context: {
+        runId: run.run.id
+      },
+      createdAt: "2026-06-26T10:07:00.000Z"
+    });
+    await postJson(app, "/handoffs", {
+      fromSource: "codex",
+      project: "other-project",
+      summary: "Should not be included"
+    });
 
     const response = await app.request("/agent/context?project=ice-council&min_importance=4", {
       headers: authHeaders()
@@ -530,7 +555,9 @@ describe("ledger routes", () => {
     const context = (await response.json()) as {
       project: string;
       recent_runs: Array<{ id: string }>;
-      recent_events: Array<{ message: string }>;
+      failed_runs: Array<{ id: string; summary: string }>;
+      recent_events: Array<{ message: string; data?: unknown }>;
+      recent_handoffs: Array<{ summary: string; nextAction: string }>;
       open_loops: Array<{ title: string }>;
       decisions: Array<{ title: string }>;
       next_actions: string[];
@@ -541,6 +568,16 @@ describe("ledger routes", () => {
     expect(context.recent_runs).toEqual([expect.objectContaining({ id: run.run.id })]);
     expect(context.recent_events).toEqual([
       expect.objectContaining({ message: "needs operator input" })
+    ]);
+    expect(context.recent_events[0]).not.toHaveProperty("data");
+    expect(context.failed_runs).toEqual([
+      expect.objectContaining({ id: run.run.id, summary: "Needs follow-up" })
+    ]);
+    expect(context.recent_handoffs).toEqual([
+      expect.objectContaining({
+        summary: "Continue from failed API run",
+        nextAction: "Inspect failure event"
+      })
     ]);
     expect(context.open_loops).toEqual([
       expect.objectContaining({ title: "Confirm live host path" })
