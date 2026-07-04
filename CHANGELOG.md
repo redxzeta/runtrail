@@ -1,3 +1,10 @@
+## [1.16.1](https://github.com/redxzeta/runtrail/compare/v1.16.0...v1.16.1) (2026-07-04)
+
+
+### Bug Fixes
+
+* **context:** compact review follow-ups ([#48](https://github.com/redxzeta/runtrail/issues/48)) ([5eec396](https://github.com/redxzeta/runtrail/commit/5eec39672022e636e0bcd683e55d0d55164a7c55))
+
 # [1.16.0](https://github.com/redxzeta/runtrail/compare/v1.15.0...v1.16.0) (2026-07-04)
 
 
