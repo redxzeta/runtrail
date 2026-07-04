@@ -492,6 +492,91 @@ describe("ledger routes", () => {
     ]);
   });
 
+  it("returns compact run manifests with linked records", async () => {
+    const app = createTestApp();
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+
+    await postJson(app, "/events", {
+      runId: run.run.id,
+      type: "command_executed",
+      message: "pnpm test",
+      importance: 5,
+      data: {
+        changedFiles: ["src/db/ledger.ts"],
+        stdout: "x".repeat(1000)
+      }
+    });
+    await postJson(app, "/events", {
+      runId: run.run.id,
+      type: "test_passed",
+      message: "ledger tests passed",
+      importance: 5,
+      data: {
+        changedFiles: ["test/ledger.test.ts"]
+      }
+    });
+    await postJson(app, "/open-loops", {
+      type: "needs_review",
+      project: "ice-council",
+      title: "Review manifest output",
+      sourceRunId: run.run.id
+    });
+    await postJson(app, "/handoffs", {
+      sourceRunId: run.run.id,
+      fromSource: "codex",
+      project: "ice-council",
+      summary: "Manifest ready"
+    });
+    await postJson(app, "/artifacts", {
+      runId: run.run.id,
+      kind: "log",
+      path: "data/logs/run.log",
+      sizeBytes: 1000,
+      sha256: "b".repeat(64)
+    });
+
+    const response = await app.request(`/runs/${run.run.id}/manifest`, {
+      headers: authHeaders()
+    });
+    const body = (await response.json()) as {
+      manifest: {
+        run: { id: string };
+        events: Array<{ message: string; data?: unknown }>;
+        changed_files: string[];
+        commands: Array<{ message: string }>;
+        tests: Array<{ message: string }>;
+        open_loops: Array<{ title: string }>;
+        handoffs: Array<{ summary: string }>;
+        artifacts: Array<{ kind: string; path: string; sizeBytes: number; sha256: string }>;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.manifest.run.id).toBe(run.run.id);
+    expect(body.manifest.changed_files).toEqual(["src/db/ledger.ts", "test/ledger.test.ts"]);
+    expect(body.manifest.events[0]).not.toHaveProperty("data");
+    expect(body.manifest.commands).toEqual([expect.objectContaining({ message: "pnpm test" })]);
+    expect(body.manifest.tests).toEqual([
+      expect.objectContaining({ message: "ledger tests passed" })
+    ]);
+    expect(body.manifest.open_loops).toEqual([
+      expect.objectContaining({ title: "Review manifest output" })
+    ]);
+    expect(body.manifest.handoffs).toEqual([
+      expect.objectContaining({ summary: "Manifest ready" })
+    ]);
+    expect(body.manifest.artifacts).toEqual([
+      expect.objectContaining({
+        kind: "log",
+        path: "data/logs/run.log",
+        sizeBytes: 1000,
+        sha256: "b".repeat(64)
+      })
+    ]);
+  });
+
   it("validates open loop and decision payloads", async () => {
     const app = createTestApp();
     const invalidLoop = await postJson(app, "/open-loops", {

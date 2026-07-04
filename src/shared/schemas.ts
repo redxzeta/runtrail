@@ -298,3 +298,14 @@ export type AgentContext = {
   decisions: Decision[];
   next_actions: string[];
 };
+
+export type RunManifest = {
+  run: AgentRun;
+  events: Array<Omit<AgentEvent, "data">>;
+  changed_files: string[];
+  commands: Array<Pick<AgentEvent, "id" | "message" | "createdAt">>;
+  tests: Array<Pick<AgentEvent, "id" | "type" | "message" | "createdAt">>;
+  open_loops: OpenLoop[];
+  handoffs: Handoff[];
+  artifacts: Artifact[];
+};

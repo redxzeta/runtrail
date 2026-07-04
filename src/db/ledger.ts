@@ -21,6 +21,7 @@ import type {
   ListOpenLoopsQuery,
   ListRunsQuery,
   OpenLoop,
+  RunManifest,
   UpdateOpenLoopRequest,
   UpdateRunRequest
 } from "../shared/schemas.js";
@@ -762,6 +763,39 @@ export class LedgerRepository {
     return rows.map(mapArtifactRow);
   }
 
+  getRunManifest(id: string): RunManifest | undefined {
+    const run = this.getRun(id);
+
+    if (!run) {
+      return undefined;
+    }
+
+    const events = this.listEventsForRun(id);
+    const openLoops = this.db
+      .prepare(
+        `SELECT *
+        FROM open_loops
+        WHERE source_run_id = @runId
+        ORDER BY updated_at DESC`
+      )
+      .all({ runId: id }) as OpenLoopRow[];
+
+    return {
+      run,
+      events: events.map(stripEventData),
+      changed_files: uniqueStrings(events.flatMap(readChangedFiles)),
+      commands: events
+        .filter((event) => event.type === "command_executed")
+        .map(({ id, message, createdAt }) => ({ id, message, createdAt })),
+      tests: events
+        .filter((event) => event.type.startsWith("test_"))
+        .map(({ id, type, message, createdAt }) => ({ id, type, message, createdAt })),
+      open_loops: openLoops.map(mapOpenLoopRow),
+      handoffs: this.listHandoffs({ sourceRunId: id, limit: 100 }),
+      artifacts: this.listArtifacts({ runId: id, limit: 100 })
+    };
+  }
+
   getAgentContext(query: AgentContextQuery): AgentContext {
     const params = {
       project: query.project,
@@ -909,14 +943,14 @@ function mapEventRow(row: EventRow): AgentEvent {
 }
 
 function mapEventContextRow(row: EventRow): Omit<AgentEvent, "data"> {
-  return {
+  return stripEventData({
     id: row.id,
     runId: row.run_id,
     type: row.type,
     message: row.message,
     importance: row.importance,
     createdAt: row.created_at
-  };
+  });
 }
 
 function mapOpenLoopRow(row: OpenLoopRow): OpenLoop {
@@ -974,4 +1008,33 @@ function mapArtifactRow(row: ArtifactRow): Artifact {
     sha256: row.sha256 ?? undefined,
     createdAt: row.created_at
   };
+}
+
+function stripEventData(event: AgentEvent): Omit<AgentEvent, "data"> {
+  return {
+    id: event.id,
+    runId: event.runId,
+    type: event.type,
+    message: event.message,
+    importance: event.importance,
+    createdAt: event.createdAt
+  };
+}
+
+function readChangedFiles(event: AgentEvent): string[] {
+  if (!event.data || typeof event.data !== "object" || !("changedFiles" in event.data)) {
+    return [];
+  }
+
+  const changedFiles = (event.data as { changedFiles: unknown }).changedFiles;
+
+  if (!Array.isArray(changedFiles)) {
+    return [];
+  }
+
+  return changedFiles.filter((file): file is string => typeof file === "string");
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
 }
