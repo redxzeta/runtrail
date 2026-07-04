@@ -15,6 +15,8 @@ export function migrate(db: Database.Database): void {
     addColumnIfMissing(db, "open_loops", "next_action", "next_action TEXT");
     addColumnIfMissing(db, "open_loops", "blocker_ref", "blocker_ref TEXT");
     addColumnIfMissing(db, "open_loops", "source_run_id", "source_run_id TEXT");
+    addColumnIfMissing(db, "agent_events", "prev_event_hash", "prev_event_hash TEXT");
+    addColumnIfMissing(db, "agent_events", "event_hash", "event_hash TEXT");
 
     db.prepare(
       "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"

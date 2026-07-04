@@ -5,7 +5,8 @@ import { hostname } from "node:os";
 import path from "node:path";
 import { Command } from "commander";
 import { loadConfig } from "../config.js";
-import { healthResponseSchema } from "../shared/schemas.js";
+import { verifyEventChain } from "../shared/receipts.js";
+import { type AgentEvent, healthResponseSchema } from "../shared/schemas.js";
 
 export async function runCli(argv = process.argv): Promise<void> {
   if (argv[2] === "run" && argv[3] !== "create") {
@@ -100,6 +101,13 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--project <project>", "Project name")
     .option("--output <path>", "Write Markdown to a file")
     .action(exportOpenLoops);
+
+  const verify = program.command("verify").description("Verify tamper-evident receipts");
+  verify
+    .command("run")
+    .description("Verify event receipts for a run")
+    .argument("<runId>")
+    .action(verifyRun);
 
   await program.parseAsync(argv);
 }
@@ -398,6 +406,18 @@ async function exportOpenLoops(options: { project?: string; output?: string }): 
   writeMarkdown(["# Open loops export", "", renderOpenLoops(openLoops)].join("\n"), options.output);
 }
 
+async function verifyRun(runId: string): Promise<void> {
+  const response = await requestJson(`/runs/${encodeURIComponent(runId)}`);
+  const events = readArray(response, "events").map(readEvent);
+  const result = verifyEventChain(events);
+
+  printJson({ runId, ...result });
+
+  if (result.status !== "pass") {
+    process.exitCode = 1;
+  }
+}
+
 async function requestJson(
   path: string,
   options: { method?: string; body?: Record<string, unknown> } = {}
@@ -571,6 +591,45 @@ function asRecord(value: unknown): Record<string, unknown> {
 function readField(source: Record<string, unknown>, key: string): string {
   const value = source[key];
   return typeof value === "string" && value.length > 0 ? value : "";
+}
+
+function readEvent(source: Record<string, unknown>): AgentEvent {
+  return {
+    id: readRequiredField(source, "id"),
+    runId: readRequiredField(source, "runId"),
+    type: readRequiredField(source, "type") as AgentEvent["type"],
+    message: readRequiredField(source, "message"),
+    importance: readNumberField(source, "importance"),
+    data: source.data,
+    prevEventHash: readOptionalField(source, "prevEventHash"),
+    eventHash: readOptionalField(source, "eventHash"),
+    createdAt: readRequiredField(source, "createdAt")
+  };
+}
+
+function readRequiredField(source: Record<string, unknown>, key: string): string {
+  const value = readOptionalField(source, key);
+
+  if (!value) {
+    throw new Error(`API response event missing ${key}`);
+  }
+
+  return value;
+}
+
+function readOptionalField(source: Record<string, unknown>, key: string): string | undefined {
+  const value = source[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function readNumberField(source: Record<string, unknown>, key: string): number {
+  const value = source[key];
+
+  if (typeof value !== "number") {
+    throw new Error(`API response event missing numeric ${key}`);
+  }
+
+  return value;
 }
 
 function appendQuery(query: URLSearchParams, key: string, value: string | undefined): void {

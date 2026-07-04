@@ -1,8 +1,10 @@
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadConfig, type RuntrailConfig } from "../src/config.js";
+import { LedgerRepository } from "../src/db/ledger.js";
 import { migrate } from "../src/db/migrate.js";
 import { createApp } from "../src/index.js";
+import { verifyEventChain } from "../src/shared/receipts.js";
 
 const databases: Database.Database[] = [];
 
@@ -180,6 +182,53 @@ describe("ledger routes", () => {
 
     expect(listed.events).toHaveLength(1);
     expect(listed.events[0]?.id).toBe(created.event.id);
+  });
+
+  it("adds stable event receipts and detects tampering", () => {
+    const db = new Database(":memory:");
+    databases.push(db);
+    migrate(db);
+    const ledger = new LedgerRepository(db);
+    const run = ledger.createRun({
+      source: "codex",
+      project: "ice-council",
+      task: "Implement the ledger API",
+      status: "running"
+    });
+    const first = ledger.createEvent({
+      runId: run.id,
+      type: "progress",
+      message: "first event",
+      importance: 4,
+      createdAt: "2026-06-26T09:00:00.000Z"
+    });
+    ledger.createEvent({
+      runId: run.id,
+      type: "completed",
+      message: "second event",
+      importance: 5,
+      data: { ok: true },
+      createdAt: "2026-06-26T09:05:00.000Z"
+    });
+
+    const events = ledger.listEvents({ runId: run.id, limit: 10 });
+    const repeated = ledger.listEvents({ runId: run.id, limit: 10 });
+
+    expect(first?.eventHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(repeated.map((event) => event.eventHash)).toEqual(
+      events.map((event) => event.eventHash)
+    );
+    expect(verifyEventChain(events)).toEqual({ status: "pass", checkedEvents: 2 });
+
+    db.prepare("UPDATE agent_events SET message = ? WHERE id = ?").run("tampered event", first?.id);
+
+    expect(verifyEventChain(ledger.listEvents({ runId: run.id, limit: 10 }))).toEqual(
+      expect.objectContaining({
+        status: "fail",
+        eventId: first?.id,
+        reason: "event hash does not match event content"
+      })
+    );
   });
 
   it("returns useful errors for invalid payloads and missing records", async () => {

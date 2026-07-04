@@ -26,13 +26,15 @@ export const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_agent_runs_status_updated_at
     ON agent_runs (status, updated_at DESC)`,
   `CREATE TABLE IF NOT EXISTS agent_events (
-    id TEXT PRIMARY KEY,
-    run_id TEXT NOT NULL,
-    type TEXT NOT NULL,
-    message TEXT NOT NULL,
-    importance INTEGER NOT NULL,
-    data_json TEXT,
-    created_at TEXT NOT NULL,
+            id TEXT PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            type TEXT NOT NULL,
+            message TEXT NOT NULL,
+            importance INTEGER NOT NULL,
+            data_json TEXT,
+            prev_event_hash TEXT,
+            event_hash TEXT,
+            created_at TEXT NOT NULL,
     FOREIGN KEY (run_id) REFERENCES agent_runs (id) ON DELETE CASCADE
   )`,
   `CREATE INDEX IF NOT EXISTS idx_agent_events_run_id_created_at

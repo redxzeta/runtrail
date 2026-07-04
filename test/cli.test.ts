@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../src/cli/index.js";
+import { computeEventHash } from "../src/shared/receipts.js";
+import type { AgentEvent } from "../src/shared/schemas.js";
 
 describe("cli", () => {
   afterEach(() => {
@@ -235,6 +237,91 @@ describe("cli", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("verifies run event receipts", async () => {
+    const events = addReceiptChain([
+      {
+        id: "evt_1",
+        runId: "run_1",
+        type: "progress",
+        message: "captured work",
+        importance: 4,
+        createdAt: "2026-06-26T09:00:00.000Z"
+      }
+    ]);
+    const fetchMock = mockFetch({ run: { id: "run_1" }, events });
+    const output = captureOutput();
+
+    await runCli(["node", "rt", "verify", "run", "run_1"]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL("/runs/run_1", "http://runtrail.test"),
+      expect.any(Object)
+    );
+    expect(JSON.parse(output.join("\n"))).toEqual({
+      runId: "run_1",
+      status: "pass",
+      checkedEvents: 1
+    });
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("fails receipt verification when event content changes", async () => {
+    const [event] = addReceiptChain([
+      {
+        id: "evt_1",
+        runId: "run_1",
+        type: "progress",
+        message: "captured work",
+        importance: 4,
+        createdAt: "2026-06-26T09:00:00.000Z"
+      }
+    ]);
+    mockFetch({
+      run: { id: "run_1" },
+      events: [{ ...event, message: "changed after receipt" }]
+    });
+    const output = captureOutput();
+
+    await runCli(["node", "rt", "verify", "run", "run_1"]);
+
+    expect(JSON.parse(output.join("\n"))).toEqual({
+      runId: "run_1",
+      status: "fail",
+      checkedEvents: 0,
+      eventId: "evt_1",
+      reason: "event hash does not match event content"
+    });
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("reports runs without event receipts as unverifiable", async () => {
+    mockFetch({
+      run: { id: "run_1" },
+      events: [
+        {
+          id: "evt_1",
+          runId: "run_1",
+          type: "progress",
+          message: "old event",
+          importance: 4,
+          createdAt: "2026-06-26T09:00:00.000Z"
+        }
+      ]
+    });
+    const output = captureOutput();
+
+    await runCli(["node", "rt", "verify", "run", "run_1"]);
+
+    expect(JSON.parse(output.join("\n"))).toEqual({
+      runId: "run_1",
+      status: "unverifiable",
+      checkedEvents: 0,
+      eventId: "evt_1",
+      reason: "missing event hash"
+    });
+    expect(process.exitCode).toBe(1);
+  });
+
   it("wraps a successful command in a completed run", async () => {
     const fetchMock = mockRunWrapperFetch();
     vi.stubEnv("RUNTRAIL_LOG_DIR", "./data/test-cli-logs");
@@ -458,4 +545,19 @@ function mockRunWrapperFetch(): ReturnType<typeof vi.fn> {
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
+}
+
+function addReceiptChain(events: AgentEvent[]): AgentEvent[] {
+  let previousHash: string | undefined;
+
+  return events.map((event) => {
+    const eventHash = computeEventHash(event, previousHash);
+    const withReceipt = {
+      ...event,
+      prevEventHash: previousHash,
+      eventHash
+    };
+    previousHash = eventHash;
+    return withReceipt;
+  });
 }
