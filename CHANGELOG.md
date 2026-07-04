@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/redxzeta/runtrail/compare/v1.14.0...v1.15.0) (2026-07-04)
+
+
+### Features
+
+* **ui:** improve context recovery pages ([#43](https://github.com/redxzeta/runtrail/issues/43)) ([c02e827](https://github.com/redxzeta/runtrail/commit/c02e82706f9f701effd8d0a3f7e7ef75192beb11))
+
 # [1.14.0](https://github.com/redxzeta/runtrail/compare/v1.13.0...v1.14.0) (2026-07-04)
 
 
