@@ -7,7 +7,13 @@ Set local environment first:
 ```sh
 export RUNTRAIL_URL=http://127.0.0.1:8787
 export RUNTRAIL_TOKEN=change-me-to-a-long-random-secret
-export RUNTRAIL_RUN_ID=run_existing_from_wrapper
+```
+
+Create a run for the hook session and export its returned `run.id`:
+
+```sh
+rt run create --source claude-code --project <project> --task "Claude Code session"
+export RUNTRAIL_RUN_ID=run_abc123
 ```
 
 Post lifecycle events with the CLI:
@@ -20,4 +26,4 @@ rt event create --run-id "$RUNTRAIL_RUN_ID" --type completed --message "Claude C
 rt event create --run-id "$RUNTRAIL_RUN_ID" --type failed --message "Claude Code failed" --importance 9
 ```
 
-Use `rt run --source claude-code --project <project> --task <task> -- claude ...` when possible. Hooks are useful for intermediate notifications; the wrapper is still the source of truth for start/end state, exit code, host, cwd, git metadata, and log artifacts.
+Use `rt run --source claude-code --project <project> --task <task> -- claude ...` when possible. Hooks are useful for intermediate notifications when a session run id is already exported; the wrapper does not export `RUNTRAIL_RUN_ID` for child hooks and remains the source of truth for start/end state, exit code, host, cwd, git metadata, and log artifacts.

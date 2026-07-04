@@ -2,27 +2,57 @@
   "hooks": {
     "SessionStart": [
       {
-        "command": "rt event create --run-id \"$RUNTRAIL_RUN_ID\" --type started --message \"Claude Code session started\" --importance 4"
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rt event create --run-id \"$RUNTRAIL_RUN_ID\" --type started --message \"Claude Code session started\" --importance 4"
+          }
+        ]
       }
     ],
     "Notification": [
       {
-        "command": "rt event create --run-id \"$RUNTRAIL_RUN_ID\" --type decision_required --message \"Claude Code needs input\" --importance 8"
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rt event create --run-id \"$RUNTRAIL_RUN_ID\" --type decision_required --message \"Claude Code needs input\" --importance 8"
+          }
+        ]
       }
     ],
     "PostToolUse": [
       {
-        "command": "rt event create --run-id \"$RUNTRAIL_RUN_ID\" --type files_changed --message \"Claude Code changed files\" --importance 5"
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rt event create --run-id \"$RUNTRAIL_RUN_ID\" --type files_changed --message \"Claude Code changed files\" --importance 5"
+          }
+        ]
       }
     ],
     "Stop": [
       {
-        "command": "rt event create --run-id \"$RUNTRAIL_RUN_ID\" --type completed --message \"Claude Code completed\" --importance 6"
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rt event create --run-id \"$RUNTRAIL_RUN_ID\" --type completed --message \"Claude Code completed\" --importance 6"
+          }
+        ]
       }
     ],
     "SubagentStop": [
       {
-        "command": "rt event create --run-id \"$RUNTRAIL_RUN_ID\" --type completed --message \"Claude Code subagent completed\" --importance 5"
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rt event create --run-id \"$RUNTRAIL_RUN_ID\" --type completed --message \"Claude Code subagent completed\" --importance 5"
+          }
+        ]
       }
     ]
   }
