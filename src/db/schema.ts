@@ -25,6 +25,8 @@ export const schemaStatements = [
     ON agent_runs (project, updated_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_agent_runs_status_updated_at
     ON agent_runs (status, updated_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_runs_project_status_updated_at
+    ON agent_runs (project, status, updated_at DESC)`,
   `CREATE TABLE IF NOT EXISTS agent_events (
             id TEXT PRIMARY KEY,
             run_id TEXT NOT NULL,
