@@ -1,0 +1,23 @@
+# OpenClaw Runtrail Examples
+
+Use the Runtrail wrapper when OpenClaw work should be durable across machines and agents.
+
+```sh
+export RUNTRAIL_URL=http://127.0.0.1:8787
+export RUNTRAIL_TOKEN=change-me-to-a-long-random-secret
+
+rt run \
+  --source openclaw \
+  --project ice-council \
+  --task "research candidate handoff" \
+  -- openclaw run "research today's candidate set"
+```
+
+For interactive shells:
+
+```sh
+alias clawj='rt run --source openclaw'
+clawj --project ice-council --task "submit-only preflight" -- openclaw run "prepare submit-only preflight"
+```
+
+Wrappers are preferred over agent self-reporting because they record command start, exit status, cwd, host, git metadata, changed files, and log artifact metadata even when the agent fails before writing a final summary.
