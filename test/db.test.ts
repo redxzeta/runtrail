@@ -21,6 +21,9 @@ describe("database", () => {
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as Array<{ name: string }>;
+    const indexes = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' ORDER BY name")
+      .all() as Array<{ name: string }>;
     db.close();
 
     expect(existsSync(config.storage.dbPath)).toBe(true);
@@ -34,6 +37,9 @@ describe("database", () => {
       "open_loops",
       "schema_migrations"
     ]);
+    expect(indexes.map((index) => index.name)).toContain(
+      "idx_agent_runs_project_status_updated_at"
+    );
   });
 
   it("adds open loop collaboration columns to existing databases", () => {
