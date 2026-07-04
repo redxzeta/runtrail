@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/redxzeta/runtrail/compare/v1.16.1...v1.17.0) (2026-07-04)
+
+
+### Features
+
+* **events:** add hash-chain receipts ([#51](https://github.com/redxzeta/runtrail/issues/51)) ([e469547](https://github.com/redxzeta/runtrail/commit/e46954707ec086f5d13dedcd158f897fc66347a9))
+
 ## [1.16.1](https://github.com/redxzeta/runtrail/compare/v1.16.0...v1.16.1) (2026-07-04)
 
 
