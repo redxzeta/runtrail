@@ -6,7 +6,8 @@ Runtrail is an agent-first activity ledger. Keep changes small, structured, and 
 
 - Use `pnpm` only.
 - Implement one phase at a time.
-- Do not add deployment, UI, Discord, MCP, or Markdown export work before its phase.
+- Existing UI, Discord, MCP, Markdown export, and deployment/container surfaces may be maintained in their current scope.
+- Do not expand those surfaces or add new product areas unless the active issue explicitly includes that phase.
 - Store structured facts in SQLite and verbose logs as files.
 - Do not store secrets in YAML or source files.
 - Prefer boring TypeScript, Zod validation, and focused tests.
