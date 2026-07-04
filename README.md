@@ -178,6 +178,10 @@ Do not commit real tokens or webhook URLs.
 
 Runtrail is intended for trusted LAN/VPN access. The example config binds to `0.0.0.0` so other machines on the trusted network can reach it during development.
 
+## Systemd Deployment
+
+For a non-root Ubuntu/Debian Proxmox LXC install, see [docs/systemd-lxc.md](docs/systemd-lxc.md).
+
 ## Optional Container Deployment
 
 The primary self-hosted path can still be a normal LXC/systemd service. Containers are optional for users who prefer Docker Compose or Podman Compose.

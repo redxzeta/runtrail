@@ -1,0 +1,23 @@
+[Unit]
+Description=Runtrail activity ledger
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=runtrail
+Group=runtrail
+WorkingDirectory=/opt/runtrail
+Environment=NODE_ENV=production
+Environment=RUNTRAIL_CONFIG=/etc/runtrail/config.yaml
+EnvironmentFile=/etc/runtrail/runtrail.env
+ExecStart=/usr/bin/node /opt/runtrail/dist/index.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/runtrail /var/log/runtrail /opt/runtrail/data
+
+[Install]
+WantedBy=multi-user.target
