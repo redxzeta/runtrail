@@ -185,6 +185,16 @@ export const listArtifactsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(50)
 });
 
+export const journalSearchQuerySchema = z.object({
+  project: z.string().trim().min(1).max(120).optional(),
+  source: z.string().trim().min(1).max(80).optional(),
+  status: z.string().trim().min(1).max(80).optional(),
+  text: z.string().trim().min(1).max(200).optional(),
+  date_from: z.string().datetime().optional(),
+  date_to: z.string().datetime().optional(),
+  limit: z.coerce.number().int().positive().max(50).default(20)
+});
+
 export const agentContextQuerySchema = z.object({
   project: z.string().trim().min(1).max(120),
   limit: z.coerce.number().int().positive().max(50).default(10),
@@ -209,6 +219,7 @@ export type CreateHandoffRequest = z.infer<typeof createHandoffRequestSchema>;
 export type ListHandoffsQuery = z.infer<typeof listHandoffsQuerySchema>;
 export type CreateArtifactRequest = z.infer<typeof createArtifactRequestSchema>;
 export type ListArtifactsQuery = z.infer<typeof listArtifactsQuerySchema>;
+export type JournalSearchQuery = z.infer<typeof journalSearchQuerySchema>;
 export type AgentContextQuery = z.infer<typeof agentContextQuerySchema>;
 
 export type AgentRun = {
@@ -308,4 +319,12 @@ export type RunManifest = {
   open_loops: OpenLoop[];
   handoffs: Handoff[];
   artifacts: Artifact[];
+};
+
+export type JournalSearchResults = {
+  runs: AgentRun[];
+  events: Array<Omit<AgentEvent, "data">>;
+  open_loops: OpenLoop[];
+  handoffs: Handoff[];
+  decisions: Decision[];
 };

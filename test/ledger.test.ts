@@ -737,6 +737,94 @@ describe("ledger routes", () => {
     expect(context.next_actions).toEqual(["Confirm live host path"]);
   });
 
+  it("searches journal records with text, date, project, source, and status filters", async () => {
+    const app = createTestApp();
+    const run = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        project: "runtrail",
+        source: "codex",
+        task: "needle run task",
+        startedAt: "2026-07-01T10:00:00.000Z"
+      })
+    ).json()) as { run: { id: string } };
+    await postJson(app, "/runs", {
+      ...validRunRequest(),
+      project: "other",
+      source: "codex",
+      task: "needle wrong project",
+      startedAt: "2026-07-01T10:00:00.000Z"
+    });
+    await postJson(app, "/events", {
+      runId: run.run.id,
+      type: "progress",
+      message: "needle event",
+      createdAt: "2026-07-01T10:05:00.000Z"
+    });
+    await postJson(app, "/open-loops", {
+      type: "blocked",
+      project: "runtrail",
+      title: "needle loop",
+      source: "codex",
+      createdAt: "2026-07-01T10:06:00.000Z"
+    });
+    await postJson(app, "/handoffs", {
+      fromSource: "codex",
+      project: "runtrail",
+      summary: "needle handoff",
+      createdAt: "2026-07-01T10:07:00.000Z"
+    });
+    await postJson(app, "/decisions", {
+      project: "runtrail",
+      title: "needle decision",
+      decision: "Use simple SQLite search",
+      createdAt: "2026-07-01T10:08:00.000Z"
+    });
+
+    const query =
+      "project=runtrail&source=codex&text=needle&date_from=2026-07-01T00:00:00.000Z&date_to=2026-07-02T00:00:00.000Z";
+    const response = await app.request(`/search?${query}`, {
+      headers: authHeaders()
+    });
+    const body = (await response.json()) as {
+      results: {
+        runs: Array<{ task: string }>;
+        events: Array<{ message: string }>;
+        open_loops: Array<{ title: string }>;
+        handoffs: Array<{ summary: string }>;
+        decisions: Array<{ title: string }>;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.results.runs).toEqual([expect.objectContaining({ task: "needle run task" })]);
+    expect(body.results.events).toEqual([expect.objectContaining({ message: "needle event" })]);
+    expect(body.results.open_loops).toEqual([expect.objectContaining({ title: "needle loop" })]);
+    expect(body.results.handoffs).toEqual([expect.objectContaining({ summary: "needle handoff" })]);
+    expect(body.results.decisions).toEqual([expect.objectContaining({ title: "needle decision" })]);
+
+    const htmlResponse = await app.request(`/search?${query}`, {
+      headers: {
+        ...authHeaders(),
+        accept: "text/html"
+      }
+    });
+    const html = await htmlResponse.text();
+
+    expect(htmlResponse.status).toBe(200);
+    expect(html).toContain("Run results");
+    expect(html).toContain("needle handoff");
+
+    const statusResponse = await app.request("/search?project=runtrail&status=running", {
+      headers: authHeaders()
+    });
+    const statusBody = (await statusResponse.json()) as {
+      results: { runs: Array<{ task: string }> };
+    };
+
+    expect(statusBody.results.runs).toEqual([expect.objectContaining({ task: "needle run task" })]);
+  });
+
   it("keeps low-importance exceptional events in agent context", async () => {
     const app = createTestApp();
     const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {

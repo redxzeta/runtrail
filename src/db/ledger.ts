@@ -14,6 +14,8 @@ import type {
   CreateRunRequest,
   Decision,
   Handoff,
+  JournalSearchQuery,
+  JournalSearchResults,
   ListArtifactsQuery,
   ListDecisionsQuery,
   ListEventsQuery,
@@ -763,6 +765,89 @@ export class LedgerRepository {
     return rows.map(mapArtifactRow);
   }
 
+  searchJournal(query: JournalSearchQuery): JournalSearchResults {
+    const params = searchParams(query);
+    const runFilters = searchFilters(query, "agent_runs", ["task", "summary", "project", "source"]);
+    const eventFilters = searchFilters(query, "agent_events", ["message"], "agent_runs");
+    const openLoopFilters = searchFilters(query, "open_loops", [
+      "title",
+      "description",
+      "next_action",
+      "blocker_ref",
+      "project",
+      "source",
+      "owner"
+    ]);
+    const handoffFilters = searchFilters(query, "handoffs", [
+      "summary",
+      "next_action",
+      "project",
+      "from_source",
+      "to_source"
+    ]);
+    const decisionFilters = searchFilters(query, "decisions", [
+      "title",
+      "decision",
+      "rationale",
+      "project"
+    ]);
+
+    const runs = this.db
+      .prepare(
+        `SELECT *
+        FROM agent_runs
+        ${whereClause(runFilters)}
+        ORDER BY updated_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as RunRow[];
+    const events = this.db
+      .prepare(
+        `SELECT agent_events.*
+        FROM agent_events
+        INNER JOIN agent_runs ON agent_runs.id = agent_events.run_id
+        ${whereClause(eventFilters)}
+        ORDER BY agent_events.created_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as EventRow[];
+    const openLoops = this.db
+      .prepare(
+        `SELECT *
+        FROM open_loops
+        ${whereClause(openLoopFilters)}
+        ORDER BY updated_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as OpenLoopRow[];
+    const handoffs = this.db
+      .prepare(
+        `SELECT *
+        FROM handoffs
+        ${whereClause(handoffFilters)}
+        ORDER BY created_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as HandoffRow[];
+    const decisions = this.db
+      .prepare(
+        `SELECT *
+        FROM decisions
+        ${whereClause(decisionFilters)}
+        ORDER BY created_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as DecisionRow[];
+
+    return {
+      runs: runs.map(mapRunRow),
+      events: events.map(mapEventContextRow),
+      open_loops: openLoops.map(mapOpenLoopRow),
+      handoffs: handoffs.map(mapHandoffRow),
+      decisions: decisions.map(mapDecisionRow)
+    };
+  }
+
   getRunManifest(id: string): RunManifest | undefined {
     const run = this.getRun(id);
 
@@ -1037,4 +1122,77 @@ function readChangedFiles(event: AgentEvent): string[] {
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function searchParams(query: JournalSearchQuery): Record<string, string | number> {
+  return {
+    limit: query.limit,
+    project: query.project ?? "",
+    source: query.source ?? "",
+    status: query.status ?? "",
+    dateFrom: query.date_from ?? "",
+    dateTo: query.date_to ?? "",
+    text: query.text ? `%${escapeLike(query.text)}%` : ""
+  };
+}
+
+function searchFilters(
+  query: JournalSearchQuery,
+  table: string,
+  textColumns: string[],
+  runTable = table
+): string[] {
+  const filters: string[] = [];
+
+  if (query.project) {
+    filters.push(`${runTable}.project = @project`);
+  }
+
+  if (query.source) {
+    if (table === "handoffs") {
+      filters.push("(handoffs.from_source = @source OR handoffs.to_source = @source)");
+    } else if (table === "open_loops") {
+      filters.push("open_loops.source = @source");
+    } else if (table !== "decisions") {
+      filters.push(`${runTable}.source = @source`);
+    }
+  }
+
+  if (query.status) {
+    if (table === "agent_runs" || table === "open_loops") {
+      filters.push(`${table}.status = @status`);
+    }
+  }
+
+  if (query.date_from) {
+    filters.push(`${dateColumn(table)} >= @dateFrom`);
+  }
+
+  if (query.date_to) {
+    filters.push(`${dateColumn(table)} < @dateTo`);
+  }
+
+  if (query.text) {
+    filters.push(
+      `(${textColumns.map((column) => `${table}.${column} LIKE @text ESCAPE '\\'`).join(" OR ")})`
+    );
+  }
+
+  return filters;
+}
+
+function dateColumn(table: string): string {
+  if (table === "agent_runs") {
+    return "agent_runs.started_at";
+  }
+
+  return `${table}.created_at`;
+}
+
+function whereClause(filters: string[]): string {
+  return filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+}
+
+function escapeLike(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
 }

@@ -15,6 +15,8 @@ import {
   createRunRequestSchema,
   type Decision,
   type Handoff,
+  type JournalSearchResults,
+  journalSearchQuerySchema,
   listArtifactsQuerySchema,
   listDecisionsQuerySchema,
   listEventsQuerySchema,
@@ -297,6 +299,24 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     return c.json(ledger.getAgentContext(parsed.data));
   });
 
+  route.get("/search", (c) => {
+    const parsed = journalSearchQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams)
+    );
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    const results = ledger.searchJournal(parsed.data);
+
+    if (wantsHtml(c.req.raw)) {
+      return c.html(page("Search", [searchForm(parsed.data), searchResults(results)]));
+    }
+
+    return c.json({ results });
+  });
+
   route.post("/handoffs", async (c) => {
     const body = await readJson(c.req.raw);
     const parsed = createHandoffRequestSchema.safeParse(body);
@@ -445,6 +465,7 @@ function page(title: string, sections: string[]): string {
     <nav>
       ${link("/today", "Today")}
       ${link("/runs", "Runs")}
+      ${link("/search", "Search")}
       ${link("/open-loops", "Open loops")}
       ${link("/decisions", "Decisions")}
       ${link("/errors", "Errors")}
@@ -668,6 +689,61 @@ function decisionList(decisions: Decision[]): string {
             <td>${escapeHtml(decision.decision)}</td>
             <td>${decision.project ? escapeHtml(decision.project) : "global"}</td>
             <td class="meta">${escapeHtml(decision.createdAt)}</td>
+          </tr>`
+        )
+        .join("")}</tbody>
+    </table>
+  </section>`;
+}
+
+function searchForm(query: {
+  project?: string;
+  source?: string;
+  status?: string;
+  text?: string;
+  date_from?: string;
+  date_to?: string;
+}): string {
+  return `<section>
+    <h2>Search</h2>
+    <form method="get" action="/search">
+      <p><label>Text <input name="text" value="${escapeHtml(query.text ?? "")}"></label></p>
+      <p><label>Project <input name="project" value="${escapeHtml(query.project ?? "")}"></label></p>
+      <p><label>Source <input name="source" value="${escapeHtml(query.source ?? "")}"></label></p>
+      <p><label>Status <input name="status" value="${escapeHtml(query.status ?? "")}"></label></p>
+      <p><label>Date from <input name="date_from" value="${escapeHtml(query.date_from ?? "")}"></label></p>
+      <p><label>Date to <input name="date_to" value="${escapeHtml(query.date_to ?? "")}"></label></p>
+      <button type="submit">Search</button>
+    </form>
+  </section>`;
+}
+
+function searchResults(results: JournalSearchResults): string {
+  return [
+    runList(results.runs, "Run results"),
+    eventList(results.events, "Event results"),
+    openLoopList(results.open_loops, "Open loop results"),
+    handoffList(results.handoffs, "Handoff results"),
+    decisionList(results.decisions)
+  ].join("");
+}
+
+function eventList(events: Array<Omit<AgentEvent, "data">>, title: string): string {
+  if (events.length === 0) {
+    return section(title, ['<p class="empty">No events found.</p>']);
+  }
+
+  return `<section>
+    <h2>${escapeHtml(title)}</h2>
+    <table>
+      <thead><tr><th>Type</th><th>Message</th><th>Importance</th><th>Created</th></tr></thead>
+      <tbody>${events
+        .map(
+          (event) => `<tr>
+            <td>${escapeHtml(event.type)}</td>
+            <td>${escapeHtml(event.message)}</td>
+            <td>${event.importance}</td>
+            <td class="meta">${escapeHtml(event.createdAt)}</td>
           </tr>`
         )
         .join("")}</tbody>
