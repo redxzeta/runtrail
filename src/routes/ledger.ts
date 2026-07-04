@@ -598,6 +598,14 @@ function groupedOpenLoopList(openLoops: OpenLoop[]): string[] {
     openLoopList(
       openLoops.filter((loop) => loop.type === "ready_to_deploy"),
       "Ready to deploy"
+    ),
+    openLoopList(
+      openLoops.filter((loop) => loop.type === "follow_up"),
+      "Follow up"
+    ),
+    openLoopList(
+      openLoops.filter((loop) => loop.type === "risk"),
+      "Risk"
     )
   ];
 }

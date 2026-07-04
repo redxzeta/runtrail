@@ -82,6 +82,26 @@ describe("ledger routes", () => {
     expect(fetched.events).toEqual([]);
   });
 
+  it("normalizes run date filters before SQLite text comparison", async () => {
+    const app = createTestApp();
+    await postJson(app, "/runs", {
+      ...validRunRequest(),
+      task: "exclusive boundary run",
+      startedAt: "2026-06-28T00:00:00.000Z"
+    });
+
+    const response = await app.request(
+      "/runs?project=ice-council&started_to=2026-06-28T00:00:00Z",
+      {
+        headers: authHeaders()
+      }
+    );
+    const body = (await response.json()) as { runs: Array<{ task: string }> };
+
+    expect(response.status).toBe(200);
+    expect(body.runs).toEqual([]);
+  });
+
   it("stores omitted run metadata as nullable SQLite values", async () => {
     const app = createTestApp();
     const createdResponse = await postJson(app, "/runs", {
@@ -666,7 +686,8 @@ describe("ledger routes", () => {
     await postJson(app, "/open-loops", {
       type: "blocked",
       project: "ice-council",
-      title: "Confirm live host path"
+      title: "Confirm live host path",
+      nextAction: "Check host readiness"
     });
     await postJson(app, "/decisions", {
       title: "Global retention policy",
@@ -705,7 +726,7 @@ describe("ledger routes", () => {
       recent_runs: Array<{ id: string }>;
       failed_runs: Array<{ id: string; summary: string }>;
       recent_events: Array<{ message: string; data?: unknown }>;
-      recent_handoffs: Array<{ summary: string; nextAction: string }>;
+      recent_handoffs: Array<{ summary: string; nextAction: string; context?: unknown }>;
       open_loops: Array<{ title: string }>;
       decisions: Array<{ title: string }>;
       next_actions: string[];
@@ -727,6 +748,7 @@ describe("ledger routes", () => {
         nextAction: "Inspect failure event"
       })
     ]);
+    expect(context.recent_handoffs[0]).not.toHaveProperty("context");
     expect(context.open_loops).toEqual([
       expect.objectContaining({ title: "Confirm live host path" })
     ]);
@@ -734,7 +756,7 @@ describe("ledger routes", () => {
       "Use concise context",
       "Global retention policy"
     ]);
-    expect(context.next_actions).toEqual(["Confirm live host path"]);
+    expect(context.next_actions).toEqual(["Check host readiness"]);
   });
 
   it("searches journal records with text, date, project, source, and status filters", async () => {
@@ -907,6 +929,16 @@ describe("ledger routes", () => {
       summary: "Review failed UI run",
       nextAction: "Check route output"
     });
+    await postJson(app, "/open-loops", {
+      type: "follow_up",
+      project: "ice-council",
+      title: "Schedule follow-up"
+    });
+    await postJson(app, "/open-loops", {
+      type: "risk",
+      project: "ice-council",
+      title: "Track deployment risk"
+    });
     await postJson(app, "/artifacts", {
       runId: run.run.id,
       kind: "log",
@@ -979,6 +1011,10 @@ describe("ledger routes", () => {
       "Resolve production blocker"
     );
     expect(pages.find((page) => page.path === "/open-loops")?.body).toContain("Inspect failed run");
+    expect(pages.find((page) => page.path === "/open-loops")?.body).toContain("Schedule follow-up");
+    expect(pages.find((page) => page.path === "/open-loops")?.body).toContain(
+      "Track deployment risk"
+    );
     expect(pages.find((page) => page.path === "/projects/ice-council")?.body).toContain(
       "Recent handoffs"
     );

@@ -14,6 +14,7 @@ import type {
   CreateRunRequest,
   Decision,
   Handoff,
+  HandoffSummary,
   JournalSearchQuery,
   JournalSearchResults,
   ListArtifactsQuery,
@@ -243,12 +244,12 @@ export class LedgerRepository {
 
     if (query.started_from) {
       filters.push("started_at >= @startedFrom");
-      params.startedFrom = query.started_from;
+      params.startedFrom = normalizeTimestamp(query.started_from);
     }
 
     if (query.started_to) {
       filters.push("started_at < @startedTo");
-      params.startedTo = query.started_to;
+      params.startedTo = normalizeTimestamp(query.started_to);
     }
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
@@ -903,7 +904,14 @@ export class LedgerRepository {
 
     const recentEvents = this.db
       .prepare(
-        `SELECT agent_events.*
+        `SELECT
+          agent_events.id,
+          agent_events.run_id,
+          agent_events.type,
+          agent_events.message,
+          agent_events.importance,
+          NULL AS data_json,
+          agent_events.created_at
         FROM agent_events
         INNER JOIN agent_runs ON agent_runs.id = agent_events.run_id
         WHERE agent_runs.project = @project
@@ -940,7 +948,16 @@ export class LedgerRepository {
 
     const handoffs = this.db
       .prepare(
-        `SELECT *
+        `SELECT
+          id,
+          source_run_id,
+          from_source,
+          to_source,
+          project,
+          summary,
+          next_action,
+          NULL AS context_json,
+          created_at
         FROM handoffs
         WHERE project = @project
         ORDER BY created_at DESC
@@ -963,10 +980,10 @@ export class LedgerRepository {
       recent_runs: recentRuns.map(mapRunRow),
       failed_runs: failedRuns.map(mapRunRow),
       recent_events: recentEvents.map(mapEventContextRow),
-      recent_handoffs: handoffs.map(mapHandoffRow),
+      recent_handoffs: handoffs.map(mapHandoffSummaryRow),
       open_loops: openLoops.map(mapOpenLoopRow),
       decisions: decisions.map(mapDecisionRow),
-      next_actions: openLoops.map((loop) => loop.title)
+      next_actions: openLoops.map((loop) => loop.next_action ?? loop.title)
     };
   }
 }
@@ -1083,6 +1100,19 @@ function mapHandoffRow(row: HandoffRow): Handoff {
   };
 }
 
+function mapHandoffSummaryRow(row: HandoffRow): HandoffSummary {
+  return {
+    id: row.id,
+    sourceRunId: row.source_run_id ?? undefined,
+    fromSource: row.from_source,
+    toSource: row.to_source ?? undefined,
+    project: row.project,
+    summary: row.summary,
+    nextAction: row.next_action ?? undefined,
+    createdAt: row.created_at
+  };
+}
+
 function mapArtifactRow(row: ArtifactRow): Artifact {
   return {
     id: row.id,
@@ -1130,10 +1160,14 @@ function searchParams(query: JournalSearchQuery): Record<string, string | number
     project: query.project ?? "",
     source: query.source ?? "",
     status: query.status ?? "",
-    dateFrom: query.date_from ?? "",
-    dateTo: query.date_to ?? "",
+    dateFrom: query.date_from ? normalizeTimestamp(query.date_from) : "",
+    dateTo: query.date_to ? normalizeTimestamp(query.date_to) : "",
     text: query.text ? `%${escapeLike(query.text)}%` : ""
   };
+}
+
+function normalizeTimestamp(value: string): string {
+  return new Date(value).toISOString();
 }
 
 function searchFilters(
