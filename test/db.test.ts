@@ -26,7 +26,9 @@ describe("database", () => {
     expect(tables.map((table) => table.name)).toEqual([
       "agent_events",
       "agent_runs",
+      "artifacts",
       "decisions",
+      "handoffs",
       "open_loops",
       "schema_migrations"
     ]);

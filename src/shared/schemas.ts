@@ -137,6 +137,42 @@ export const listDecisionsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(50)
 });
 
+export const createHandoffRequestSchema = z.object({
+  sourceRunId: z.string().trim().min(1).optional(),
+  fromSource: z.string().trim().min(1).max(80),
+  toSource: z.string().trim().min(1).max(80).optional(),
+  project: z.string().trim().min(1).max(120),
+  summary: z.string().trim().min(1).max(2000),
+  nextAction: z.string().trim().min(1).max(1000).optional(),
+  context: z.unknown().optional(),
+  createdAt: z.string().datetime().optional()
+});
+
+export const listHandoffsQuerySchema = z.object({
+  project: z.string().trim().min(1).max(120).optional(),
+  sourceRunId: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50)
+});
+
+export const createArtifactRequestSchema = z.object({
+  runId: z.string().trim().min(1),
+  kind: z.string().trim().min(1).max(80),
+  path: z.string().trim().min(1).max(1000),
+  sizeBytes: z.number().int().nonnegative().optional(),
+  sha256: z
+    .string()
+    .trim()
+    .regex(/^[a-fA-F0-9]{64}$/)
+    .optional(),
+  createdAt: z.string().datetime().optional()
+});
+
+export const listArtifactsQuerySchema = z.object({
+  runId: z.string().trim().min(1).optional(),
+  kind: z.string().trim().min(1).max(80).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50)
+});
+
 export const agentContextQuerySchema = z.object({
   project: z.string().trim().min(1).max(120),
   limit: z.coerce.number().int().positive().max(50).default(10),
@@ -157,6 +193,10 @@ export type UpdateOpenLoopRequest = z.infer<typeof updateOpenLoopRequestSchema>;
 export type ListOpenLoopsQuery = z.infer<typeof listOpenLoopsQuerySchema>;
 export type CreateDecisionRequest = z.infer<typeof createDecisionRequestSchema>;
 export type ListDecisionsQuery = z.infer<typeof listDecisionsQuerySchema>;
+export type CreateHandoffRequest = z.infer<typeof createHandoffRequestSchema>;
+export type ListHandoffsQuery = z.infer<typeof listHandoffsQuerySchema>;
+export type CreateArtifactRequest = z.infer<typeof createArtifactRequestSchema>;
+export type ListArtifactsQuery = z.infer<typeof listArtifactsQuerySchema>;
 export type AgentContextQuery = z.infer<typeof agentContextQuerySchema>;
 
 export type AgentRun = {
@@ -206,6 +246,28 @@ export type Decision = {
   title: string;
   decision: string;
   rationale?: string;
+  createdAt: string;
+};
+
+export type Handoff = {
+  id: string;
+  sourceRunId?: string;
+  fromSource: string;
+  toSource?: string;
+  project: string;
+  summary: string;
+  nextAction?: string;
+  context?: unknown;
+  createdAt: string;
+};
+
+export type Artifact = {
+  id: string;
+  runId: string;
+  kind: string;
+  path: string;
+  sizeBytes?: number;
+  sha256?: string;
   createdAt: string;
 };
 

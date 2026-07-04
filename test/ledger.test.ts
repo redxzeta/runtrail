@@ -323,6 +323,112 @@ describe("ledger routes", () => {
     ]);
   });
 
+  it("creates, lists, and fetches handoffs", async () => {
+    const app = createTestApp();
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+    const createdResponse = await postJson(app, "/handoffs", {
+      sourceRunId: run.run.id,
+      fromSource: "codex",
+      toSource: "openclaw",
+      project: "ice-council",
+      summary: "API work is ready for operator review",
+      nextAction: "Review changed routes",
+      context: {
+        changedFiles: ["src/routes/ledger.ts"]
+      },
+      createdAt: "2026-07-03T12:00:00.000Z"
+    });
+
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as {
+      handoff: {
+        id: string;
+        sourceRunId: string;
+        fromSource: string;
+        toSource: string;
+        context: { changedFiles: string[] };
+      };
+    };
+
+    expect(created.handoff.id).toMatch(/^handoff_/);
+    expect(created.handoff.sourceRunId).toBe(run.run.id);
+    expect(created.handoff.fromSource).toBe("codex");
+    expect(created.handoff.toSource).toBe("openclaw");
+    expect(created.handoff.context.changedFiles).toEqual(["src/routes/ledger.ts"]);
+
+    const listedResponse = await app.request(`/handoffs?project=ice-council`, {
+      headers: authHeaders()
+    });
+    const listed = (await listedResponse.json()) as {
+      handoffs: Array<{ id: string; nextAction: string }>;
+    };
+
+    expect(listedResponse.status).toBe(200);
+    expect(listed.handoffs).toEqual([
+      expect.objectContaining({
+        id: created.handoff.id,
+        nextAction: "Review changed routes"
+      })
+    ]);
+
+    const fetchedResponse = await app.request(`/handoffs/${created.handoff.id}`, {
+      headers: authHeaders()
+    });
+    const fetched = (await fetchedResponse.json()) as {
+      handoff: { id: string; summary: string };
+    };
+
+    expect(fetchedResponse.status).toBe(200);
+    expect(fetched.handoff).toEqual(
+      expect.objectContaining({
+        id: created.handoff.id,
+        summary: "API work is ready for operator review"
+      })
+    );
+  });
+
+  it("creates and lists artifact metadata", async () => {
+    const app = createTestApp();
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+    const createdResponse = await postJson(app, "/artifacts", {
+      runId: run.run.id,
+      kind: "log",
+      path: "data/logs/run_123.log",
+      sizeBytes: 42,
+      sha256: "a".repeat(64),
+      createdAt: "2026-07-03T12:05:00.000Z"
+    });
+
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as {
+      artifact: { id: string; runId: string; path: string; sizeBytes: number; sha256: string };
+    };
+
+    expect(created.artifact.id).toMatch(/^art_/);
+    expect(created.artifact.runId).toBe(run.run.id);
+    expect(created.artifact.path).toBe("data/logs/run_123.log");
+    expect(created.artifact.sizeBytes).toBe(42);
+
+    const listedResponse = await app.request(`/artifacts?runId=${run.run.id}`, {
+      headers: authHeaders()
+    });
+    const listed = (await listedResponse.json()) as {
+      artifacts: Array<{ id: string; sha256: string }>;
+    };
+
+    expect(listedResponse.status).toBe(200);
+    expect(listed.artifacts).toEqual([
+      expect.objectContaining({
+        id: created.artifact.id,
+        sha256: "a".repeat(64)
+      })
+    ]);
+  });
+
   it("validates open loop and decision payloads", async () => {
     const app = createTestApp();
     const invalidLoop = await postJson(app, "/open-loops", {
@@ -348,6 +454,37 @@ describe("ledger routes", () => {
     expect(missingLoop.status).toBe(404);
     expect(await missingLoop.json()).toEqual({ error: "Open loop not found" });
     expect(invalidDecision.status).toBe(400);
+  });
+
+  it("validates handoff and artifact payloads", async () => {
+    const app = createTestApp();
+    const invalidHandoff = await postJson(app, "/handoffs", {
+      fromSource: "codex",
+      project: "runtrail",
+      summary: ""
+    });
+    const missingRunHandoff = await postJson(app, "/handoffs", {
+      sourceRunId: "run_missing",
+      fromSource: "codex",
+      project: "runtrail",
+      summary: "Continue work"
+    });
+    const invalidArtifact = await postJson(app, "/artifacts", {
+      runId: "run_missing",
+      kind: "log",
+      path: "data/logs/run.log",
+      sha256: "not-a-sha"
+    });
+
+    expect(invalidHandoff.status).toBe(400);
+    expect(await invalidHandoff.json()).toEqual(
+      expect.objectContaining({
+        error: "Invalid request"
+      })
+    );
+    expect(missingRunHandoff.status).toBe(404);
+    expect(await missingRunHandoff.json()).toEqual({ error: "Source run not found" });
+    expect(invalidArtifact.status).toBe(400);
   });
 
   it("returns compact agent context for a project", async () => {
