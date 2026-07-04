@@ -5,6 +5,7 @@ import { LedgerRepository } from "../db/ledger.js";
 import {
   type AgentEvent,
   type AgentRun,
+  type Artifact,
   agentContextQuerySchema,
   createArtifactRequestSchema,
   createDecisionRequestSchema,
@@ -13,6 +14,7 @@ import {
   createOpenLoopRequestSchema,
   createRunRequestSchema,
   type Decision,
+  type Handoff,
   listArtifactsQuerySchema,
   listDecisionsQuerySchema,
   listEventsQuerySchema,
@@ -20,6 +22,7 @@ import {
   listOpenLoopsQuerySchema,
   listRunsQuerySchema,
   type OpenLoop,
+  type RunManifest,
   updateOpenLoopRequestSchema,
   updateRunRequestSchema
 } from "../shared/schemas.js";
@@ -49,18 +52,40 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     await next();
   });
 
-  route.get("/", (c) =>
-    c.html(
-      page("Runtrail", [
-        section("Context recovery", [
-          link("/runs", "Recent runs"),
-          link("/open-loops", "Open loops"),
-          link("/decisions", "Decisions"),
-          link("/errors", "Failed runs")
-        ])
+  route.get("/", (c) => c.redirect("/today"));
+
+  route.get("/today", (c) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const recentRuns = ledger.listRuns({ limit: 100 });
+    const completedToday = recentRuns.filter(
+      (run) => run.status === "completed" && run.completedAt?.startsWith(today)
+    );
+    const failedToday = recentRuns.filter(
+      (run) => run.status === "failed" && run.completedAt?.startsWith(today)
+    );
+    const inProgress = recentRuns.filter((run) => run.status === "running");
+    const openLoops = ledger.listOpenLoops({ status: "open", limit: 100 });
+
+    return c.html(
+      page("Today", [
+        runList(inProgress, "In progress"),
+        runList(completedToday, "Completed today"),
+        runList(failedToday, "Failed today"),
+        openLoopList(
+          openLoops.filter((loop) => loop.type === "needs_review"),
+          "Needs review"
+        ),
+        openLoopList(
+          openLoops.filter((loop) => loop.type === "decision_required"),
+          "Decision required"
+        ),
+        openLoopList(
+          openLoops.filter((loop) => loop.type === "blocked"),
+          "Blocked"
+        )
       ])
-    )
-  );
+    );
+  });
 
   route.post("/runs", async (c) => {
     const body = await readJson(c.req.raw);
@@ -125,13 +150,12 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json({ error: "Run not found" }, 404);
     }
 
-    const events = ledger.listEventsForRun(run.id);
-
     if (wantsHtml(c.req.raw)) {
-      return c.html(page(run.task, [runDetail(run, events)]));
+      const manifest = ledger.getRunManifest(run.id);
+      return c.html(page(run.task, [runDetail(run, ledger.listEventsForRun(run.id), manifest)]));
     }
 
-    return c.json({ run, events });
+    return c.json({ run, events: ledger.listEventsForRun(run.id) });
   });
 
   route.post("/events", async (c) => {
@@ -194,7 +218,7 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     const openLoops = ledger.listOpenLoops(parsed.data);
 
     if (wantsHtml(c.req.raw)) {
-      return c.html(page("Open loops", [openLoopList(openLoops)]));
+      return c.html(page("Open loops", groupedOpenLoopList(openLoops)));
     }
 
     return c.json({ openLoops });
@@ -215,6 +239,21 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     }
 
     return c.json({ openLoop });
+  });
+
+  route.post("/open-loops/:id/resolve", async (c) => {
+    const body = await c.req.parseBody();
+    const resolution = body.resolution;
+    const openLoop = ledger.updateOpenLoop(c.req.param("id"), {
+      status: "resolved",
+      resolution: typeof resolution === "string" && resolution.trim() ? resolution : "Resolved"
+    });
+
+    if (!openLoop) {
+      return c.json({ error: "Open loop not found" }, 404);
+    }
+
+    return c.redirect("/open-loops");
   });
 
   route.post("/decisions", async (c) => {
@@ -331,9 +370,17 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     const runs = ledger.listRuns({ project, limit: 25 });
     const openLoops = ledger.listOpenLoops({ project, status: "open", limit: 25 });
     const decisions = ledger.listDecisions({ project, includeGlobal: true, limit: 25 });
+    const context = ledger.getAgentContext({ project, limit: 25, min_importance: 4 });
 
     return c.html(
-      page(`Project: ${project}`, [runList(runs), openLoopList(openLoops), decisionList(decisions)])
+      page(`Project: ${project}`, [
+        runList(runs, "Recent runs"),
+        openLoopList(openLoops, "Unresolved open loops"),
+        handoffList(context.recent_handoffs, "Recent handoffs"),
+        runList(context.failed_runs, "Recent failures"),
+        summaryList(runs),
+        decisionList(decisions)
+      ])
     );
   });
 
@@ -396,7 +443,7 @@ function page(title: string, sections: string[]): string {
   <header>
     <h1>${escapeHtml(title)}</h1>
     <nav>
-      ${link("/", "Home")}
+      ${link("/today", "Today")}
       ${link("/runs", "Runs")}
       ${link("/open-loops", "Open loops")}
       ${link("/decisions", "Decisions")}
@@ -412,13 +459,13 @@ function section(title: string, items: string[]): string {
   return `<section><h2>${escapeHtml(title)}</h2>${items.join(" ")}</section>`;
 }
 
-function runList(runs: AgentRun[]): string {
+function runList(runs: AgentRun[], title = "Runs"): string {
   if (runs.length === 0) {
-    return section("Runs", ['<p class="empty">No runs found.</p>']);
+    return section(title, ['<p class="empty">No runs found.</p>']);
   }
 
   return `<section>
-    <h2>Runs</h2>
+    <h2>${escapeHtml(title)}</h2>
     <table>
       <thead><tr><th>Task</th><th>Status</th><th>Summary</th><th>Project</th><th>Updated</th></tr></thead>
       <tbody>${runs
@@ -436,14 +483,27 @@ function runList(runs: AgentRun[]): string {
   </section>`;
 }
 
-function runDetail(run: AgentRun, events: AgentEvent[]): string {
+function runDetail(run: AgentRun, events: AgentEvent[], manifest?: RunManifest): string {
+  const failure = findFailure(events);
+  const nextActions = manifest?.open_loops.map((loop) => loop.nextAction ?? loop.title) ?? [];
+
   return `<section>
     <h2>${escapeHtml(run.status)}</h2>
     <p>${escapeHtml(run.summary ?? run.task)}</p>
     <p class="meta">${escapeHtml(run.source)} / ${escapeHtml(run.project)} / ${escapeHtml(
       run.startedAt
     )}</p>
+    ${
+      failure
+        ? `<p><strong>Failure:</strong> ${escapeHtml(failure.message)}${failure.exitCode === undefined ? "" : ` (exit ${failure.exitCode})`}</p>`
+        : ""
+    }
   </section>
+  ${stringList("Changed files", manifest?.changed_files ?? [])}
+  ${stringList("Next actions", nextActions)}
+  ${artifactList(manifest?.artifacts ?? [])}
+  ${openLoopList(manifest?.open_loops ?? [], "Open loops from this run")}
+  ${handoffList(manifest?.handoffs ?? [], "Handoffs from this run")}
   <section>
     <h2>Events</h2>
     ${
@@ -466,27 +526,130 @@ function runDetail(run: AgentRun, events: AgentEvent[]): string {
   </section>`;
 }
 
-function openLoopList(openLoops: OpenLoop[]): string {
+function openLoopList(openLoops: OpenLoop[], title = "Open loops"): string {
   if (openLoops.length === 0) {
-    return section("Open loops", ['<p class="empty">No open loops found.</p>']);
+    return section(title, ['<p class="empty">No open loops found.</p>']);
   }
 
   return `<section>
-    <h2>Open loops</h2>
+    <h2>${escapeHtml(title)}</h2>
     <table>
-      <thead><tr><th>Title</th><th>Type</th><th>Project</th><th>Updated</th></tr></thead>
+      <thead><tr><th>Title</th><th>Type</th><th>Next action</th><th>Project</th><th>Updated</th><th>Resolve</th></tr></thead>
       <tbody>${openLoops
         .map(
           (loop) => `<tr>
             <td>${escapeHtml(loop.title)}</td>
             <td>${escapeHtml(loop.type)}</td>
+            <td>${escapeHtml(loop.nextAction ?? "")}</td>
             <td>${link(`/projects/${encodeURIComponent(loop.project)}`, loop.project)}</td>
             <td class="meta">${escapeHtml(loop.updatedAt)}</td>
+            <td>
+              <form method="post" action="/open-loops/${escapeHtml(loop.id)}/resolve">
+                <input type="hidden" name="resolution" value="Resolved from UI">
+                <button type="submit">Resolve</button>
+              </form>
+            </td>
           </tr>`
         )
         .join("")}</tbody>
     </table>
   </section>`;
+}
+
+function groupedOpenLoopList(openLoops: OpenLoop[]): string[] {
+  return [
+    openLoopList(
+      openLoops.filter((loop) => loop.type === "needs_review"),
+      "Needs review"
+    ),
+    openLoopList(
+      openLoops.filter((loop) => loop.type === "decision_required"),
+      "Decision required"
+    ),
+    openLoopList(
+      openLoops.filter((loop) => loop.type === "blocked"),
+      "Blocked"
+    ),
+    openLoopList(
+      openLoops.filter((loop) => loop.type === "failed_unresolved"),
+      "Failed / unresolved"
+    ),
+    openLoopList(
+      openLoops.filter((loop) => loop.type === "ready_to_deploy"),
+      "Ready to deploy"
+    )
+  ];
+}
+
+function handoffList(handoffs: Handoff[], title: string): string {
+  if (handoffs.length === 0) {
+    return section(title, ['<p class="empty">No handoffs found.</p>']);
+  }
+
+  return `<section>
+    <h2>${escapeHtml(title)}</h2>
+    <table>
+      <thead><tr><th>Summary</th><th>From</th><th>To</th><th>Next action</th><th>Created</th></tr></thead>
+      <tbody>${handoffs
+        .map(
+          (handoff) => `<tr>
+            <td>${escapeHtml(handoff.summary)}</td>
+            <td>${escapeHtml(handoff.fromSource)}</td>
+            <td>${escapeHtml(handoff.toSource ?? "")}</td>
+            <td>${escapeHtml(handoff.nextAction ?? "")}</td>
+            <td class="meta">${escapeHtml(handoff.createdAt)}</td>
+          </tr>`
+        )
+        .join("")}</tbody>
+    </table>
+  </section>`;
+}
+
+function artifactList(artifacts: Artifact[]): string {
+  if (artifacts.length === 0) {
+    return section("Artifacts", ['<p class="empty">No artifacts found.</p>']);
+  }
+
+  return `<section>
+    <h2>Artifacts</h2>
+    <table>
+      <thead><tr><th>Kind</th><th>Path</th><th>Size</th><th>SHA-256</th></tr></thead>
+      <tbody>${artifacts
+        .map(
+          (artifact) => `<tr>
+            <td>${escapeHtml(artifact.kind)}</td>
+            <td>${escapeHtml(artifact.path)}</td>
+            <td>${artifact.sizeBytes ?? ""}</td>
+            <td class="meta">${escapeHtml(artifact.sha256 ?? "")}</td>
+          </tr>`
+        )
+        .join("")}</tbody>
+    </table>
+  </section>`;
+}
+
+function summaryList(runs: AgentRun[]): string {
+  const summaries = runs.filter((run) => run.summary);
+
+  if (summaries.length === 0) {
+    return section("Latest summaries", ['<p class="empty">No summaries found.</p>']);
+  }
+
+  return section(
+    "Latest summaries",
+    summaries.map((run) => `<p>${escapeHtml(run.summary ?? "")}</p>`)
+  );
+}
+
+function stringList(title: string, values: string[]): string {
+  if (values.length === 0) {
+    return section(title, [`<p class="empty">No ${escapeHtml(title.toLowerCase())} found.</p>`]);
+  }
+
+  return section(
+    title,
+    values.map((value) => `<p>${escapeHtml(value)}</p>`)
+  );
 }
 
 function decisionList(decisions: Decision[]): string {
@@ -570,6 +733,35 @@ function notifyDiscord(config: RuntrailConfig, run: AgentRun | undefined, event:
 
 function isNotifiable(type: AgentEvent["type"]): boolean {
   return ["failed", "completed", "blocked", "needs_review", "decision_required"].includes(type);
+}
+
+function findFailure(events: AgentEvent[]): { message: string; exitCode?: number } | undefined {
+  let event: AgentEvent | undefined;
+
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if (events[index]?.type === "failed") {
+      event = events[index];
+      break;
+    }
+  }
+
+  if (!event) {
+    return undefined;
+  }
+
+  return {
+    message: event.message,
+    exitCode: readExitCode(event.data)
+  };
+}
+
+function readExitCode(data: unknown): number | undefined {
+  if (!data || typeof data !== "object" || !("exitCode" in data)) {
+    return undefined;
+  }
+
+  const exitCode = (data as { exitCode: unknown }).exitCode;
+  return typeof exitCode === "number" ? exitCode : undefined;
 }
 
 function readChangedFiles(data: unknown): string[] {
