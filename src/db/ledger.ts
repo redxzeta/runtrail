@@ -5,13 +5,19 @@ import type {
   AgentContextQuery,
   AgentEvent,
   AgentRun,
+  Artifact,
+  CreateArtifactRequest,
   CreateDecisionRequest,
   CreateEventRequest,
+  CreateHandoffRequest,
   CreateOpenLoopRequest,
   CreateRunRequest,
   Decision,
+  Handoff,
+  ListArtifactsQuery,
   ListDecisionsQuery,
   ListEventsQuery,
+  ListHandoffsQuery,
   ListOpenLoopsQuery,
   ListRunsQuery,
   OpenLoop,
@@ -67,6 +73,28 @@ type DecisionRow = {
   title: string;
   decision: string;
   rationale: string | null;
+  created_at: string;
+};
+
+type HandoffRow = {
+  id: string;
+  source_run_id: string | null;
+  from_source: string;
+  to_source: string | null;
+  project: string;
+  summary: string;
+  next_action: string | null;
+  context_json: string | null;
+  created_at: string;
+};
+
+type ArtifactRow = {
+  id: string;
+  run_id: string;
+  kind: string;
+  path: string;
+  size_bytes: number | null;
+  sha256: string | null;
   created_at: string;
 };
 
@@ -520,6 +548,169 @@ export class LedgerRepository {
     return rows.map(mapDecisionRow);
   }
 
+  createHandoff(input: CreateHandoffRequest): Handoff | undefined {
+    if (input.sourceRunId && !this.getRun(input.sourceRunId)) {
+      return undefined;
+    }
+
+    const handoff: Handoff = {
+      id: createId("handoff"),
+      sourceRunId: input.sourceRunId,
+      fromSource: input.fromSource,
+      toSource: input.toSource,
+      project: input.project,
+      summary: input.summary,
+      nextAction: input.nextAction,
+      context: input.context,
+      createdAt: input.createdAt ?? nowIso()
+    };
+
+    this.db
+      .prepare(
+        `INSERT INTO handoffs (
+          id,
+          source_run_id,
+          from_source,
+          to_source,
+          project,
+          summary,
+          next_action,
+          context_json,
+          created_at
+        ) VALUES (
+          @id,
+          @sourceRunId,
+          @fromSource,
+          @toSource,
+          @project,
+          @summary,
+          @nextAction,
+          @contextJson,
+          @createdAt
+        )`
+      )
+      .run({
+        ...handoff,
+        sourceRunId: toSqlValue(handoff.sourceRunId),
+        toSource: toSqlValue(handoff.toSource),
+        nextAction: toSqlValue(handoff.nextAction),
+        contextJson: handoff.context === undefined ? null : JSON.stringify(handoff.context)
+      });
+
+    return handoff;
+  }
+
+  listHandoffs(query: ListHandoffsQuery): Handoff[] {
+    const filters: string[] = [];
+    const params: Record<string, string | number> = {
+      limit: query.limit
+    };
+
+    if (query.project) {
+      filters.push("project = @project");
+      params.project = query.project;
+    }
+
+    if (query.sourceRunId) {
+      filters.push("source_run_id = @sourceRunId");
+      params.sourceRunId = query.sourceRunId;
+    }
+
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+    const rows = this.db
+      .prepare(
+        `SELECT *
+        FROM handoffs
+        ${whereClause}
+        ORDER BY created_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as HandoffRow[];
+
+    return rows.map(mapHandoffRow);
+  }
+
+  getHandoff(id: string): Handoff | undefined {
+    const row = this.db.prepare("SELECT * FROM handoffs WHERE id = ?").get(id) as
+      | HandoffRow
+      | undefined;
+    return row ? mapHandoffRow(row) : undefined;
+  }
+
+  createArtifact(input: CreateArtifactRequest): Artifact | undefined {
+    if (!this.getRun(input.runId)) {
+      return undefined;
+    }
+
+    const artifact: Artifact = {
+      id: createId("art"),
+      runId: input.runId,
+      kind: input.kind,
+      path: input.path,
+      sizeBytes: input.sizeBytes,
+      sha256: input.sha256,
+      createdAt: input.createdAt ?? nowIso()
+    };
+
+    this.db
+      .prepare(
+        `INSERT INTO artifacts (
+          id,
+          run_id,
+          kind,
+          path,
+          size_bytes,
+          sha256,
+          created_at
+        ) VALUES (
+          @id,
+          @runId,
+          @kind,
+          @path,
+          @sizeBytes,
+          @sha256,
+          @createdAt
+        )`
+      )
+      .run({
+        ...artifact,
+        sizeBytes: toSqlValue(artifact.sizeBytes),
+        sha256: toSqlValue(artifact.sha256)
+      });
+
+    return artifact;
+  }
+
+  listArtifacts(query: ListArtifactsQuery): Artifact[] {
+    const filters: string[] = [];
+    const params: Record<string, string | number> = {
+      limit: query.limit
+    };
+
+    if (query.runId) {
+      filters.push("run_id = @runId");
+      params.runId = query.runId;
+    }
+
+    if (query.kind) {
+      filters.push("kind = @kind");
+      params.kind = query.kind;
+    }
+
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+    const rows = this.db
+      .prepare(
+        `SELECT *
+        FROM artifacts
+        ${whereClause}
+        ORDER BY created_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as ArtifactRow[];
+
+    return rows.map(mapArtifactRow);
+  }
+
   getAgentContext(query: AgentContextQuery): AgentContext {
     const params = {
       project: query.project,
@@ -665,6 +856,32 @@ function mapDecisionRow(row: DecisionRow): Decision {
     title: row.title,
     decision: row.decision,
     rationale: row.rationale ?? undefined,
+    createdAt: row.created_at
+  };
+}
+
+function mapHandoffRow(row: HandoffRow): Handoff {
+  return {
+    id: row.id,
+    sourceRunId: row.source_run_id ?? undefined,
+    fromSource: row.from_source,
+    toSource: row.to_source ?? undefined,
+    project: row.project,
+    summary: row.summary,
+    nextAction: row.next_action ?? undefined,
+    context: row.context_json ? JSON.parse(row.context_json) : undefined,
+    createdAt: row.created_at
+  };
+}
+
+function mapArtifactRow(row: ArtifactRow): Artifact {
+  return {
+    id: row.id,
+    runId: row.run_id,
+    kind: row.kind,
+    path: row.path,
+    sizeBytes: row.size_bytes ?? undefined,
+    sha256: row.sha256 ?? undefined,
     createdAt: row.created_at
   };
 }

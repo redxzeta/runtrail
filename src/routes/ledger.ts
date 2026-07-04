@@ -6,13 +6,17 @@ import {
   type AgentEvent,
   type AgentRun,
   agentContextQuerySchema,
+  createArtifactRequestSchema,
   createDecisionRequestSchema,
   createEventRequestSchema,
+  createHandoffRequestSchema,
   createOpenLoopRequestSchema,
   createRunRequestSchema,
   type Decision,
+  listArtifactsQuerySchema,
   listDecisionsQuerySchema,
   listEventsQuerySchema,
+  listHandoffsQuerySchema,
   listOpenLoopsQuerySchema,
   listRunsQuerySchema,
   type OpenLoop,
@@ -236,6 +240,74 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     }
 
     return c.json(ledger.getAgentContext(parsed.data));
+  });
+
+  route.post("/handoffs", async (c) => {
+    const body = await readJson(c.req.raw);
+    const parsed = createHandoffRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    const handoff = ledger.createHandoff(parsed.data);
+
+    if (!handoff) {
+      return c.json({ error: "Source run not found" }, 404);
+    }
+
+    return c.json({ handoff }, 201);
+  });
+
+  route.get("/handoffs", (c) => {
+    const parsed = listHandoffsQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams)
+    );
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    return c.json({ handoffs: ledger.listHandoffs(parsed.data) });
+  });
+
+  route.get("/handoffs/:id", (c) => {
+    const handoff = ledger.getHandoff(c.req.param("id"));
+
+    if (!handoff) {
+      return c.json({ error: "Handoff not found" }, 404);
+    }
+
+    return c.json({ handoff });
+  });
+
+  route.post("/artifacts", async (c) => {
+    const body = await readJson(c.req.raw);
+    const parsed = createArtifactRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    const artifact = ledger.createArtifact(parsed.data);
+
+    if (!artifact) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
+    return c.json({ artifact }, 201);
+  });
+
+  route.get("/artifacts", (c) => {
+    const parsed = listArtifactsQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams)
+    );
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    return c.json({ artifacts: ledger.listArtifacts(parsed.data) });
   });
 
   route.get("/projects/:project", (c) => {

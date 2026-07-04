@@ -66,5 +66,35 @@ export const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_decisions_project_created_at
     ON decisions (project, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_decisions_created_at
-    ON decisions (created_at DESC)`
+    ON decisions (created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS handoffs (
+    id TEXT PRIMARY KEY,
+    source_run_id TEXT,
+    from_source TEXT NOT NULL,
+    to_source TEXT,
+    project TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    next_action TEXT,
+    context_json TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (source_run_id) REFERENCES agent_runs (id) ON DELETE SET NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_handoffs_project_created_at
+    ON handoffs (project, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_handoffs_source_run_id_created_at
+    ON handoffs (source_run_id, created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS artifacts (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    path TEXT NOT NULL,
+    size_bytes INTEGER,
+    sha256 TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES agent_runs (id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id_created_at
+    ON artifacts (run_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_artifacts_kind_created_at
+    ON artifacts (kind, created_at DESC)`
 ] as const;
