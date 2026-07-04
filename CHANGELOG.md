@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/redxzeta/runtrail/compare/v1.15.0...v1.16.0) (2026-07-04)
+
+
+### Features
+
+* **search:** add journal search ([#45](https://github.com/redxzeta/runtrail/issues/45)) ([e20a53a](https://github.com/redxzeta/runtrail/commit/e20a53ae7007548d5719bb74958836beff05fd4d))
+
 # [1.15.0](https://github.com/redxzeta/runtrail/compare/v1.14.0...v1.15.0) (2026-07-04)
 
 
