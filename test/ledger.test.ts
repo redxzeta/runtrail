@@ -774,17 +774,38 @@ describe("ledger routes", () => {
       runId: run.run.id,
       type: "failed",
       message: "Command failed",
-      importance: 8
+      importance: 8,
+      data: {
+        exitCode: 1,
+        changedFiles: ["src/routes/ledger.ts"]
+      }
     });
     await app.request(`/runs/${run.run.id}`, {
       method: "PATCH",
       body: JSON.stringify({ status: "failed", summary: "Needs inspection" }),
       headers: authHeaders()
     });
-    await postJson(app, "/open-loops", {
+    const loopResponse = await postJson(app, "/open-loops", {
       type: "blocked",
       project: "ice-council",
-      title: "Resolve production blocker"
+      title: "Resolve production blocker",
+      nextAction: "Inspect failed run",
+      sourceRunId: run.run.id
+    });
+    const loop = (await loopResponse.json()) as { openLoop: { id: string } };
+    await postJson(app, "/handoffs", {
+      sourceRunId: run.run.id,
+      fromSource: "codex",
+      toSource: "openclaw",
+      project: "ice-council",
+      summary: "Review failed UI run",
+      nextAction: "Check route output"
+    });
+    await postJson(app, "/artifacts", {
+      runId: run.run.id,
+      kind: "log",
+      path: "data/logs/ui-run.log",
+      sizeBytes: 10
     });
     await postJson(app, "/decisions", {
       project: "ice-council",
@@ -800,7 +821,7 @@ describe("ledger routes", () => {
 
     const pages = await Promise.all(
       [
-        "/",
+        "/today",
         "/runs",
         `/runs/${run.run.id}`,
         "/projects/ice-council",
@@ -825,15 +846,64 @@ describe("ledger routes", () => {
       expect(page.body, page.path).toContain("Runtrail");
     }
 
+    const rootResponse = await app.request("/", {
+      headers: {
+        ...authHeaders(),
+        accept: "text/html"
+      }
+    });
+
+    expect(rootResponse.status).toBe(302);
+    expect(rootResponse.headers.get("location")).toBe("/today");
+    expect(pages.find((page) => page.path === "/today")?.body).toContain("Failed today");
     expect(pages.find((page) => page.path === "/runs")?.body).toContain("Implement the ledger API");
     expect(pages.find((page) => page.path === `/runs/${run.run.id}`)?.body).toContain(
       "Command failed"
     );
+    expect(pages.find((page) => page.path === `/runs/${run.run.id}`)?.body).toContain(
+      "src/routes/ledger.ts"
+    );
+    expect(pages.find((page) => page.path === `/runs/${run.run.id}`)?.body).toContain(
+      "data/logs/ui-run.log"
+    );
+    expect(pages.find((page) => page.path === `/runs/${run.run.id}`)?.body).toContain(
+      "Review failed UI run"
+    );
     expect(pages.find((page) => page.path === "/open-loops")?.body).toContain(
       "Resolve production blocker"
     );
+    expect(pages.find((page) => page.path === "/open-loops")?.body).toContain("Inspect failed run");
+    expect(pages.find((page) => page.path === "/projects/ice-council")?.body).toContain(
+      "Recent handoffs"
+    );
+    expect(pages.find((page) => page.path === "/projects/ice-council")?.body).toContain(
+      "Review failed UI run"
+    );
     expect(pages.find((page) => page.path === "/decisions")?.body).toContain("Keep UI simple");
     expect(pages.find((page) => page.path === "/errors")?.body).toContain("Needs inspection");
+
+    const resolveResponse = await app.request(`/open-loops/${loop.openLoop.id}/resolve`, {
+      method: "POST",
+      body: new URLSearchParams({ resolution: "Reviewed from test" }),
+      headers: {
+        ...authHeaders(),
+        "content-type": "application/x-www-form-urlencoded"
+      }
+    });
+    const resolvedList = (await (
+      await app.request("/open-loops?project=ice-council&status=resolved", {
+        headers: authHeaders()
+      })
+    ).json()) as { openLoops: Array<{ id: string; resolution: string }> };
+
+    expect(resolveResponse.status).toBe(302);
+    expect(resolveResponse.headers.get("location")).toBe("/open-loops");
+    expect(resolvedList.openLoops).toEqual([
+      expect.objectContaining({
+        id: loop.openLoop.id,
+        resolution: "Reviewed from test"
+      })
+    ]);
   });
 
   it("sends Discord notifications only for high-signal events", async () => {
