@@ -746,6 +746,17 @@ export class LedgerRepository {
       )
       .all(params) as EventRow[];
 
+    const failedRuns = this.db
+      .prepare(
+        `SELECT *
+        FROM agent_runs
+        WHERE project = @project
+          AND status = 'failed'
+        ORDER BY updated_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as RunRow[];
+
     const openLoops = this.db
       .prepare(
         `SELECT *
@@ -756,6 +767,16 @@ export class LedgerRepository {
         LIMIT @limit`
       )
       .all(params) as OpenLoopRow[];
+
+    const handoffs = this.db
+      .prepare(
+        `SELECT *
+        FROM handoffs
+        WHERE project = @project
+        ORDER BY created_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as HandoffRow[];
 
     const decisions = this.db
       .prepare(
@@ -770,7 +791,9 @@ export class LedgerRepository {
     return {
       project: query.project,
       recent_runs: recentRuns.map(mapRunRow),
-      recent_events: recentEvents.map(mapEventRow),
+      failed_runs: failedRuns.map(mapRunRow),
+      recent_events: recentEvents.map(mapEventContextRow),
+      recent_handoffs: handoffs.map(mapHandoffRow),
       open_loops: openLoops.map(mapOpenLoopRow),
       decisions: decisions.map(mapDecisionRow),
       next_actions: openLoops.map((loop) => loop.title)
@@ -830,6 +853,17 @@ function mapEventRow(row: EventRow): AgentEvent {
     message: row.message,
     importance: row.importance,
     data: row.data_json ? JSON.parse(row.data_json) : undefined,
+    createdAt: row.created_at
+  };
+}
+
+function mapEventContextRow(row: EventRow): Omit<AgentEvent, "data"> {
+  return {
+    id: row.id,
+    runId: row.run_id,
+    type: row.type,
+    message: row.message,
+    importance: row.importance,
     createdAt: row.created_at
   };
 }

@@ -274,7 +274,9 @@ export type Artifact = {
 export type AgentContext = {
   project: string;
   recent_runs: AgentRun[];
-  recent_events: AgentEvent[];
+  failed_runs: AgentRun[];
+  recent_events: Array<Omit<AgentEvent, "data">>;
+  recent_handoffs: Handoff[];
   open_loops: OpenLoop[];
   decisions: Decision[];
   next_actions: string[];
