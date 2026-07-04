@@ -1,9 +1,11 @@
 import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "../src/config.js";
 import { openDatabase } from "../src/db/index.js";
+import { migrate } from "../src/db/migrate.js";
 
 describe("database", () => {
   it("creates and migrates the configured SQLite database", () => {
@@ -32,5 +34,31 @@ describe("database", () => {
       "open_loops",
       "schema_migrations"
     ]);
+  });
+
+  it("adds open loop collaboration columns to existing databases", () => {
+    const db = new Database(":memory:");
+    db.exec(`
+      CREATE TABLE open_loops (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        project TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL,
+        resolution TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        resolved_at TEXT
+      )
+    `);
+
+    migrate(db);
+    const columns = db.prepare("PRAGMA table_info(open_loops)").all() as Array<{ name: string }>;
+    db.close();
+
+    expect(columns.map((column) => column.name)).toEqual(
+      expect.arrayContaining(["owner", "source", "next_action", "blocker_ref", "source_run_id"])
+    );
   });
 });

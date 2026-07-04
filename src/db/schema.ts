@@ -45,11 +45,17 @@ export const schemaStatements = [
     project TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
+    owner TEXT,
+    source TEXT,
+    next_action TEXT,
+    blocker_ref TEXT,
+    source_run_id TEXT,
     status TEXT NOT NULL,
     resolution TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    resolved_at TEXT
+    resolved_at TEXT,
+    FOREIGN KEY (source_run_id) REFERENCES agent_runs (id) ON DELETE SET NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_open_loops_project_status_updated_at
     ON open_loops (project, status, updated_at DESC)`,

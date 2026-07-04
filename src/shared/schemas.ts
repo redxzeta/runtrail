@@ -42,11 +42,13 @@ export const openLoopTypeSchema = z.enum([
   "blocked",
   "needs_review",
   "decision_required",
+  "failed_unresolved",
+  "ready_to_deploy",
   "follow_up",
   "risk"
 ]);
 
-export const openLoopStatusSchema = z.enum(["open", "resolved"]);
+export const openLoopStatusSchema = z.enum(["open", "resolved", "cancelled"]);
 
 export const createRunRequestSchema = z.object({
   source: z.string().trim().min(1).max(80),
@@ -101,6 +103,11 @@ export const createOpenLoopRequestSchema = z.object({
   project: z.string().trim().min(1).max(120),
   title: z.string().trim().min(1).max(240),
   description: z.string().trim().min(1).max(4000).optional(),
+  owner: z.string().trim().min(1).max(120).optional(),
+  source: z.string().trim().min(1).max(80).optional(),
+  nextAction: z.string().trim().min(1).max(1000).optional(),
+  blockerRef: z.string().trim().min(1).max(1000).optional(),
+  sourceRunId: z.string().trim().min(1).optional(),
   createdAt: z.string().datetime().optional()
 });
 
@@ -109,6 +116,11 @@ export const updateOpenLoopRequestSchema = z
     status: openLoopStatusSchema.optional(),
     title: z.string().trim().min(1).max(240).optional(),
     description: z.string().trim().min(1).max(4000).nullable().optional(),
+    owner: z.string().trim().min(1).max(120).nullable().optional(),
+    source: z.string().trim().min(1).max(80).nullable().optional(),
+    nextAction: z.string().trim().min(1).max(1000).nullable().optional(),
+    blockerRef: z.string().trim().min(1).max(1000).nullable().optional(),
+    sourceRunId: z.string().trim().min(1).nullable().optional(),
     resolution: z.string().trim().min(1).max(4000).nullable().optional(),
     resolvedAt: z.string().datetime().nullable().optional()
   })
@@ -233,6 +245,11 @@ export type OpenLoop = {
   project: string;
   title: string;
   description?: string;
+  owner?: string;
+  source?: string;
+  nextAction?: string;
+  blockerRef?: string;
+  sourceRunId?: string;
   status: OpenLoopStatus;
   resolution?: string;
   createdAt: string;
