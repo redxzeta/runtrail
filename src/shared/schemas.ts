@@ -247,6 +247,8 @@ export type AgentEvent = {
   message: string;
   importance: number;
   data?: unknown;
+  prevEventHash?: string;
+  eventHash?: string;
   createdAt: string;
 };
 

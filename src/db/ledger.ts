@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import { createId } from "../shared/ids.js";
+import { compareEventsForReceipts, computeEventHash } from "../shared/receipts.js";
 import type {
   AgentContext,
   AgentContextQuery,
@@ -55,6 +56,8 @@ type EventRow = {
   message: string;
   importance: number;
   data_json: string | null;
+  prev_event_hash: string | null;
+  event_hash: string | null;
   created_at: string;
 };
 
@@ -300,6 +303,8 @@ export class LedgerRepository {
             message,
             importance,
             data_json,
+            prev_event_hash,
+            event_hash,
             created_at
           ) VALUES (
             @id,
@@ -308,6 +313,8 @@ export class LedgerRepository {
             @message,
             @importance,
             @dataJson,
+            NULL,
+            NULL,
             @createdAt
           )`
         )
@@ -319,11 +326,36 @@ export class LedgerRepository {
       this.db
         .prepare("UPDATE agent_runs SET updated_at = ? WHERE id = ?")
         .run(event.createdAt, event.runId);
+
+      this.recomputeEventHashes(event.runId);
     });
 
     transaction();
 
-    return event;
+    const stored = this.db
+      .prepare("SELECT * FROM agent_events WHERE id = ?")
+      .get(event.id) as EventRow;
+    return mapEventRow(stored);
+  }
+
+  private recomputeEventHashes(runId: string): void {
+    const rows = this.db
+      .prepare(
+        `SELECT *
+        FROM agent_events
+        WHERE run_id = ?
+        ORDER BY created_at ASC, id ASC`
+      )
+      .all(runId) as EventRow[];
+    let previousHash: string | undefined;
+
+    for (const event of rows.map(mapEventRow).sort(compareEventsForReceipts)) {
+      const eventHash = computeEventHash(event, previousHash);
+      this.db
+        .prepare("UPDATE agent_events SET prev_event_hash = ?, event_hash = ? WHERE id = ?")
+        .run(previousHash ?? null, eventHash, event.id);
+      previousHash = eventHash;
+    }
   }
 
   listEvents(query: ListEventsQuery): AgentEvent[] {
@@ -1040,6 +1072,8 @@ function mapEventRow(row: EventRow): AgentEvent {
     message: row.message,
     importance: row.importance,
     data: row.data_json ? JSON.parse(row.data_json) : undefined,
+    prevEventHash: row.prev_event_hash ?? undefined,
+    eventHash: row.event_hash ?? undefined,
     createdAt: row.created_at
   };
 }
