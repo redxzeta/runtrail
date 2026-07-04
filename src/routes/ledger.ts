@@ -108,6 +108,16 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     return c.json({ runs });
   });
 
+  route.get("/runs/:id/manifest", (c) => {
+    const manifest = ledger.getRunManifest(c.req.param("id"));
+
+    if (!manifest) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
+    return c.json({ manifest });
+  });
+
   route.get("/runs/:id", (c) => {
     const run = ledger.getRun(c.req.param("id"));
 
