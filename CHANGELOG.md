@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/redxzeta/runtrail/compare/v1.10.1...v1.11.0) (2026-07-04)
+
+
+### Features
+
+* **ledger:** add handoffs and artifacts ([#38](https://github.com/redxzeta/runtrail/issues/38)) ([cc3ce7b](https://github.com/redxzeta/runtrail/commit/cc3ce7b57988d429729b3176de2be0ae49e5e938))
+
 ## [1.10.1](https://github.com/redxzeta/runtrail/compare/v1.10.0...v1.10.1) (2026-06-28)
 
 
