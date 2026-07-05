@@ -80,6 +80,17 @@ describe("database", () => {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         resolved_at TEXT
+      );
+      CREATE TABLE handoffs (
+        id TEXT PRIMARY KEY,
+        source_run_id TEXT,
+        from_source TEXT NOT NULL,
+        to_source TEXT,
+        project TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        next_action TEXT,
+        context_json TEXT,
+        created_at TEXT NOT NULL
       )
     `);
 

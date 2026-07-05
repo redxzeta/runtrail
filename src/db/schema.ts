@@ -115,8 +115,6 @@ export const schemaStatements = [
     ON handoffs (project, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_handoffs_source_run_id_created_at
     ON handoffs (source_run_id, created_at DESC)`,
-  `CREATE INDEX IF NOT EXISTS idx_handoffs_category_created_at
-    ON handoffs (category, created_at DESC)`,
   `CREATE TABLE IF NOT EXISTS handoff_tags (
     handoff_id TEXT NOT NULL,
     tag TEXT NOT NULL,
