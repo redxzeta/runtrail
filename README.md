@@ -178,6 +178,11 @@ Example MCP server configuration:
 The MCP adapter is a thin HTTP client. It does not access SQLite directly.
 MCP startup paths must read local environment/config only. Do not SSH, sudo, or
 scrape `/etc/runtrail/runtrail.env` from an MCP startup command.
+
+Agent continuity tools include `journal_get_context`, `journal_search`,
+`journal_search_runs`, `journal_get_run_manifest`, `journal_create_handoff`,
+`journal_create_event`, `journal_create_open_loop`,
+`journal_resolve_open_loop`, and `journal_record_decision`.
 See [docs/mcp-safe-surface.md](docs/mcp-safe-surface.md) for the proposed safe read/write tool surface and default response limits.
 
 ## Markdown Exports

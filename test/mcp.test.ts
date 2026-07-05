@@ -24,6 +24,9 @@ describe("mcp adapter", () => {
       "journal_create_open_loop",
       "journal_resolve_open_loop",
       "journal_record_decision",
+      "journal_create_handoff",
+      "journal_get_run_manifest",
+      "journal_search",
       "journal_search_runs"
     ]);
   });
@@ -49,6 +52,21 @@ describe("mcp adapter", () => {
       client
     );
     await callRuntrailTool(
+      "journal_search",
+      {
+        project: "runtrail",
+        source: "codex",
+        status: "failed",
+        category: "implementation",
+        tag: "mcp",
+        text: "handoff",
+        date_from: "2026-07-01T00:00:00.000Z",
+        date_to: "2026-07-02T00:00:00.000Z",
+        limit: 10
+      },
+      client
+    );
+    await callRuntrailTool(
       "journal_search_runs",
       {
         project: "runtrail",
@@ -66,6 +84,10 @@ describe("mcp adapter", () => {
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(
       2,
+      "/search?project=runtrail&source=codex&status=failed&category=implementation&tag=mcp&text=handoff&date_from=2026-07-01T00%3A00%3A00.000Z&date_to=2026-07-02T00%3A00%3A00.000Z&limit=10"
+    );
+    expect(client.requestJson).toHaveBeenNthCalledWith(
+      3,
       "/runs?project=runtrail&status=failed&category=implementation&tag=mcp&limit=10"
     );
   });
@@ -112,6 +134,26 @@ describe("mcp adapter", () => {
       },
       client
     );
+    await callRuntrailTool(
+      "journal_create_handoff",
+      {
+        sourceRunId: "run_1",
+        fromSource: "codex",
+        toSource: "openclaw",
+        project: "runtrail",
+        summary: "Continue MCP docs",
+        nextAction: "Verify OpenClaw tool filter",
+        context: { changedFiles: ["README.md"] }
+      },
+      client
+    );
+    await callRuntrailTool(
+      "journal_get_run_manifest",
+      {
+        runId: "run_1"
+      },
+      client
+    );
 
     expect(client.requestJson).toHaveBeenNthCalledWith(
       1,
@@ -145,6 +187,23 @@ describe("mcp adapter", () => {
       "/decisions",
       expect.objectContaining({ method: "POST" })
     );
+    expect(client.requestJson).toHaveBeenNthCalledWith(
+      5,
+      "/handoffs",
+      expect.objectContaining({
+        method: "POST",
+        body: {
+          sourceRunId: "run_1",
+          fromSource: "codex",
+          toSource: "openclaw",
+          project: "runtrail",
+          summary: "Continue MCP docs",
+          nextAction: "Verify OpenClaw tool filter",
+          context: { changedFiles: ["README.md"] }
+        }
+      })
+    );
+    expect(client.requestJson).toHaveBeenNthCalledWith(6, "/runs/run_1/manifest");
   });
 
   it("builds the HTTP client from URL and token without loading YAML", async () => {
@@ -173,7 +232,7 @@ describe("mcp adapter", () => {
     });
 
     expect(server).toBeDefined();
-    expect(runtrailToolNames).toHaveLength(6);
+    expect(runtrailToolNames).toHaveLength(9);
   });
 
   it("fails fast when bridge config is missing", () => {

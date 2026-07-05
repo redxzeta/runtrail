@@ -21,3 +21,9 @@ clawj --project ice-council --task "submit-only preflight" -- openclaw run "prep
 ```
 
 Wrappers are preferred over agent self-reporting because they record command start, exit status, cwd, host, git metadata, changed files, and log artifact metadata even when the agent fails before writing a final summary.
+
+When OpenClaw uses Runtrail MCP directly, include the continuity tools in the
+server tool filter: `journal_get_context`, `journal_search`,
+`journal_search_runs`, `journal_get_run_manifest`, `journal_create_handoff`,
+`journal_create_event`, `journal_create_open_loop`,
+`journal_resolve_open_loop`, and `journal_record_decision`.

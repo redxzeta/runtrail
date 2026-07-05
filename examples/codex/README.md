@@ -21,3 +21,9 @@ codexj --project runtrail --task "review open loops" -- codex "summarize blocker
 ```
 
 Wrappers are preferred over agent self-reporting because Runtrail still captures the run outcome and log path when Codex exits non-zero, loses context, or stops before posting a handoff.
+
+When Codex uses Runtrail MCP directly, include the continuity tools in the
+server allowlist: `journal_get_context`, `journal_search`,
+`journal_search_runs`, `journal_get_run_manifest`, `journal_create_handoff`,
+`journal_create_event`, `journal_create_open_loop`,
+`journal_resolve_open_loop`, and `journal_record_decision`.
