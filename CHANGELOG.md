@@ -1,3 +1,10 @@
+# [1.18.0](https://github.com/redxzeta/runtrail/compare/v1.17.1...v1.18.0) (2026-07-05)
+
+
+### Features
+
+* **mcp:** add remote endpoint and stdio bridge ([#68](https://github.com/redxzeta/runtrail/issues/68)) ([c1e5bb9](https://github.com/redxzeta/runtrail/commit/c1e5bb992360cfd354c3a059838b4fa686c983ff))
+
 ## [1.17.1](https://github.com/redxzeta/runtrail/compare/v1.17.0...v1.17.1) (2026-07-04)
 
 
