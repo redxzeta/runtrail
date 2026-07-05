@@ -91,7 +91,7 @@ describe("cli", () => {
     );
   });
 
-  it("creates runs, events, loops, and decisions through the API", async () => {
+  it("creates runs, events, loops, decisions, and handoffs through the API", async () => {
     const fetchMock = mockFetch({ ok: true });
     captureOutput();
 
@@ -158,6 +158,26 @@ describe("cli", () => {
       "--decision",
       "Expose HTTP API through rt"
     ]);
+    await runCli([
+      "node",
+      "rt",
+      "handoff",
+      "create",
+      "--source-run-id",
+      "run_1",
+      "--from-source",
+      "codex",
+      "--to-source",
+      "openclaw",
+      "--project",
+      "runtrail",
+      "--summary",
+      "Continue CLI metadata",
+      "--next-action",
+      "Verify wrapper flags",
+      "--context-json",
+      '{"changedFiles":["src/cli/index.ts"]}'
+    ]);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -209,6 +229,22 @@ describe("cli", () => {
       5,
       new URL("/decisions", "http://runtrail.test"),
       expect.objectContaining({ method: "POST" })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      6,
+      new URL("/handoffs", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          sourceRunId: "run_1",
+          fromSource: "codex",
+          toSource: "openclaw",
+          project: "runtrail",
+          summary: "Continue CLI metadata",
+          nextAction: "Verify wrapper flags",
+          context: { changedFiles: ["src/cli/index.ts"] }
+        })
+      })
     );
   });
 
@@ -351,6 +387,12 @@ describe("cli", () => {
       "runtrail",
       "--task",
       "wrapper success",
+      "--category",
+      "implementation",
+      "--tag",
+      "codex",
+      "--tag",
+      "issue-72",
       "--",
       process.execPath,
       "-e",
@@ -367,6 +409,12 @@ describe("cli", () => {
         body: expect.stringContaining('"task":"wrapper success"')
       })
     );
+    const createRunBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+      category?: string;
+      tags?: string[];
+    };
+    expect(createRunBody.category).toBe("implementation");
+    expect(createRunBody.tags).toEqual(["codex", "issue-72"]);
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       new URL("/events", "http://runtrail.test"),
@@ -375,6 +423,12 @@ describe("cli", () => {
         body: expect.stringContaining('"exitCode":0')
       })
     );
+    const finalEventBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)) as {
+      category?: string;
+      tags?: string[];
+    };
+    expect(finalEventBody.category).toBe("implementation");
+    expect(finalEventBody.tags).toEqual(["codex", "issue-72"]);
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       new URL("/runs/run_wrap", "http://runtrail.test"),

@@ -10,6 +10,9 @@ rt run \
   --source openclaw \
   --project ice-council \
   --task "research candidate handoff" \
+  --category research \
+  --tag openclaw \
+  --tag ice-council \
   -- openclaw run "research today's candidate set"
 ```
 
@@ -17,7 +20,7 @@ For interactive shells:
 
 ```sh
 alias clawj='rt run --source openclaw'
-clawj --project ice-council --task "submit-only preflight" -- openclaw run "prepare submit-only preflight"
+clawj --project ice-council --task "submit-only preflight" --category ops --tag openclaw --tag submit-only -- openclaw run "prepare submit-only preflight"
 ```
 
 Wrappers are preferred over agent self-reporting because they record command start, exit status, cwd, host, git metadata, changed files, and log artifact metadata even when the agent fails before writing a final summary.

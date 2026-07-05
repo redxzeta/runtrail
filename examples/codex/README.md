@@ -10,6 +10,9 @@ rt run \
   --source codex \
   --project runtrail \
   --task "implement event API" \
+  --category implementation \
+  --tag codex \
+  --tag runtrail \
   -- codex "implement event API"
 ```
 
@@ -17,7 +20,7 @@ For interactive shells:
 
 ```sh
 alias codexj='rt run --source codex'
-codexj --project runtrail --task "review open loops" -- codex "summarize blockers and next actions"
+codexj --project runtrail --task "review open loops" --category review --tag codex -- codex "summarize blockers and next actions"
 ```
 
 Wrappers are preferred over agent self-reporting because Runtrail still captures the run outcome and log path when Codex exits non-zero, loses context, or stops before posting a handoff.

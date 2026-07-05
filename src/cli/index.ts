@@ -79,6 +79,19 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--rationale <rationale>", "Decision rationale")
     .action(addDecision);
 
+  const handoff = program.command("handoff").description("Manage handoffs");
+  handoff
+    .command("create")
+    .description("Create a handoff")
+    .requiredOption("--from-source <fromSource>", "Source handing off work")
+    .requiredOption("--project <project>", "Project name")
+    .requiredOption("--summary <summary>", "Handoff summary")
+    .option("--source-run-id <sourceRunId>", "Source run ID")
+    .option("--to-source <toSource>", "Target source")
+    .option("--next-action <nextAction>", "Recommended next action")
+    .option("--context-json <json>", "Additional handoff context as JSON")
+    .action(createHandoff);
+
   const exportCommand = program.command("export").description("Export Markdown summaries");
   exportCommand
     .command("daily")
@@ -170,6 +183,8 @@ async function wrapRun(
     source: string;
     project: string;
     task: string;
+    category?: string;
+    tags?: string[];
   }
 ): Promise<void> {
   if (!options.source || !options.project || !options.task) {
@@ -198,6 +213,8 @@ async function wrapRun(
       gitRepoPath: gitBefore.repoPath,
       gitBranch: gitBefore.branch,
       gitCommit: gitBefore.commit,
+      category: options.category,
+      tags: options.tags,
       startedAt: new Date().toISOString()
     })
   });
@@ -218,6 +235,8 @@ async function wrapRun(
       type: status,
       message: exitCode === 0 ? "Command completed" : `Command failed with exit code ${exitCode}`,
       importance: exitCode === 0 ? 5 : 8,
+      category: options.category,
+      tags: options.tags,
       data: {
         exitCode,
         logPath,
@@ -243,7 +262,13 @@ async function wrapRun(
 }
 
 async function wrapRunFromArgv(args: string[]): Promise<void> {
-  const options: { source?: string; project?: string; task?: string } = {};
+  const options: {
+    category?: string;
+    source?: string;
+    project?: string;
+    tag?: string[];
+    task?: string;
+  } = {};
   const command: string[] = [];
   let parsingCommand = false;
 
@@ -260,14 +285,39 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
       continue;
     }
 
-    if (value === "--source" || value === "--project" || value === "--task") {
+    if (
+      value === "--source" ||
+      value === "--project" ||
+      value === "--task" ||
+      value === "--category"
+    ) {
       const next = args[index + 1];
 
       if (!next) {
         throw new Error(`Missing value for ${value}`);
       }
 
-      options[value.slice(2) as keyof typeof options] = next;
+      if (value === "--source") {
+        options.source = next;
+      } else if (value === "--project") {
+        options.project = next;
+      } else if (value === "--task") {
+        options.task = next;
+      } else {
+        options.category = next;
+      }
+      index += 1;
+      continue;
+    }
+
+    if (value === "--tag") {
+      const next = args[index + 1];
+
+      if (!next) {
+        throw new Error(`Missing value for ${value}`);
+      }
+
+      options.tag = [...(options.tag ?? []), next];
       index += 1;
       continue;
     }
@@ -279,7 +329,9 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
   await wrapRun(command, {
     source: options.source ?? "",
     project: options.project ?? "",
-    task: options.task ?? ""
+    task: options.task ?? "",
+    category: options.category,
+    tags: optionTags(options.tag)
   });
 }
 
@@ -353,6 +405,33 @@ async function addDecision(options: {
         title: options.title,
         decision: options.decision,
         rationale: options.rationale
+      })
+    })
+  );
+}
+
+async function createHandoff(options: {
+  sourceRunId?: string;
+  fromSource: string;
+  toSource?: string;
+  project: string;
+  summary: string;
+  nextAction?: string;
+  contextJson?: string;
+}): Promise<void> {
+  printJson(
+    await requestJson("/handoffs", {
+      method: "POST",
+      body: compact({
+        sourceRunId: options.sourceRunId,
+        fromSource: options.fromSource,
+        toSource: options.toSource,
+        project: options.project,
+        summary: options.summary,
+        nextAction: options.nextAction,
+        context: options.contextJson
+          ? parseJsonOption(options.contextJson, "--context-json")
+          : undefined
       })
     })
   );
