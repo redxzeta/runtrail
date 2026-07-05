@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/redxzeta/runtrail/compare/v1.18.0...v1.19.0) (2026-07-05)
+
+
+### Features
+
+* **metadata:** add tags and categories ([#70](https://github.com/redxzeta/runtrail/issues/70)) ([42eaaf7](https://github.com/redxzeta/runtrail/commit/42eaaf7405d76a58834ab26447bbb345aad0fd08))
+
 # [1.18.0](https://github.com/redxzeta/runtrail/compare/v1.17.1...v1.18.0) (2026-07-05)
 
 
