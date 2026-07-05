@@ -175,6 +175,12 @@ describe("cli", () => {
       "Continue CLI metadata",
       "--next-action",
       "Verify wrapper flags",
+      "--category",
+      "implementation",
+      "--tag",
+      "cli",
+      "--tag",
+      "issue-79",
       "--context-json",
       '{"changedFiles":["src/cli/index.ts"]}'
     ]);
@@ -242,6 +248,8 @@ describe("cli", () => {
           project: "runtrail",
           summary: "Continue CLI metadata",
           nextAction: "Verify wrapper flags",
+          category: "implementation",
+          tags: ["cli", "issue-79"],
           context: { changedFiles: ["src/cli/index.ts"] }
         })
       })

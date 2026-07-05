@@ -136,6 +136,8 @@ export function createRuntrailMcpServer(
         sourceRunId: z.string().optional(),
         toSource: z.string().optional(),
         nextAction: z.string().optional(),
+        category: z.string().optional(),
+        tags: z.array(z.string()).optional(),
         context: z.record(z.string(), z.unknown()).optional()
       }
     },
@@ -275,6 +277,8 @@ export async function callRuntrailTool(
           project: requireString(args, "project"),
           summary: requireString(args, "summary"),
           nextAction: args.nextAction,
+          category: args.category,
+          tags: args.tags,
           context: args.context
         })
       });

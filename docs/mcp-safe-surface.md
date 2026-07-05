@@ -22,7 +22,7 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 | `journal_get_context` | Read-only | `GET /agent/context` | `{ project: string, limit?: number, min_importance?: number }` | Compact project context with recent runs, failed runs, compact events, compact handoffs, open loops, decisions, and next actions |
 | `journal_search` | Read-only | `GET /search` | `{ project?: string, source?: string, status?: string, category?: string, tag?: string, text?: string, date_from?: string, date_to?: string, limit?: number }` | Compact runs, events, open loops, handoffs, and decisions matching the filters |
 | `journal_create_event` | Write | `POST /events` | `{ runId: string, type: EventType, message: string, importance?: number, category?: string, tags?: string[], data?: object }` | `{ event: AgentEvent }` |
-| `journal_create_handoff` | Write | `POST /handoffs` | `{ sourceRunId?: string, fromSource: string, toSource?: string, project: string, summary: string, nextAction?: string, context?: object }` | `{ handoff: Handoff }` |
+| `journal_create_handoff` | Write | `POST /handoffs` | `{ sourceRunId?: string, fromSource: string, toSource?: string, project: string, summary: string, nextAction?: string, category?: string, tags?: string[], context?: object }` | `{ handoff: Handoff }` |
 | `journal_create_open_loop` | Write | `POST /open-loops` | `{ type: OpenLoopType, project: string, title: string, description?: string }` | `{ openLoop: OpenLoop }` |
 | `journal_resolve_open_loop` | Write | `PATCH /open-loops/:id` | `{ id: string, resolution?: string }` | `{ openLoop: OpenLoop }` with status set to `resolved` |
 | `journal_record_decision` | Write | `POST /decisions` | `{ project?: string, title: string, decision: string, rationale?: string }` | `{ decision: Decision }` |
@@ -31,7 +31,7 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 
 - Reuse the Zod-backed HTTP schemas from `src/shared/schemas.ts`; MCP schemas should be narrower only when the tool intentionally hides API fields.
 - `AgentEventWithoutData` means `id`, `runId`, `type`, `message`, `importance`, and `createdAt`.
-- Compact handoff output means `id`, `sourceRunId`, `fromSource`, `toSource`, `project`, `summary`, `nextAction`, and `createdAt`; omit `context` unless a future explicit detail tool is added.
+- Compact handoff output means `id`, `sourceRunId`, `fromSource`, `toSource`, `project`, `summary`, `nextAction`, `category`, `tags`, and `createdAt`; omit `context` unless a future explicit detail tool is added.
 - Date filters use ISO datetimes and are normalized by the service before SQLite comparisons.
 
 ## Guardrails

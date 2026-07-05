@@ -78,6 +78,8 @@ export type HandoffRow = {
   project: string;
   summary: string;
   next_action: string | null;
+  category: string | null;
+  tags_json: string | null;
   context_json: string | null;
   created_at: string;
 };
@@ -187,6 +189,8 @@ export function mapHandoffRow(row: HandoffRow): Handoff {
     project: row.project,
     summary: row.summary,
     nextAction: row.next_action ?? undefined,
+    category: row.category ?? undefined,
+    tags: parseTags(row.tags_json),
     context: row.context_json ? JSON.parse(row.context_json) : undefined,
     createdAt: row.created_at
   };
@@ -201,6 +205,8 @@ export function mapHandoffSummaryRow(row: HandoffRow): HandoffSummary {
     project: row.project,
     summary: row.summary,
     nextAction: row.next_action ?? undefined,
+    category: row.category ?? undefined,
+    tags: parseTags(row.tags_json),
     createdAt: row.created_at
   };
 }
@@ -297,7 +303,7 @@ export function searchFilters(
   }
 
   if (query.category) {
-    if (table === "agent_runs" || table === "agent_events") {
+    if (table === "agent_runs" || table === "agent_events" || table === "handoffs") {
       filters.push(`${table}.category = @category`);
     } else {
       filters.push("1 = 0");
@@ -312,6 +318,10 @@ export function searchFilters(
     } else if (table === "agent_events") {
       filters.push(
         "EXISTS (SELECT 1 FROM agent_event_tags WHERE agent_event_tags.event_id = agent_events.id AND agent_event_tags.tag = @tag)"
+      );
+    } else if (table === "handoffs") {
+      filters.push(
+        "EXISTS (SELECT 1 FROM handoff_tags WHERE handoff_tags.handoff_id = handoffs.id AND handoff_tags.tag = @tag)"
       );
     } else {
       filters.push("1 = 0");

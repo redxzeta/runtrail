@@ -165,6 +165,8 @@ export const createHandoffRequestSchema = z.object({
   project: z.string().trim().min(1).max(120),
   summary: z.string().trim().min(1).max(2000),
   nextAction: z.string().trim().min(1).max(1000).optional(),
+  category: categorySchema,
+  tags: tagsSchema,
   context: z.unknown().optional(),
   createdAt: z.string().datetime().optional()
 });
@@ -302,6 +304,8 @@ export type Handoff = {
   project: string;
   summary: string;
   nextAction?: string;
+  category?: string;
+  tags?: string[];
   context?: unknown;
   createdAt: string;
 };

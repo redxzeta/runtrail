@@ -143,6 +143,8 @@ describe("mcp adapter", () => {
         project: "runtrail",
         summary: "Continue MCP docs",
         nextAction: "Verify OpenClaw tool filter",
+        category: "implementation",
+        tags: ["mcp", "docs"],
         context: { changedFiles: ["README.md"] }
       },
       client
@@ -199,6 +201,8 @@ describe("mcp adapter", () => {
           project: "runtrail",
           summary: "Continue MCP docs",
           nextAction: "Verify OpenClaw tool filter",
+          category: "implementation",
+          tags: ["mcp", "docs"],
           context: { changedFiles: ["README.md"] }
         }
       })

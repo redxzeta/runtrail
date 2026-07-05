@@ -514,6 +514,8 @@ describe("ledger routes", () => {
       project: "ice-council",
       summary: "API work is ready for operator review",
       nextAction: "Review changed routes",
+      category: "implementation",
+      tags: ["mcp", "issue-79", "mcp"],
       context: {
         changedFiles: ["src/routes/ledger.ts"]
       },
@@ -527,6 +529,8 @@ describe("ledger routes", () => {
         sourceRunId: string;
         fromSource: string;
         toSource: string;
+        category: string;
+        tags: string[];
         context: { changedFiles: string[] };
       };
     };
@@ -535,6 +539,8 @@ describe("ledger routes", () => {
     expect(created.handoff.sourceRunId).toBe(run.run.id);
     expect(created.handoff.fromSource).toBe("codex");
     expect(created.handoff.toSource).toBe("openclaw");
+    expect(created.handoff.category).toBe("implementation");
+    expect(created.handoff.tags).toEqual(["mcp", "issue-79"]);
     expect(created.handoff.context.changedFiles).toEqual(["src/routes/ledger.ts"]);
 
     const listedResponse = await app.request(`/handoffs?project=ice-council`, {
@@ -556,14 +562,16 @@ describe("ledger routes", () => {
       headers: authHeaders()
     });
     const fetched = (await fetchedResponse.json()) as {
-      handoff: { id: string; summary: string };
+      handoff: { id: string; summary: string; category: string; tags: string[] };
     };
 
     expect(fetchedResponse.status).toBe(200);
     expect(fetched.handoff).toEqual(
       expect.objectContaining({
         id: created.handoff.id,
-        summary: "API work is ready for operator review"
+        summary: "API work is ready for operator review",
+        category: "implementation",
+        tags: ["mcp", "issue-79"]
       })
     );
   });
@@ -894,6 +902,8 @@ describe("ledger routes", () => {
       fromSource: "codex",
       project: "runtrail",
       summary: "needle handoff",
+      category: "implementation",
+      tags: ["mcp", "handoff", "mcp"],
       createdAt: "2026-07-01T10:07:00.000Z"
     });
     await postJson(app, "/decisions", {
@@ -959,6 +969,7 @@ describe("ledger routes", () => {
       results: {
         runs: Array<{ task: string; tags?: string[] }>;
         events: Array<{ message: string; tags?: string[] }>;
+        handoffs: Array<{ summary: string; tags?: string[] }>;
         open_loops: unknown[];
       };
     };
@@ -968,6 +979,9 @@ describe("ledger routes", () => {
     ]);
     expect(metadataBody.results.events).toEqual([
       expect.objectContaining({ message: "needle event", tags: ["mcp"] })
+    ]);
+    expect(metadataBody.results.handoffs).toEqual([
+      expect.objectContaining({ summary: "needle handoff", tags: ["mcp", "handoff"] })
     ]);
     expect(metadataBody.results.open_loops).toEqual([]);
 

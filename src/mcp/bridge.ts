@@ -119,6 +119,8 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
         sourceRunId: z.string().optional(),
         toSource: z.string().optional(),
         nextAction: z.string().optional(),
+        category: z.string().optional(),
+        tags: z.array(z.string()).optional(),
         context: z.record(z.string(), z.unknown()).optional()
       }
     },
