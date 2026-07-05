@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/redxzeta/runtrail/compare/v1.22.0...v1.22.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* **db:** defer handoff category index migration ([#81](https://github.com/redxzeta/runtrail/issues/81)) ([b59e61f](https://github.com/redxzeta/runtrail/commit/b59e61f4627e6d2fc5f0c29bdbc1bfd2c28a948c))
+
 # [1.22.0](https://github.com/redxzeta/runtrail/compare/v1.21.0...v1.22.0) (2026-07-05)
 
 
