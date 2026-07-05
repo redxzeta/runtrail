@@ -1,3 +1,10 @@
+# [1.21.0](https://github.com/redxzeta/runtrail/compare/v1.20.0...v1.21.0) (2026-07-05)
+
+
+### Features
+
+* **cli:** add agent metadata handoffs ([#76](https://github.com/redxzeta/runtrail/issues/76)) ([7fe2c16](https://github.com/redxzeta/runtrail/commit/7fe2c16b00ab12948d6be6f169cf9d5273c69b93))
+
 # [1.20.0](https://github.com/redxzeta/runtrail/compare/v1.19.0...v1.20.0) (2026-07-05)
 
 
