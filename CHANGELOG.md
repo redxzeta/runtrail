@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/redxzeta/runtrail/compare/v1.21.0...v1.22.0) (2026-07-05)
+
+
+### Features
+
+* **search:** tag handoff records ([#80](https://github.com/redxzeta/runtrail/issues/80)) ([761e0ba](https://github.com/redxzeta/runtrail/commit/761e0ba9e4394499e510e9ec7dcc91dc04f1f2c1))
+
 # [1.21.0](https://github.com/redxzeta/runtrail/compare/v1.20.0...v1.21.0) (2026-07-05)
 
 
