@@ -321,8 +321,8 @@ export class LedgerRepository {
   }
 
   private replaceTags(
-    table: "agent_run_tags" | "agent_event_tags",
-    idColumn: "run_id" | "event_id",
+    table: "agent_run_tags" | "agent_event_tags" | "handoff_tags",
+    idColumn: "run_id" | "event_id" | "handoff_id",
     id: string,
     tags: string[] | undefined
   ): void {
@@ -641,6 +641,7 @@ export class LedgerRepository {
       return undefined;
     }
 
+    const tags = normalizeTags(input.tags);
     const handoff: Handoff = {
       id: createId("handoff"),
       sourceRunId: input.sourceRunId,
@@ -649,41 +650,54 @@ export class LedgerRepository {
       project: input.project,
       summary: input.summary,
       nextAction: input.nextAction,
+      category: input.category,
+      tags,
       context: input.context,
       createdAt: input.createdAt ?? nowIso()
     };
 
-    this.db
-      .prepare(
-        `INSERT INTO handoffs (
-          id,
-          source_run_id,
-          from_source,
-          to_source,
-          project,
-          summary,
-          next_action,
-          context_json,
-          created_at
-        ) VALUES (
-          @id,
-          @sourceRunId,
-          @fromSource,
-          @toSource,
-          @project,
-          @summary,
-          @nextAction,
-          @contextJson,
-          @createdAt
-        )`
-      )
-      .run({
-        ...handoff,
-        sourceRunId: toSqlValue(handoff.sourceRunId),
-        toSource: toSqlValue(handoff.toSource),
-        nextAction: toSqlValue(handoff.nextAction),
-        contextJson: handoff.context === undefined ? null : JSON.stringify(handoff.context)
-      });
+    const transaction = this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO handoffs (
+            id,
+            source_run_id,
+            from_source,
+            to_source,
+            project,
+            summary,
+            next_action,
+            category,
+            tags_json,
+            context_json,
+            created_at
+          ) VALUES (
+            @id,
+            @sourceRunId,
+            @fromSource,
+            @toSource,
+            @project,
+            @summary,
+            @nextAction,
+            @category,
+            @tagsJson,
+            @contextJson,
+            @createdAt
+          )`
+        )
+        .run({
+          ...handoff,
+          sourceRunId: toSqlValue(handoff.sourceRunId),
+          toSource: toSqlValue(handoff.toSource),
+          nextAction: toSqlValue(handoff.nextAction),
+          category: toSqlValue(handoff.category),
+          tagsJson: tagsToJson(handoff.tags),
+          contextJson: handoff.context === undefined ? null : JSON.stringify(handoff.context)
+        });
+      this.replaceTags("handoff_tags", "handoff_id", handoff.id, handoff.tags);
+    });
+
+    transaction();
 
     return handoff;
   }

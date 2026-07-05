@@ -53,7 +53,7 @@ Claude Code hook snippet:
 
 ```sh
 rt event create --run-id "$RUNTRAIL_RUN_ID" --type progress --message "Claude Code made progress" --importance 4 --category implementation --tag claude-code --tag issue-N
-rt handoff create --source-run-id "$RUNTRAIL_RUN_ID" --from-source claude-code --to-source codex --project "$RUNTRAIL_PROJECT" --summary "Ready for continuation" --next-action "Review changed files and run tests"
+rt handoff create --source-run-id "$RUNTRAIL_RUN_ID" --from-source claude-code --to-source codex --project "$RUNTRAIL_PROJECT" --summary "Ready for continuation" --next-action "Review changed files and run tests" --category implementation --tag claude-code --tag issue-N
 ```
 
 opencode MCP snippet:

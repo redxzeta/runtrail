@@ -89,6 +89,8 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--source-run-id <sourceRunId>", "Source run ID")
     .option("--to-source <toSource>", "Target source")
     .option("--next-action <nextAction>", "Recommended next action")
+    .option("--category <category>", "Handoff category")
+    .option("--tag <tag>", "Handoff tag", collectOption, [])
     .option("--context-json <json>", "Additional handoff context as JSON")
     .action(createHandoff);
 
@@ -417,6 +419,8 @@ async function createHandoff(options: {
   project: string;
   summary: string;
   nextAction?: string;
+  category?: string;
+  tag?: string[];
   contextJson?: string;
 }): Promise<void> {
   printJson(
@@ -429,6 +433,8 @@ async function createHandoff(options: {
         project: options.project,
         summary: options.summary,
         nextAction: options.nextAction,
+        category: options.category,
+        tags: optionTags(options.tag),
         context: options.contextJson
           ? parseJsonOption(options.contextJson, "--context-json")
           : undefined

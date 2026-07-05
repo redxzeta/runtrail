@@ -105,6 +105,8 @@ export const schemaStatements = [
     project TEXT NOT NULL,
     summary TEXT NOT NULL,
     next_action TEXT,
+    category TEXT,
+    tags_json TEXT,
     context_json TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (source_run_id) REFERENCES agent_runs (id) ON DELETE SET NULL
@@ -113,6 +115,16 @@ export const schemaStatements = [
     ON handoffs (project, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_handoffs_source_run_id_created_at
     ON handoffs (source_run_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_handoffs_category_created_at
+    ON handoffs (category, created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS handoff_tags (
+    handoff_id TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    PRIMARY KEY (handoff_id, tag),
+    FOREIGN KEY (handoff_id) REFERENCES handoffs (id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_handoff_tags_tag_handoff_id
+    ON handoff_tags (tag, handoff_id)`,
   `CREATE TABLE IF NOT EXISTS artifacts (
     id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,

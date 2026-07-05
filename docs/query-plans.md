@@ -8,7 +8,7 @@ Context endpoints were mostly covered by existing indexes:
 
 - Recent runs: `idx_agent_runs_project_updated_at`
 - Open loops: `idx_open_loops_project_status_updated_at`
-- Handoffs: `idx_handoffs_project_created_at`
+- Handoffs: `idx_handoffs_project_created_at`, `idx_handoffs_category_created_at`, `idx_handoff_tags_tag_handoff_id`
 - Decisions: `idx_decisions_project_created_at`, with a temporary sort for `project = ? OR project IS NULL`
 
 Two `agent_runs` paths filtered by both `project` and `status` but used only `idx_agent_runs_status_updated_at`:

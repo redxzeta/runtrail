@@ -35,6 +35,7 @@ describe("database", () => {
       "agent_runs",
       "artifacts",
       "decisions",
+      "handoff_tags",
       "handoffs",
       "open_loops",
       "schema_migrations"
@@ -43,6 +44,7 @@ describe("database", () => {
       "idx_agent_runs_project_status_updated_at"
     );
     expect(indexes.map((index) => index.name)).toContain("idx_agent_run_tags_tag_run_id");
+    expect(indexes.map((index) => index.name)).toContain("idx_handoff_tags_tag_handoff_id");
   });
 
   it("adds collaboration and metadata columns to existing databases", () => {
@@ -86,6 +88,9 @@ describe("database", () => {
     const eventColumns = db.prepare("PRAGMA table_info(agent_events)").all() as Array<{
       name: string;
     }>;
+    const handoffColumns = db.prepare("PRAGMA table_info(handoffs)").all() as Array<{
+      name: string;
+    }>;
     const loopColumns = db.prepare("PRAGMA table_info(open_loops)").all() as Array<{
       name: string;
     }>;
@@ -96,6 +101,9 @@ describe("database", () => {
     );
     expect(eventColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining(["category", "tags_json", "prev_event_hash", "event_hash"])
+    );
+    expect(handoffColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining(["category", "tags_json"])
     );
     expect(loopColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining(["owner", "source", "next_action", "blocker_ref", "source_run_id"])
