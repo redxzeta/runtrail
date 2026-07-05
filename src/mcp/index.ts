@@ -54,6 +54,8 @@ export function createRuntrailMcpServer(
         type: z.string(),
         message: z.string(),
         importance: z.number().int().min(0).max(10).optional(),
+        category: z.string().optional(),
+        tags: z.array(z.string()).optional(),
         data: z.record(z.string(), z.unknown()).optional()
       }
     },
@@ -111,6 +113,8 @@ export function createRuntrailMcpServer(
       inputSchema: {
         project: z.string().optional(),
         status: z.string().optional(),
+        category: z.string().optional(),
+        tag: z.string().optional(),
         limit: z.number().int().positive().optional()
       }
     },
@@ -172,6 +176,8 @@ export async function callRuntrailTool(
           type: requireString(args, "type"),
           message: requireString(args, "message"),
           importance: args.importance,
+          category: args.category,
+          tags: args.tags,
           data: args.data
         })
       });
@@ -210,6 +216,8 @@ export async function callRuntrailTool(
       const query = new URLSearchParams();
       appendOptional(query, "project", args.project);
       appendOptional(query, "status", args.status);
+      appendOptional(query, "category", args.category);
+      appendOptional(query, "tag", args.tag);
       appendOptional(query, "limit", args.limit);
       const suffix = query.toString();
       return await client.requestJson(`/runs${suffix ? `?${suffix}` : ""}`);

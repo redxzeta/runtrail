@@ -29,7 +29,9 @@ describe("database", () => {
     expect(existsSync(config.storage.dbPath)).toBe(true);
     expect(migration?.name).toBe("001_initial_schema");
     expect(tables.map((table) => table.name)).toEqual([
+      "agent_event_tags",
       "agent_events",
+      "agent_run_tags",
       "agent_runs",
       "artifacts",
       "decisions",
@@ -40,11 +42,31 @@ describe("database", () => {
     expect(indexes.map((index) => index.name)).toContain(
       "idx_agent_runs_project_status_updated_at"
     );
+    expect(indexes.map((index) => index.name)).toContain("idx_agent_run_tags_tag_run_id");
   });
 
-  it("adds open loop collaboration columns to existing databases", () => {
+  it("adds collaboration and metadata columns to existing databases", () => {
     const db = new Database(":memory:");
     db.exec(`
+      CREATE TABLE agent_runs (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL,
+        project TEXT NOT NULL,
+        task TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE agent_events (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        message TEXT NOT NULL,
+        importance INTEGER NOT NULL,
+        data_json TEXT,
+        created_at TEXT NOT NULL
+      );
       CREATE TABLE open_loops (
         id TEXT PRIMARY KEY,
         type TEXT NOT NULL,
@@ -60,10 +82,22 @@ describe("database", () => {
     `);
 
     migrate(db);
-    const columns = db.prepare("PRAGMA table_info(open_loops)").all() as Array<{ name: string }>;
+    const runColumns = db.prepare("PRAGMA table_info(agent_runs)").all() as Array<{ name: string }>;
+    const eventColumns = db.prepare("PRAGMA table_info(agent_events)").all() as Array<{
+      name: string;
+    }>;
+    const loopColumns = db.prepare("PRAGMA table_info(open_loops)").all() as Array<{
+      name: string;
+    }>;
     db.close();
 
-    expect(columns.map((column) => column.name)).toEqual(
+    expect(runColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining(["category", "tags_json"])
+    );
+    expect(eventColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining(["category", "tags_json", "prev_event_hash", "event_hash"])
+    );
+    expect(loopColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining(["owner", "source", "next_action", "blocker_ref", "source_run_id"])
     );
   });

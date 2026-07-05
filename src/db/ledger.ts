@@ -42,6 +42,7 @@ import {
   mapHandoffSummaryRow,
   mapOpenLoopRow,
   mapRunRow,
+  normalizeTags,
   normalizeTimestamp,
   type OpenLoopRow,
   type RunRow,
@@ -49,6 +50,7 @@ import {
   searchFilters,
   searchParams,
   stripEventData,
+  tagsToJson,
   toSqlValue,
   uniqueStrings,
   whereClause
@@ -62,6 +64,7 @@ export class LedgerRepository {
 
   createRun(input: CreateRunRequest): AgentRun {
     const timestamp = nowIso();
+    const tags = normalizeTags(input.tags);
     const run: AgentRun = {
       id: createId("run"),
       source: input.source,
@@ -74,57 +77,70 @@ export class LedgerRepository {
       gitBranch: input.gitBranch,
       gitCommit: input.gitCommit,
       summary: input.summary,
+      category: input.category,
+      tags,
       startedAt: input.startedAt ?? timestamp,
       createdAt: timestamp,
       updatedAt: timestamp
     };
 
-    this.db
-      .prepare(
-        `INSERT INTO agent_runs (
-          id,
-          source,
-          project,
-          task,
-          status,
-          hostname,
-          cwd,
-          git_repo_path,
-          git_branch,
-          git_commit,
-          summary,
-          started_at,
-          completed_at,
-          created_at,
-          updated_at
-        ) VALUES (
-          @id,
-          @source,
-          @project,
-          @task,
-          @status,
-          @hostname,
-          @cwd,
-          @gitRepoPath,
-          @gitBranch,
-          @gitCommit,
-          @summary,
-          @startedAt,
-          @completedAt,
-          @createdAt,
-          @updatedAt
-        )`
-      )
-      .run({
-        ...run,
-        hostname: toSqlValue(run.hostname),
-        cwd: toSqlValue(run.cwd),
-        gitRepoPath: toSqlValue(run.gitRepoPath),
-        gitBranch: toSqlValue(run.gitBranch),
-        gitCommit: toSqlValue(run.gitCommit),
-        summary: toSqlValue(run.summary),
-        completedAt: null
-      });
+    const transaction = this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO agent_runs (
+            id,
+            source,
+            project,
+            task,
+            status,
+            hostname,
+            cwd,
+            git_repo_path,
+            git_branch,
+            git_commit,
+            summary,
+            category,
+            tags_json,
+            started_at,
+            completed_at,
+            created_at,
+            updated_at
+          ) VALUES (
+            @id,
+            @source,
+            @project,
+            @task,
+            @status,
+            @hostname,
+            @cwd,
+            @gitRepoPath,
+            @gitBranch,
+            @gitCommit,
+            @summary,
+            @category,
+            @tagsJson,
+            @startedAt,
+            @completedAt,
+            @createdAt,
+            @updatedAt
+          )`
+        )
+        .run({
+          ...run,
+          hostname: toSqlValue(run.hostname),
+          cwd: toSqlValue(run.cwd),
+          gitRepoPath: toSqlValue(run.gitRepoPath),
+          gitBranch: toSqlValue(run.gitBranch),
+          gitCommit: toSqlValue(run.gitCommit),
+          summary: toSqlValue(run.summary),
+          category: toSqlValue(run.category),
+          tagsJson: tagsToJson(run.tags),
+          completedAt: null
+        });
+      this.replaceTags("agent_run_tags", "run_id", run.id, run.tags);
+    });
+
+    transaction();
 
     return run;
   }
@@ -189,6 +205,18 @@ export class LedgerRepository {
       params.status = query.status;
     }
 
+    if (query.category) {
+      filters.push("category = @category");
+      params.category = query.category;
+    }
+
+    if (query.tag) {
+      filters.push(
+        "EXISTS (SELECT 1 FROM agent_run_tags WHERE agent_run_tags.run_id = agent_runs.id AND agent_run_tags.tag = @tag)"
+      );
+      params.tag = query.tag;
+    }
+
     if (query.started_from) {
       filters.push("started_at >= @startedFrom");
       params.startedFrom = normalizeTimestamp(query.started_from);
@@ -227,12 +255,15 @@ export class LedgerRepository {
       return undefined;
     }
 
+    const tags = normalizeTags(input.tags);
     const event: AgentEvent = {
       id: createId("evt"),
       runId: input.runId,
       type: input.type,
       message: input.message,
       importance: input.importance,
+      category: input.category,
+      tags,
       data: input.data,
       createdAt: input.createdAt ?? nowIso()
     };
@@ -246,6 +277,8 @@ export class LedgerRepository {
             type,
             message,
             importance,
+            category,
+            tags_json,
             data_json,
             prev_event_hash,
             event_hash,
@@ -256,6 +289,8 @@ export class LedgerRepository {
             @type,
             @message,
             @importance,
+            @category,
+            @tagsJson,
             @dataJson,
             NULL,
             NULL,
@@ -264,8 +299,11 @@ export class LedgerRepository {
         )
         .run({
           ...event,
+          category: toSqlValue(event.category),
+          tagsJson: tagsToJson(event.tags),
           dataJson: event.data === undefined ? null : JSON.stringify(event.data)
         });
+      this.replaceTags("agent_event_tags", "event_id", event.id, event.tags);
 
       this.db
         .prepare("UPDATE agent_runs SET updated_at = ? WHERE id = ?")
@@ -280,6 +318,25 @@ export class LedgerRepository {
       .prepare("SELECT * FROM agent_events WHERE id = ?")
       .get(event.id) as EventRow;
     return mapEventRow(stored);
+  }
+
+  private replaceTags(
+    table: "agent_run_tags" | "agent_event_tags",
+    idColumn: "run_id" | "event_id",
+    id: string,
+    tags: string[] | undefined
+  ): void {
+    this.db.prepare(`DELETE FROM ${table} WHERE ${idColumn} = ?`).run(id);
+
+    if (!tags) {
+      return;
+    }
+
+    const insert = this.db.prepare(`INSERT INTO ${table} (${idColumn}, tag) VALUES (?, ?)`);
+
+    for (const tag of tags) {
+      insert.run(id, tag);
+    }
   }
 
   private recomputeEventHashes(runId: string): void {

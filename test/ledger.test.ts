@@ -133,6 +133,41 @@ describe("ledger routes", () => {
     expect(fetched.run).not.toHaveProperty("summary");
   });
 
+  it("stores run metadata and filters runs by category and tag", async () => {
+    const app = createTestApp();
+    await postJson(app, "/runs", {
+      ...validRunRequest(),
+      task: "remote mcp bridge",
+      category: "implementation",
+      tags: ["mcp", "codex", "mcp"]
+    });
+    await postJson(app, "/runs", {
+      ...validRunRequest(),
+      task: "deployment check",
+      category: "deploy",
+      tags: ["lxc"]
+    });
+
+    const response = await app.request(
+      "/runs?project=ice-council&category=implementation&tag=mcp",
+      {
+        headers: authHeaders()
+      }
+    );
+    const body = (await response.json()) as {
+      runs: Array<{ task: string; category?: string; tags?: string[] }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.runs).toEqual([
+      expect.objectContaining({
+        task: "remote mcp bridge",
+        category: "implementation",
+        tags: ["mcp", "codex"]
+      })
+    ]);
+  });
+
   it("creates and lists events attached to a run", async () => {
     const app = createTestApp();
     const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
@@ -143,6 +178,8 @@ describe("ledger routes", () => {
       type: "progress",
       message: "Read the route patterns",
       importance: 5,
+      category: "implementation",
+      tags: ["api", "mcp", "api"],
       createdAt: "2026-06-26T09:30:00.000Z",
       data: {
         files: ["src/index.ts"]
@@ -151,10 +188,18 @@ describe("ledger routes", () => {
 
     expect(eventResponse.status).toBe(201);
     const created = (await eventResponse.json()) as {
-      event: { id: string; runId: string; data: { files: string[] } };
+      event: {
+        id: string;
+        runId: string;
+        category?: string;
+        tags?: string[];
+        data: { files: string[] };
+      };
     };
     expect(created.event.id).toMatch(/^evt_/);
     expect(created.event.runId).toBe(run.run.id);
+    expect(created.event.category).toBe("implementation");
+    expect(created.event.tags).toEqual(["api", "mcp"]);
     expect(created.event.data.files).toEqual(["src/index.ts"]);
 
     const fetchedResponse = await app.request(`/runs/${run.run.id}`, {
@@ -162,14 +207,16 @@ describe("ledger routes", () => {
     });
     const fetched = (await fetchedResponse.json()) as {
       run: { updatedAt: string };
-      events: Array<{ id: string; message: string }>;
+      events: Array<{ id: string; message: string; category?: string; tags?: string[] }>;
     };
 
     expect(fetched.run.updatedAt).toBe("2026-06-26T09:30:00.000Z");
     expect(fetched.events).toEqual([
       expect.objectContaining({
         id: created.event.id,
-        message: "Read the route patterns"
+        message: "Read the route patterns",
+        category: "implementation",
+        tags: ["api", "mcp"]
       })
     ]);
 
@@ -816,6 +863,8 @@ describe("ledger routes", () => {
         project: "runtrail",
         source: "codex",
         task: "needle run task",
+        category: "implementation",
+        tags: ["mcp", "search"],
         startedAt: "2026-07-01T10:00:00.000Z"
       })
     ).json()) as { run: { id: string } };
@@ -830,6 +879,8 @@ describe("ledger routes", () => {
       runId: run.run.id,
       type: "progress",
       message: "needle event",
+      category: "implementation",
+      tags: ["mcp"],
       createdAt: "2026-07-01T10:05:00.000Z"
     });
     await postJson(app, "/open-loops", {
@@ -897,6 +948,28 @@ describe("ledger routes", () => {
     expect(statusBody.results.events).toEqual([
       expect.objectContaining({ message: "needle event" })
     ]);
+
+    const metadataResponse = await app.request(
+      "/search?project=runtrail&category=implementation&tag=mcp",
+      {
+        headers: authHeaders()
+      }
+    );
+    const metadataBody = (await metadataResponse.json()) as {
+      results: {
+        runs: Array<{ task: string; tags?: string[] }>;
+        events: Array<{ message: string; tags?: string[] }>;
+        open_loops: unknown[];
+      };
+    };
+
+    expect(metadataBody.results.runs).toEqual([
+      expect.objectContaining({ task: "needle run task", tags: ["mcp", "search"] })
+    ]);
+    expect(metadataBody.results.events).toEqual([
+      expect.objectContaining({ message: "needle event", tags: ["mcp"] })
+    ]);
+    expect(metadataBody.results.open_loops).toEqual([]);
 
     await app.request(`/runs/${run.run.id}`, {
       method: "PATCH",

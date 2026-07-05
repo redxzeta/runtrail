@@ -105,7 +105,13 @@ describe("cli", () => {
       "--project",
       "runtrail",
       "--task",
-      "ship cli"
+      "ship cli",
+      "--category",
+      "implementation",
+      "--tag",
+      "cli",
+      "--tag",
+      "metadata"
     ]);
     await runCli([
       "node",
@@ -120,6 +126,10 @@ describe("cli", () => {
       "wired commands",
       "--importance",
       "5",
+      "--category",
+      "implementation",
+      "--tag",
+      "cli",
       "--data-json",
       '{"files":["src/cli/index.ts"]}'
     ]);
@@ -157,7 +167,9 @@ describe("cli", () => {
         body: JSON.stringify({
           source: "codex",
           project: "runtrail",
-          task: "ship cli"
+          task: "ship cli",
+          category: "implementation",
+          tags: ["cli", "metadata"]
         })
       })
     );
@@ -171,6 +183,8 @@ describe("cli", () => {
           type: "progress",
           message: "wired commands",
           importance: 5,
+          category: "implementation",
+          tags: ["cli"],
           data: { files: ["src/cli/index.ts"] }
         })
       })

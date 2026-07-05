@@ -15,8 +15,18 @@ export function migrate(db: Database.Database): void {
     addColumnIfMissing(db, "open_loops", "next_action", "next_action TEXT");
     addColumnIfMissing(db, "open_loops", "blocker_ref", "blocker_ref TEXT");
     addColumnIfMissing(db, "open_loops", "source_run_id", "source_run_id TEXT");
+    addColumnIfMissing(db, "agent_runs", "category", "category TEXT");
+    addColumnIfMissing(db, "agent_runs", "tags_json", "tags_json TEXT");
+    addColumnIfMissing(db, "agent_events", "category", "category TEXT");
+    addColumnIfMissing(db, "agent_events", "tags_json", "tags_json TEXT");
     addColumnIfMissing(db, "agent_events", "prev_event_hash", "prev_event_hash TEXT");
     addColumnIfMissing(db, "agent_events", "event_hash", "event_hash TEXT");
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_agent_runs_category_updated_at ON agent_runs (category, updated_at DESC)"
+    );
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_agent_events_category_created_at ON agent_events (category, created_at DESC)"
+    );
 
     db.prepare(
       "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"

@@ -36,6 +36,8 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--task <task>", "Task summary")
     .option("--status <status>", "Initial status")
     .option("--summary <summary>", "Run summary")
+    .option("--category <category>", "Run category")
+    .option("--tag <tag>", "Run tag", collectOption, [])
     .action(createRun);
 
   const event = program.command("event").description("Manage events");
@@ -46,6 +48,8 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--type <type>", "Event type")
     .requiredOption("--message <message>", "Event message")
     .option("--importance <importance>", "Importance from 0 to 10", parseInteger)
+    .option("--category <category>", "Event category")
+    .option("--tag <tag>", "Event tag", collectOption, [])
     .option("--data-json <json>", "Additional event data as JSON")
     .action(createEvent);
 
@@ -141,6 +145,8 @@ async function createRun(options: {
   task: string;
   status?: string;
   summary?: string;
+  category?: string;
+  tag?: string[];
 }): Promise<void> {
   printJson(
     await requestJson("/runs", {
@@ -150,7 +156,9 @@ async function createRun(options: {
         project: options.project,
         task: options.task,
         status: options.status,
-        summary: options.summary
+        summary: options.summary,
+        category: options.category,
+        tags: optionTags(options.tag)
       })
     })
   );
@@ -280,6 +288,8 @@ async function createEvent(options: {
   type: string;
   message: string;
   importance?: number;
+  category?: string;
+  tag?: string[];
   dataJson?: string;
 }): Promise<void> {
   printJson(
@@ -290,6 +300,8 @@ async function createEvent(options: {
         type: options.type,
         message: options.message,
         importance: options.importance,
+        category: options.category,
+        tags: optionTags(options.tag),
         data: options.dataJson ? parseJsonOption(options.dataJson, "--data-json") : undefined
       })
     })
@@ -458,8 +470,16 @@ function parseInteger(value: string): number {
   return parsed;
 }
 
+function collectOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
 function compact(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+}
+
+function optionTags(tags: string[] | undefined): string[] | undefined {
+  return tags && tags.length > 0 ? tags : undefined;
 }
 
 function parseJsonOption(value: string, optionName: string): unknown {

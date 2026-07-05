@@ -16,6 +16,8 @@ export const schemaStatements = [
     git_branch TEXT,
     git_commit TEXT,
     summary TEXT,
+    category TEXT,
+    tags_json TEXT,
     started_at TEXT NOT NULL,
     completed_at TEXT,
     created_at TEXT NOT NULL,
@@ -27,12 +29,22 @@ export const schemaStatements = [
     ON agent_runs (status, updated_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_agent_runs_project_status_updated_at
     ON agent_runs (project, status, updated_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS agent_run_tags (
+    run_id TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    PRIMARY KEY (run_id, tag),
+    FOREIGN KEY (run_id) REFERENCES agent_runs (id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_run_tags_tag_run_id
+    ON agent_run_tags (tag, run_id)`,
   `CREATE TABLE IF NOT EXISTS agent_events (
             id TEXT PRIMARY KEY,
             run_id TEXT NOT NULL,
             type TEXT NOT NULL,
             message TEXT NOT NULL,
             importance INTEGER NOT NULL,
+            category TEXT,
+            tags_json TEXT,
             data_json TEXT,
             prev_event_hash TEXT,
             event_hash TEXT,
@@ -43,6 +55,14 @@ export const schemaStatements = [
     ON agent_events (run_id, created_at ASC)`,
   `CREATE INDEX IF NOT EXISTS idx_agent_events_created_at
     ON agent_events (created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS agent_event_tags (
+    event_id TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    PRIMARY KEY (event_id, tag),
+    FOREIGN KEY (event_id) REFERENCES agent_events (id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_agent_event_tags_tag_event_id
+    ON agent_event_tags (tag, event_id)`,
   `CREATE TABLE IF NOT EXISTS open_loops (
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL,
