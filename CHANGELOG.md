@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/redxzeta/runtrail/compare/v1.19.0...v1.20.0) (2026-07-05)
+
+
+### Features
+
+* **mcp:** expose continuity tools ([#75](https://github.com/redxzeta/runtrail/issues/75)) ([9ef405f](https://github.com/redxzeta/runtrail/commit/9ef405f1047cacfdeac1ac82853488fce907aab4))
+
 # [1.19.0](https://github.com/redxzeta/runtrail/compare/v1.18.0...v1.19.0) (2026-07-05)
 
 
