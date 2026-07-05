@@ -186,6 +186,7 @@ Agent continuity tools include `journal_get_context`, `journal_search`,
 `journal_create_event`, `journal_create_open_loop`,
 `journal_resolve_open_loop`, and `journal_record_decision`.
 See [docs/mcp-safe-surface.md](docs/mcp-safe-surface.md) for the proposed safe read/write tool surface and default response limits.
+See [docs/agent-write-contract.md](docs/agent-write-contract.md) for the recommended cross-agent write contract.
 
 ## Markdown Exports
 
