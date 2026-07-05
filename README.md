@@ -91,12 +91,14 @@ pnpm cli event create --run-id run_abc123 --type progress --message "added comma
 pnpm cli loop add --type blocked --project runtrail --title "choose retention policy"
 pnpm cli loop resolve loop_abc123 --resolution "keep structured data in SQLite"
 pnpm cli decision add --project runtrail --title "SQLite remains source of truth" --decision "Markdown is export-only"
+pnpm cli handoff create --source-run-id run_abc123 --from-source codex --to-source openclaw --project runtrail --summary "metadata is ready" --next-action "continue with MCP tools"
 ```
 
 Wrap a command and journal its result:
 
 ```sh
 pnpm cli run --source codex --project runtrail --task "fix retry logic" -- pnpm test
+pnpm cli run --source codex --project runtrail --task "fix retry logic" --category implementation --tag codex --tag issue-123 -- pnpm test
 ```
 
 ## MCP Adapter
