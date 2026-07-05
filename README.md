@@ -101,7 +101,59 @@ pnpm cli run --source codex --project runtrail --task "fix retry logic" -- pnpm 
 
 ## MCP Adapter
 
-Runtrail can expose the HTTP API to MCP-compatible agents through a separate stdio process:
+Runtrail can expose the HTTP API to MCP-compatible agents through MCP. Remote-capable
+agents should use the hosted Streamable HTTP endpoint:
+
+Remote endpoint: `http://127.0.0.1:8787/mcp`
+
+Example remote MCP configuration for OpenCode:
+
+```json
+{
+  "mcp": {
+    "runtrail": {
+      "type": "remote",
+      "url": "http://127.0.0.1:8787/mcp",
+      "headers": {
+        "Authorization": "Bearer ${RUNTRAIL_TOKEN}"
+      },
+      "enabled": true
+    }
+  }
+}
+```
+
+Claude Code can use the same `/mcp` URL with HTTP transport:
+
+```sh
+claude mcp add --transport http runtrail http://127.0.0.1:8787/mcp
+```
+
+Stdio-only agents such as Codex or OpenClaw should use the bridge. The bridge
+starts locally and forwards tool calls to the hosted `/mcp` endpoint:
+
+```sh
+RUNTRAIL_MCP_URL=http://127.0.0.1:8787/mcp RUNTRAIL_TOKEN=change-me-to-a-long-random-secret pnpm mcp:bridge
+```
+
+Example stdio MCP server configuration:
+
+```json
+{
+  "mcpServers": {
+    "runtrail": {
+      "command": "runtrail-mcp-bridge",
+      "env": {
+        "RUNTRAIL_MCP_URL": "http://127.0.0.1:8787/mcp",
+        "RUNTRAIL_TOKEN": "change-me-to-a-long-random-secret"
+      }
+    }
+  }
+}
+```
+
+For local development, Runtrail can still expose the HTTP API to MCP-compatible
+agents through a direct stdio process:
 
 ```sh
 RUNTRAIL_URL=http://127.0.0.1:8787 RUNTRAIL_TOKEN=change-me-to-a-long-random-secret pnpm mcp
@@ -124,6 +176,8 @@ Example MCP server configuration:
 ```
 
 The MCP adapter is a thin HTTP client. It does not access SQLite directly.
+MCP startup paths must read local environment/config only. Do not SSH, sudo, or
+scrape `/etc/runtrail/runtrail.env` from an MCP startup command.
 See [docs/mcp-safe-surface.md](docs/mcp-safe-surface.md) for the proposed safe read/write tool surface and default response limits.
 
 ## Markdown Exports

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createRuntrailMcpBridgeServer, loadBridgeConfig } from "../src/mcp/bridge.js";
 import {
   callRuntrailTool,
   createHttpClient,
@@ -154,6 +155,24 @@ describe("mcp adapter", () => {
     const [, init] = fetchMock.mock.calls[0] as unknown as [URL, { headers: Headers }];
     expect(fetchMock).toHaveBeenCalledWith(new URL("/health", "http://runtrail.test"), init);
     expect(init.headers.get("authorization")).toBe("Bearer secret-token");
+  });
+
+  it("constructs the bridge server with the Runtrail tool set", () => {
+    const server = createRuntrailMcpBridgeServer({
+      callTool: vi.fn()
+    });
+
+    expect(server).toBeDefined();
+    expect(runtrailToolNames).toHaveLength(6);
+  });
+
+  it("fails fast when bridge config is missing", () => {
+    expect(() => loadBridgeConfig({ RUNTRAIL_TOKEN: "secret-token" })).toThrow(
+      "RUNTRAIL_MCP_URL is required"
+    );
+    expect(() => loadBridgeConfig({ RUNTRAIL_MCP_URL: "http://runtrail.test/mcp" })).toThrow(
+      "RUNTRAIL_TOKEN is required"
+    );
   });
 });
 

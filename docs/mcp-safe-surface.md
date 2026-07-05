@@ -5,6 +5,9 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 ## Defaults
 
 - Require `RUNTRAIL_URL` and `RUNTRAIL_TOKEN` from the MCP process environment.
+- Expose hosted MCP over Streamable HTTP at `/mcp` for remote-capable agents.
+- Use `RUNTRAIL_MCP_URL` and `RUNTRAIL_TOKEN` for stdio bridge processes.
+- Never SSH, sudo, or scrape live env files from MCP startup commands.
 - Default every list-style tool to `limit: 10`; cap caller-provided limits at `50`.
 - Require `project` for project-context and open-loop list tools.
 - Return compact event and handoff shapes by default; fetch full detail only through explicit id-based tools.
