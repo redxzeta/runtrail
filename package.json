@@ -15,11 +15,13 @@
     "format": "biome check --write .",
     "release": "semantic-release",
     "cli": "tsx src/cli/index.ts",
-    "mcp": "tsx src/mcp/index.ts"
+    "mcp": "tsx src/mcp/index.ts",
+    "mcp:bridge": "tsx src/mcp/bridge.ts"
   },
   "bin": {
     "rt": "dist/cli/index.js",
-    "runtrail-mcp": "dist/mcp/index.js"
+    "runtrail-mcp": "dist/mcp/index.js",
+    "runtrail-mcp-bridge": "dist/mcp/bridge.js"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",

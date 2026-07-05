@@ -5,6 +5,7 @@ import { loadConfig, type RuntrailConfig } from "./config.js";
 import { openDatabase } from "./db/index.js";
 import { createHealthRoute } from "./routes/health.js";
 import { createLedgerRoute } from "./routes/ledger.js";
+import { createMcpRoute } from "./routes/mcp.js";
 
 type CreateAppOptions = {
   config?: RuntrailConfig;
@@ -16,6 +17,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
   app.route("/health", createHealthRoute());
 
   if (options.config && options.db) {
+    app.route("/mcp", createMcpRoute({ config: options.config }));
     app.route("/", createLedgerRoute({ config: options.config, db: options.db }));
   }
 

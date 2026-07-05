@@ -11,7 +11,7 @@ export type RuntrailHttpClient = {
   ): Promise<unknown>;
 };
 
-type RuntrailHttpClientConfig = Pick<RuntrailConfig, "url" | "security">;
+export type RuntrailHttpClientConfig = Pick<RuntrailConfig, "url" | "security">;
 
 export const runtrailToolNames = [
   "journal_get_context",
