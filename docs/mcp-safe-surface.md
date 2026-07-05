@@ -17,13 +17,15 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 
 | Tool | Mode | HTTP route | Input | Output |
 | --- | --- | --- | --- | --- |
-| `journal_recent_runs` | Read-only | `GET /runs` | `{ project?: string, status?: string, started_from?: string, started_to?: string, limit?: number }` | `{ runs: AgentRun[] }` capped and ordered by recent update |
-| `journal_get_run` | Read-only | `GET /runs/:id` | `{ id: string }` | `{ run: AgentRun, events: AgentEventWithoutData[] }` plus compact related records when implemented |
+| `journal_search_runs` | Read-only | `GET /runs` | `{ project?: string, status?: string, category?: string, tag?: string, limit?: number }` | `{ runs: AgentRun[] }` capped and ordered by recent update |
+| `journal_get_run_manifest` | Read-only | `GET /runs/:id/manifest` | `{ runId: string }` | Compact run manifest with linked events, changed files, commands, tests, open loops, handoffs, and artifacts |
 | `journal_get_context` | Read-only | `GET /agent/context` | `{ project: string, limit?: number, min_importance?: number }` | Compact project context with recent runs, failed runs, compact events, compact handoffs, open loops, decisions, and next actions |
-| `journal_list_open_loops` | Read-only | `GET /open-loops` | `{ project: string, type?: OpenLoopType, status?: OpenLoopStatus, limit?: number }` | `{ openLoops: OpenLoop[] }` scoped to one project by default |
-| `journal_create_event` | Write | `POST /events` | `{ runId: string, type: EventType, message: string, importance?: number, data?: object }` | `{ event: AgentEvent }` |
+| `journal_search` | Read-only | `GET /search` | `{ project?: string, source?: string, status?: string, category?: string, tag?: string, text?: string, date_from?: string, date_to?: string, limit?: number }` | Compact runs, events, open loops, handoffs, and decisions matching the filters |
+| `journal_create_event` | Write | `POST /events` | `{ runId: string, type: EventType, message: string, importance?: number, category?: string, tags?: string[], data?: object }` | `{ event: AgentEvent }` |
 | `journal_create_handoff` | Write | `POST /handoffs` | `{ sourceRunId?: string, fromSource: string, toSource?: string, project: string, summary: string, nextAction?: string, context?: object }` | `{ handoff: Handoff }` |
+| `journal_create_open_loop` | Write | `POST /open-loops` | `{ type: OpenLoopType, project: string, title: string, description?: string }` | `{ openLoop: OpenLoop }` |
 | `journal_resolve_open_loop` | Write | `PATCH /open-loops/:id` | `{ id: string, resolution?: string }` | `{ openLoop: OpenLoop }` with status set to `resolved` |
+| `journal_record_decision` | Write | `POST /decisions` | `{ project?: string, title: string, decision: string, rationale?: string }` | `{ decision: Decision }` |
 
 ## Schema Notes
 

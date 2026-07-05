@@ -19,6 +19,9 @@ export const runtrailToolNames = [
   "journal_create_open_loop",
   "journal_resolve_open_loop",
   "journal_record_decision",
+  "journal_create_handoff",
+  "journal_get_run_manifest",
+  "journal_search",
   "journal_search_runs"
 ] as const;
 
@@ -121,6 +124,56 @@ export function createRuntrailMcpServer(
     async (args) => mcpText(await callRuntrailTool("journal_search_runs", args, client))
   );
 
+  server.registerTool(
+    "journal_create_handoff",
+    {
+      title: "Create Runtrail handoff",
+      description: "Create a handoff for another agent or source",
+      inputSchema: {
+        fromSource: z.string(),
+        project: z.string(),
+        summary: z.string(),
+        sourceRunId: z.string().optional(),
+        toSource: z.string().optional(),
+        nextAction: z.string().optional(),
+        context: z.record(z.string(), z.unknown()).optional()
+      }
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_create_handoff", args, client))
+  );
+
+  server.registerTool(
+    "journal_get_run_manifest",
+    {
+      title: "Get Runtrail run manifest",
+      description: "Get compact linked records for one Runtrail run",
+      inputSchema: {
+        runId: z.string()
+      }
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_get_run_manifest", args, client))
+  );
+
+  server.registerTool(
+    "journal_search",
+    {
+      title: "Search Runtrail journal",
+      description: "Search Runtrail runs, events, open loops, handoffs, and decisions",
+      inputSchema: {
+        project: z.string().optional(),
+        source: z.string().optional(),
+        status: z.string().optional(),
+        category: z.string().optional(),
+        tag: z.string().optional(),
+        text: z.string().optional(),
+        date_from: z.string().optional(),
+        date_to: z.string().optional(),
+        limit: z.number().int().positive().optional()
+      }
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_search", args, client))
+  );
+
   return server;
 }
 
@@ -212,6 +265,37 @@ export async function callRuntrailTool(
           rationale: args.rationale
         })
       });
+    case "journal_create_handoff":
+      return await client.requestJson("/handoffs", {
+        method: "POST",
+        body: compact({
+          sourceRunId: args.sourceRunId,
+          fromSource: requireString(args, "fromSource"),
+          toSource: args.toSource,
+          project: requireString(args, "project"),
+          summary: requireString(args, "summary"),
+          nextAction: args.nextAction,
+          context: args.context
+        })
+      });
+    case "journal_get_run_manifest":
+      return await client.requestJson(
+        `/runs/${encodeURIComponent(requireString(args, "runId"))}/manifest`
+      );
+    case "journal_search": {
+      const query = new URLSearchParams();
+      appendOptional(query, "project", args.project);
+      appendOptional(query, "source", args.source);
+      appendOptional(query, "status", args.status);
+      appendOptional(query, "category", args.category);
+      appendOptional(query, "tag", args.tag);
+      appendOptional(query, "text", args.text);
+      appendOptional(query, "date_from", args.date_from);
+      appendOptional(query, "date_to", args.date_to);
+      appendOptional(query, "limit", args.limit);
+      const suffix = query.toString();
+      return await client.requestJson(`/search${suffix ? `?${suffix}` : ""}`);
+    }
     case "journal_search_runs": {
       const query = new URLSearchParams();
       appendOptional(query, "project", args.project);

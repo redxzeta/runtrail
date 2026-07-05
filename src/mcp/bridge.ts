@@ -107,6 +107,56 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
     async (args) => await forwardTool(client, "journal_search_runs", args)
   );
 
+  server.registerTool(
+    "journal_create_handoff",
+    {
+      title: "Create Runtrail handoff",
+      description: "Create a handoff for another agent or source",
+      inputSchema: {
+        fromSource: z.string(),
+        project: z.string(),
+        summary: z.string(),
+        sourceRunId: z.string().optional(),
+        toSource: z.string().optional(),
+        nextAction: z.string().optional(),
+        context: z.record(z.string(), z.unknown()).optional()
+      }
+    },
+    async (args) => await forwardTool(client, "journal_create_handoff", args)
+  );
+
+  server.registerTool(
+    "journal_get_run_manifest",
+    {
+      title: "Get Runtrail run manifest",
+      description: "Get compact linked records for one Runtrail run",
+      inputSchema: {
+        runId: z.string()
+      }
+    },
+    async (args) => await forwardTool(client, "journal_get_run_manifest", args)
+  );
+
+  server.registerTool(
+    "journal_search",
+    {
+      title: "Search Runtrail journal",
+      description: "Search Runtrail runs, events, open loops, handoffs, and decisions",
+      inputSchema: {
+        project: z.string().optional(),
+        source: z.string().optional(),
+        status: z.string().optional(),
+        category: z.string().optional(),
+        tag: z.string().optional(),
+        text: z.string().optional(),
+        date_from: z.string().optional(),
+        date_to: z.string().optional(),
+        limit: z.number().int().positive().optional()
+      }
+    },
+    async (args) => await forwardTool(client, "journal_search", args)
+  );
+
   return server;
 }
 
