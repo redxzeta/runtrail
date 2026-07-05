@@ -53,6 +53,8 @@ describe("mcp adapter", () => {
       {
         project: "runtrail",
         status: "failed",
+        category: "implementation",
+        tag: "mcp",
         limit: 10
       },
       client
@@ -64,7 +66,7 @@ describe("mcp adapter", () => {
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(
       2,
-      "/runs?project=runtrail&status=failed&limit=10"
+      "/runs?project=runtrail&status=failed&category=implementation&tag=mcp&limit=10"
     );
   });
 
@@ -78,6 +80,8 @@ describe("mcp adapter", () => {
         type: "completed",
         message: "Done",
         importance: 5,
+        category: "implementation",
+        tags: ["mcp", "docs"],
         data: { changedFiles: ["README.md"] }
       },
       client
@@ -112,7 +116,13 @@ describe("mcp adapter", () => {
     expect(client.requestJson).toHaveBeenNthCalledWith(
       1,
       "/events",
-      expect.objectContaining({ method: "POST" })
+      expect.objectContaining({
+        method: "POST",
+        body: expect.objectContaining({
+          category: "implementation",
+          tags: ["mcp", "docs"]
+        })
+      })
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(
       2,

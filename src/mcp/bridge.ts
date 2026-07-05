@@ -40,6 +40,8 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
         type: z.string(),
         message: z.string(),
         importance: z.number().int().min(0).max(10).optional(),
+        category: z.string().optional(),
+        tags: z.array(z.string()).optional(),
         data: z.record(z.string(), z.unknown()).optional()
       }
     },
@@ -97,6 +99,8 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
       inputSchema: {
         project: z.string().optional(),
         status: z.string().optional(),
+        category: z.string().optional(),
+        tag: z.string().optional(),
         limit: z.number().int().positive().optional()
       }
     },

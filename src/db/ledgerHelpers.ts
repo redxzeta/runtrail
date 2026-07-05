@@ -21,6 +21,8 @@ export type RunRow = {
   git_branch: string | null;
   git_commit: string | null;
   summary: string | null;
+  category: string | null;
+  tags_json: string | null;
   started_at: string;
   completed_at: string | null;
   created_at: string;
@@ -33,6 +35,8 @@ export type EventRow = {
   type: AgentEvent["type"];
   message: string;
   importance: number;
+  category: string | null;
+  tags_json: string | null;
   data_json: string | null;
   prev_event_hash: string | null;
   event_hash: string | null;
@@ -105,6 +109,8 @@ export function mapRunRow(row: RunRow): AgentRun {
     gitBranch: row.git_branch ?? undefined,
     gitCommit: row.git_commit ?? undefined,
     summary: row.summary ?? undefined,
+    category: row.category ?? undefined,
+    tags: parseTags(row.tags_json),
     startedAt: row.started_at,
     completedAt: row.completed_at ?? undefined,
     createdAt: row.created_at,
@@ -119,6 +125,8 @@ export function mapEventRow(row: EventRow): AgentEvent {
     type: row.type,
     message: row.message,
     importance: row.importance,
+    category: row.category ?? undefined,
+    tags: parseTags(row.tags_json),
     data: row.data_json ? JSON.parse(row.data_json) : undefined,
     prevEventHash: row.prev_event_hash ?? undefined,
     eventHash: row.event_hash ?? undefined,
@@ -133,6 +141,8 @@ export function mapEventContextRow(row: EventRow): Omit<AgentEvent, "data"> {
     type: row.type,
     message: row.message,
     importance: row.importance,
+    category: row.category ?? undefined,
+    tags: parseTags(row.tags_json),
     createdAt: row.created_at
   });
 }
@@ -214,6 +224,8 @@ export function stripEventData(event: AgentEvent): Omit<AgentEvent, "data"> {
     type: event.type,
     message: event.message,
     importance: event.importance,
+    category: event.category,
+    tags: event.tags,
     createdAt: event.createdAt
   };
 }
@@ -242,6 +254,8 @@ export function searchParams(query: JournalSearchQuery): Record<string, string |
     project: query.project ?? "",
     source: query.source ?? "",
     status: query.status ?? "",
+    category: query.category ?? "",
+    tag: query.tag ?? "",
     dateFrom: query.date_from ? normalizeTimestamp(query.date_from) : "",
     dateTo: query.date_to ? normalizeTimestamp(query.date_to) : "",
     text: query.text ? `%${escapeLike(query.text)}%` : ""
@@ -282,6 +296,28 @@ export function searchFilters(
     }
   }
 
+  if (query.category) {
+    if (table === "agent_runs" || table === "agent_events") {
+      filters.push(`${table}.category = @category`);
+    } else {
+      filters.push("1 = 0");
+    }
+  }
+
+  if (query.tag) {
+    if (table === "agent_runs") {
+      filters.push(
+        "EXISTS (SELECT 1 FROM agent_run_tags WHERE agent_run_tags.run_id = agent_runs.id AND agent_run_tags.tag = @tag)"
+      );
+    } else if (table === "agent_events") {
+      filters.push(
+        "EXISTS (SELECT 1 FROM agent_event_tags WHERE agent_event_tags.event_id = agent_events.id AND agent_event_tags.tag = @tag)"
+      );
+    } else {
+      filters.push("1 = 0");
+    }
+  }
+
   if (query.date_from) {
     filters.push(`${dateColumn(table)} >= @dateFrom`);
   }
@@ -297,6 +333,30 @@ export function searchFilters(
   }
 
   return filters;
+}
+
+export function normalizeTags(tags: string[] | undefined): string[] | undefined {
+  if (!tags) {
+    return undefined;
+  }
+
+  const normalized = uniqueStrings(tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0));
+
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+export function tagsToJson(tags: string[] | undefined): string | null {
+  return tags ? JSON.stringify(tags) : null;
+}
+
+function parseTags(value: string | null): string[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = JSON.parse(value);
+
+  return Array.isArray(parsed) && parsed.length > 0 ? parsed : undefined;
 }
 
 export function whereClause(filters: string[]): string {

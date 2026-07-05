@@ -37,7 +37,7 @@ Create a run:
 curl -X POST http://127.0.0.1:8787/runs \
   -H "authorization: Bearer $RUNTRAIL_TOKEN" \
   -H "content-type: application/json" \
-  -d '{"source":"codex","project":"runtrail","task":"implement runs API"}'
+  -d '{"source":"codex","project":"runtrail","task":"implement runs API","category":"implementation","tags":["codex","issue-123"]}'
 ```
 
 Attach an event:
@@ -46,14 +46,14 @@ Attach an event:
 curl -X POST http://127.0.0.1:8787/events \
   -H "authorization: Bearer $RUNTRAIL_TOKEN" \
   -H "content-type: application/json" \
-  -d '{"runId":"run_abc123","type":"progress","message":"added tests","importance":4}'
+  -d '{"runId":"run_abc123","type":"progress","message":"added tests","importance":4,"category":"implementation","tags":["tests"]}'
 ```
 
 Fetch recent runs:
 
 ```sh
 curl -H "authorization: Bearer $RUNTRAIL_TOKEN" \
-  "http://127.0.0.1:8787/runs?project=runtrail"
+  "http://127.0.0.1:8787/runs?project=runtrail&category=implementation&tag=codex"
 ```
 
 Create an open loop:
@@ -86,8 +86,8 @@ curl -X POST http://127.0.0.1:8787/decisions \
 CLI equivalents:
 
 ```sh
-pnpm cli run create --source codex --project runtrail --task "implement CLI core"
-pnpm cli event create --run-id run_abc123 --type progress --message "added command tests" --importance 5
+pnpm cli run create --source codex --project runtrail --task "implement CLI core" --category implementation --tag codex --tag issue-123
+pnpm cli event create --run-id run_abc123 --type progress --message "added command tests" --importance 5 --category implementation --tag tests
 pnpm cli loop add --type blocked --project runtrail --title "choose retention policy"
 pnpm cli loop resolve loop_abc123 --resolution "keep structured data in SQLite"
 pnpm cli decision add --project runtrail --title "SQLite remains source of truth" --decision "Markdown is export-only"

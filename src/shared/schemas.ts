@@ -49,6 +49,9 @@ export const openLoopTypeSchema = z.enum([
 ]);
 
 export const openLoopStatusSchema = z.enum(["open", "resolved", "cancelled"]);
+const tagSchema = z.string().trim().min(1).max(80);
+const tagsSchema = z.array(tagSchema).max(20).optional();
+const categorySchema = z.string().trim().min(1).max(80).optional();
 
 export const createRunRequestSchema = z.object({
   source: z.string().trim().min(1).max(80),
@@ -61,6 +64,8 @@ export const createRunRequestSchema = z.object({
   gitBranch: z.string().trim().min(1).max(255).optional(),
   gitCommit: z.string().trim().min(1).max(80).optional(),
   summary: z.string().trim().min(1).max(2000).optional(),
+  category: categorySchema,
+  tags: tagsSchema,
   startedAt: z.string().datetime().optional()
 });
 
@@ -81,6 +86,8 @@ export const createEventRequestSchema = z.object({
   type: eventTypeSchema,
   message: z.string().trim().min(1).max(4000),
   importance: z.number().int().min(0).max(10).default(3),
+  category: categorySchema,
+  tags: tagsSchema,
   data: z.unknown().optional(),
   createdAt: z.string().datetime().optional()
 });
@@ -88,6 +95,8 @@ export const createEventRequestSchema = z.object({
 export const listRunsQuerySchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
   status: runStatusSchema.optional(),
+  category: categorySchema,
+  tag: tagSchema.optional(),
   started_from: z.string().datetime().optional(),
   started_to: z.string().datetime().optional(),
   limit: z.coerce.number().int().positive().max(100).default(50)
@@ -189,6 +198,8 @@ export const journalSearchQuerySchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
   source: z.string().trim().min(1).max(80).optional(),
   status: z.string().trim().min(1).max(80).optional(),
+  category: categorySchema,
+  tag: tagSchema.optional(),
   text: z.string().trim().min(1).max(200).optional(),
   date_from: z.string().datetime().optional(),
   date_to: z.string().datetime().optional(),
@@ -234,6 +245,8 @@ export type AgentRun = {
   gitBranch?: string;
   gitCommit?: string;
   summary?: string;
+  category?: string;
+  tags?: string[];
   startedAt: string;
   completedAt?: string;
   createdAt: string;
@@ -246,6 +259,8 @@ export type AgentEvent = {
   type: EventType;
   message: string;
   importance: number;
+  category?: string;
+  tags?: string[];
   data?: unknown;
   prevEventHash?: string;
   eventHash?: string;
