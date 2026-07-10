@@ -34,11 +34,21 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--source <source>", "Run source")
     .requiredOption("--project <project>", "Project name")
     .requiredOption("--task <task>", "Task summary")
+    .option("--client-run-id <clientRunId>", "Stable client session identifier")
     .option("--status <status>", "Initial status")
     .option("--summary <summary>", "Run summary")
     .option("--category <category>", "Run category")
     .option("--tag <tag>", "Run tag", collectOption, [])
     .action(createRun);
+
+  const runs = program.command("runs").description("Manage run lifecycle recovery");
+  runs
+    .command("close-stale")
+    .description("Report or close stale running records")
+    .requiredOption("--older-than <duration>", "Minimum inactivity, for example 30m, 24h, or 7d")
+    .option("--limit <limit>", "Maximum runs to inspect", parseInteger, 100)
+    .option("--apply", "Mark candidates cancelled", false)
+    .action(closeStaleRuns);
 
   const event = program.command("event").description("Manage events");
   event
@@ -158,6 +168,7 @@ async function createRun(options: {
   source: string;
   project: string;
   task: string;
+  clientRunId?: string;
   status?: string;
   summary?: string;
   category?: string;
@@ -169,12 +180,33 @@ async function createRun(options: {
       body: compact({
         source: options.source,
         project: options.project,
+        clientRunId: options.clientRunId,
         task: options.task,
         status: options.status,
         summary: options.summary,
         category: options.category,
         tags: optionTags(options.tag)
       })
+    })
+  );
+}
+
+async function closeStaleRuns(options: {
+  olderThan: string;
+  limit: number;
+  apply: boolean;
+}): Promise<void> {
+  const durationMs = parseDuration(options.olderThan);
+  const updatedBefore = new Date(Date.now() - durationMs).toISOString();
+
+  printJson(
+    await requestJson("/runs/close-stale", {
+      method: "POST",
+      body: {
+        updatedBefore,
+        apply: options.apply,
+        limit: options.limit
+      }
     })
   );
 }
@@ -553,6 +585,28 @@ function parseInteger(value: string): number {
   }
 
   return parsed;
+}
+
+function parseDuration(value: string): number {
+  const match = /^(\d+)(s|m|h|d)$/.exec(value.trim());
+
+  if (!match) {
+    throw new Error(`Expected a duration such as 30m, 24h, or 7d; got: ${value}`);
+  }
+
+  const amount = Number(match[1]);
+  const units: Record<string, number> = {
+    s: 1_000,
+    m: 60_000,
+    h: 3_600_000,
+    d: 86_400_000
+  };
+
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    throw new Error(`Duration must be greater than zero; got: ${value}`);
+  }
+
+  return amount * (units[match[2] ?? ""] ?? 0);
 }
 
 function collectOption(value: string, previous: string[]): string[] {

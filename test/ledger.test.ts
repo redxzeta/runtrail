@@ -14,6 +14,7 @@ afterEach(() => {
   }
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("ledger routes", () => {
@@ -82,6 +83,143 @@ describe("ledger routes", () => {
     expect(fetched.run.id).toBe(created.run.id);
     expect(fetched.run.status).toBe("completed");
     expect(fetched.events).toEqual([]);
+  });
+
+  it("replays client run creation without mutating the original record", async () => {
+    const app = createTestApp();
+    const firstResponse = await postJson(app, "/runs", {
+      ...validRunRequest(),
+      clientRunId: "session-82",
+      summary: "original summary"
+    });
+    const replayResponse = await postJson(app, "/runs", {
+      ...validRunRequest(),
+      clientRunId: "session-82",
+      task: "replacement task",
+      status: "failed",
+      summary: "replacement summary",
+      gitCommit: "replacement"
+    });
+    const first = (await firstResponse.json()) as { run: { id: string } };
+    const replay = (await replayResponse.json()) as {
+      run: { id: string; task: string; status: string; summary: string; gitCommit: string };
+    };
+
+    expect(firstResponse.status).toBe(201);
+    expect(replayResponse.status).toBe(200);
+    expect(replay.run).toEqual(
+      expect.objectContaining({
+        id: first.run.id,
+        task: "Implement the ledger API",
+        status: "running",
+        summary: "original summary",
+        gitCommit: "abc123"
+      })
+    );
+  });
+
+  it("creates exactly one run for concurrent requests with the same client identity", async () => {
+    const app = createTestApp();
+    const payload = { ...validRunRequest(), clientRunId: "concurrent-session" };
+    const responses = await Promise.all([
+      postJson(app, "/runs", payload),
+      postJson(app, "/runs", payload),
+      postJson(app, "/runs", payload)
+    ]);
+    const bodies = (await Promise.all(responses.map((response) => response.json()))) as Array<{
+      run: { id: string };
+    }>;
+    const listed = (await (
+      await app.request("/runs?project=ice-council", { headers: authHeaders() })
+    ).json()) as { runs: Array<{ id: string }> };
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 200, 201]);
+    expect(new Set(bodies.map((body) => body.run.id))).toHaveProperty("size", 1);
+    expect(listed.runs).toHaveLength(1);
+  });
+
+  it("preserves create behavior when clientRunId is omitted", async () => {
+    const app = createTestApp();
+    const responses = await Promise.all([
+      postJson(app, "/runs", validRunRequest()),
+      postJson(app, "/runs", validRunRequest())
+    ]);
+    const bodies = (await Promise.all(responses.map((response) => response.json()))) as Array<{
+      run: { id: string };
+    }>;
+
+    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+    expect(new Set(bodies.map((body) => body.run.id))).toHaveProperty("size", 2);
+  });
+
+  it("reports stale runs by default and applies only across the strict activity boundary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-01T00:00:00.000Z"));
+    const app = createTestApp();
+    const old = (await (
+      await postJson(app, "/runs", { ...validRunRequest(), task: "old running" })
+    ).json()) as { run: { id: string } };
+    const terminal = (await (
+      await postJson(app, "/runs", { ...validRunRequest(), task: "old terminal" })
+    ).json()) as { run: { id: string } };
+    await app.request(`/runs/${terminal.run.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "completed" }),
+      headers: authHeaders()
+    });
+
+    vi.setSystemTime(new Date("2026-07-03T00:00:00.000Z"));
+    const recent = (await (
+      await postJson(app, "/runs", { ...validRunRequest(), task: "recent running" })
+    ).json()) as { run: { id: string } };
+    const boundary = (await (
+      await postJson(app, "/runs", { ...validRunRequest(), task: "boundary running" })
+    ).json()) as { run: { id: string } };
+
+    const dryRun = await postJson(app, "/runs/close-stale", {
+      updatedBefore: "2026-07-03T00:00:00.000Z"
+    });
+    const dryBody = (await dryRun.json()) as {
+      dryRun: boolean;
+      candidateCount: number;
+      closedCount: number;
+      candidates: Array<{ id: string }>;
+    };
+
+    expect(dryBody).toEqual(
+      expect.objectContaining({ dryRun: true, candidateCount: 1, closedCount: 0 })
+    );
+    expect(dryBody.candidates.map((run) => run.id)).toEqual([old.run.id]);
+
+    vi.setSystemTime(new Date("2026-07-04T00:00:00.000Z"));
+    const applied = await postJson(app, "/runs/close-stale", {
+      updatedBefore: "2026-07-03T00:00:00.000Z",
+      apply: true
+    });
+    const appliedBody = (await applied.json()) as {
+      dryRun: boolean;
+      candidateCount: number;
+      closedCount: number;
+      closed: Array<{ id: string; status: string; summary: string; completedAt: string }>;
+    };
+
+    expect(appliedBody).toEqual(
+      expect.objectContaining({ dryRun: false, candidateCount: 1, closedCount: 1 })
+    );
+    expect(appliedBody.closed).toEqual([
+      expect.objectContaining({
+        id: old.run.id,
+        status: "cancelled",
+        summary: "Closed as stale after no activity since before 2026-07-03T00:00:00.000Z.",
+        completedAt: "2026-07-04T00:00:00.000Z"
+      })
+    ]);
+
+    for (const id of [terminal.run.id, recent.run.id, boundary.run.id]) {
+      const response = await app.request(`/runs/${id}`, { headers: authHeaders() });
+      const body = (await response.json()) as { run: { status: string } };
+      expect(body.run.status).not.toBe("cancelled");
+    }
   });
 
   it("normalizes run date filters before SQLite text comparison", async () => {
@@ -236,7 +374,7 @@ describe("ledger routes", () => {
     databases.push(db);
     migrate(db);
     const ledger = new LedgerRepository(db);
-    const run = ledger.createRun({
+    const { run } = ledger.createRun({
       source: "codex",
       project: "ice-council",
       task: "Implement the ledger API",

@@ -12,6 +12,12 @@ Every agent run should include:
 - `category`: one of `implementation`, `review`, `debug`, `deploy`, `research`, `planning`, or `ops`.
 - `tags`: stable search tags, such as `codex`, `openclaw`, `claude-code`, `opencode`, `runtrail`, `ice-council`, `issue-N`, `pr-N`, `mcp`, or `lxc`.
 
+Automatic integrations should also send a stable, non-secret `clientRunId` for the local agent
+session. Runtrail scopes this identifier by `source` and `project`. The first `POST /runs` returns
+`201`; retries with the same tuple return `200` and the original `{ run }` without changing its
+task, status, git metadata, or timestamps. Continue that run through events and `PATCH /runs/:id`.
+Clients that omit `clientRunId` keep the non-idempotent create behavior.
+
 When available, wrappers should also capture host, cwd, git repo path, branch, commit, changed files, command exit code, and log path.
 
 ## When To Write
@@ -23,6 +29,24 @@ When available, wrappers should also capture host, cwd, git repo path, branch, c
 - Write a decision when a durable architectural or operational choice is made.
 
 Use `summary` for what happened, `nextAction` for the next concrete step, and `blockedReason` inside event or handoff context when work cannot continue.
+
+## Stale Session Recovery
+
+Inspect stale `running` records through the HTTP-backed CLI. Durations use `s`, `m`, `h`, or `d`:
+
+```sh
+rt runs close-stale --older-than 24h
+```
+
+The command is a dry run by default and prints every candidate. Review that output, then repeat
+with `--apply` to mark only runs whose `updatedAt` is strictly older than the boundary as
+`cancelled`. Applied records receive a generated completion timestamp and an explicit stale-session
+summary. Recent runs and terminal runs are never selected, and Runtrail does not run an automatic
+startup sweeper.
+
+```sh
+rt runs close-stale --older-than 24h --apply
+```
 
 ## Continuation Query
 

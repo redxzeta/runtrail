@@ -7,6 +7,7 @@ import type {
   AgentEvent,
   AgentRun,
   Artifact,
+  CloseStaleRunsRequest,
   CreateArtifactRequest,
   CreateDecisionRequest,
   CreateEventRequest,
@@ -59,16 +60,25 @@ import {
 const exceptionalEventTypes = ["blocked", "failed", "needs_review", "decision_required"];
 const exceptionalEventParams = exceptionalEventTypes.map((_, index) => `@exceptional${index}`);
 
+function isUniqueConstraint(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    String(error.code).startsWith("SQLITE_CONSTRAINT_UNIQUE")
+  );
+}
+
 export class LedgerRepository {
   constructor(private readonly db: Database.Database) {}
 
-  createRun(input: CreateRunRequest): AgentRun {
+  createRun(input: CreateRunRequest): { run: AgentRun; created: boolean } {
     const timestamp = nowIso();
     const tags = normalizeTags(input.tags);
     const run: AgentRun = {
       id: createId("run"),
       source: input.source,
       project: input.project,
+      clientRunId: input.clientRunId,
       task: input.task,
       status: input.status,
       hostname: input.hostname,
@@ -91,6 +101,7 @@ export class LedgerRepository {
             id,
             source,
             project,
+            client_run_id,
             task,
             status,
             hostname,
@@ -109,6 +120,7 @@ export class LedgerRepository {
             @id,
             @source,
             @project,
+            @clientRunId,
             @task,
             @status,
             @hostname,
@@ -127,6 +139,7 @@ export class LedgerRepository {
         )
         .run({
           ...run,
+          clientRunId: toSqlValue(run.clientRunId),
           hostname: toSqlValue(run.hostname),
           cwd: toSqlValue(run.cwd),
           gitRepoPath: toSqlValue(run.gitRepoPath),
@@ -140,9 +153,78 @@ export class LedgerRepository {
       this.replaceTags("agent_run_tags", "run_id", run.id, run.tags);
     });
 
-    transaction();
+    try {
+      transaction();
+      return { run, created: true };
+    } catch (error) {
+      if (!input.clientRunId || !isUniqueConstraint(error)) {
+        throw error;
+      }
 
-    return run;
+      const existing = this.findRunByClientRunId(input.source, input.project, input.clientRunId);
+
+      if (!existing) {
+        throw error;
+      }
+
+      return { run: existing, created: false };
+    }
+  }
+
+  closeStaleRuns(input: CloseStaleRunsRequest): {
+    candidates: AgentRun[];
+    closed: AgentRun[];
+  } {
+    const updatedBefore = normalizeTimestamp(input.updatedBefore);
+    const candidates = this.db
+      .prepare(
+        `SELECT *
+        FROM agent_runs
+        WHERE status = 'running' AND updated_at < @updatedBefore
+        ORDER BY updated_at ASC
+        LIMIT @limit`
+      )
+      .all({ updatedBefore, limit: input.limit }) as RunRow[];
+    const mappedCandidates = candidates.map(mapRunRow);
+
+    if (!input.apply || mappedCandidates.length === 0) {
+      return { candidates: mappedCandidates, closed: [] };
+    }
+
+    const completedAt = nowIso();
+    const summary = `Closed as stale after no activity since before ${updatedBefore}.`;
+    const closed = this.db.transaction(() => {
+      const results: AgentRun[] = [];
+      const update = this.db.prepare(
+        `UPDATE agent_runs
+        SET status = 'cancelled',
+            summary = @summary,
+            completed_at = @completedAt,
+            updated_at = @completedAt
+        WHERE id = @id AND status = 'running' AND updated_at < @updatedBefore`
+      );
+
+      for (const candidate of mappedCandidates) {
+        const result = update.run({
+          id: candidate.id,
+          summary,
+          completedAt,
+          updatedBefore
+        });
+
+        if (result.changes === 1) {
+          const updated = this.getRun(candidate.id);
+
+          if (updated) {
+            results.push(updated);
+          }
+        }
+      }
+
+      return results;
+    })();
+
+    return { candidates: mappedCandidates, closed };
   }
 
   updateRun(id: string, input: UpdateRunRequest): AgentRun | undefined {
@@ -245,6 +327,20 @@ export class LedgerRepository {
     const row = this.db.prepare("SELECT * FROM agent_runs WHERE id = ?").get(id) as
       | RunRow
       | undefined;
+    return row ? mapRunRow(row) : undefined;
+  }
+
+  private findRunByClientRunId(
+    source: string,
+    project: string,
+    clientRunId: string
+  ): AgentRun | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM agent_runs
+        WHERE source = ? AND project = ? AND client_run_id = ?`
+      )
+      .get(source, project, clientRunId) as RunRow | undefined;
     return row ? mapRunRow(row) : undefined;
   }
 

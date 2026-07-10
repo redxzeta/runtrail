@@ -6,6 +6,7 @@ import {
   type AgentEvent,
   type AgentRun,
   agentContextQuerySchema,
+  closeStaleRunsRequestSchema,
   createArtifactRequestSchema,
   createDecisionRequestSchema,
   createEventRequestSchema,
@@ -103,7 +104,26 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json(formatValidationError(parsed.error), 400);
     }
 
-    return c.json({ run: ledger.createRun(parsed.data) }, 201);
+    const result = ledger.createRun(parsed.data);
+    return c.json({ run: result.run }, result.created ? 201 : 200);
+  });
+
+  route.post("/runs/close-stale", async (c) => {
+    const body = await readJson(c.req.raw);
+    const parsed = closeStaleRunsRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    const result = ledger.closeStaleRuns(parsed.data);
+    return c.json({
+      dryRun: !parsed.data.apply,
+      updatedBefore: parsed.data.updatedBefore,
+      candidateCount: result.candidates.length,
+      closedCount: result.closed.length,
+      ...result
+    });
   });
 
   route.patch("/runs/:id", async (c) => {

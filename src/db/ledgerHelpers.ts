@@ -13,6 +13,7 @@ export type RunRow = {
   id: string;
   source: string;
   project: string;
+  client_run_id: string | null;
   task: string;
   status: AgentRun["status"];
   hostname: string | null;
@@ -103,6 +104,7 @@ export function mapRunRow(row: RunRow): AgentRun {
     id: row.id,
     source: row.source,
     project: row.project,
+    clientRunId: row.client_run_id ?? undefined,
     task: row.task,
     status: row.status,
     hostname: row.hostname ?? undefined,
