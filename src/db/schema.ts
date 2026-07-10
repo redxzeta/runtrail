@@ -8,6 +8,7 @@ export const schemaStatements = [
     id TEXT PRIMARY KEY,
     source TEXT NOT NULL,
     project TEXT NOT NULL,
+    client_run_id TEXT,
     task TEXT NOT NULL,
     status TEXT NOT NULL,
     hostname TEXT,

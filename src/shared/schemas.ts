@@ -56,6 +56,7 @@ const categorySchema = z.string().trim().min(1).max(80).optional();
 export const createRunRequestSchema = z.object({
   source: z.string().trim().min(1).max(80),
   project: z.string().trim().min(1).max(120),
+  clientRunId: z.string().trim().min(1).max(255).optional(),
   task: z.string().trim().min(1).max(1000),
   status: runStatusSchema.default("running"),
   hostname: z.string().trim().min(1).max(255).optional(),
@@ -67,6 +68,12 @@ export const createRunRequestSchema = z.object({
   category: categorySchema,
   tags: tagsSchema,
   startedAt: z.string().datetime().optional()
+});
+
+export const closeStaleRunsRequestSchema = z.object({
+  updatedBefore: z.string().datetime(),
+  apply: z.boolean().default(false),
+  limit: z.number().int().positive().max(100).default(100)
 });
 
 export const updateRunRequestSchema = z
@@ -219,6 +226,7 @@ export type EventType = z.infer<typeof eventTypeSchema>;
 export type OpenLoopType = z.infer<typeof openLoopTypeSchema>;
 export type OpenLoopStatus = z.infer<typeof openLoopStatusSchema>;
 export type CreateRunRequest = z.infer<typeof createRunRequestSchema>;
+export type CloseStaleRunsRequest = z.infer<typeof closeStaleRunsRequestSchema>;
 export type UpdateRunRequest = z.infer<typeof updateRunRequestSchema>;
 export type CreateEventRequest = z.infer<typeof createEventRequestSchema>;
 export type ListRunsQuery = z.infer<typeof listRunsQuerySchema>;
@@ -239,6 +247,7 @@ export type AgentRun = {
   id: string;
   source: string;
   project: string;
+  clientRunId?: string;
   task: string;
   status: RunStatus;
   hostname?: string;

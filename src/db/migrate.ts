@@ -17,6 +17,7 @@ export function migrate(db: Database.Database): void {
     addColumnIfMissing(db, "open_loops", "source_run_id", "source_run_id TEXT");
     addColumnIfMissing(db, "agent_runs", "category", "category TEXT");
     addColumnIfMissing(db, "agent_runs", "tags_json", "tags_json TEXT");
+    addColumnIfMissing(db, "agent_runs", "client_run_id", "client_run_id TEXT");
     addColumnIfMissing(db, "agent_events", "category", "category TEXT");
     addColumnIfMissing(db, "agent_events", "tags_json", "tags_json TEXT");
     addColumnIfMissing(db, "agent_events", "prev_event_hash", "prev_event_hash TEXT");
@@ -31,6 +32,11 @@ export function migrate(db: Database.Database): void {
     );
     db.exec(
       "CREATE INDEX IF NOT EXISTS idx_handoffs_category_created_at ON handoffs (category, created_at DESC)"
+    );
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_runs_client_run_id
+      ON agent_runs (source, project, client_run_id)
+      WHERE client_run_id IS NOT NULL`
     );
 
     db.prepare(

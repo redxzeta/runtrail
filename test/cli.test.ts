@@ -16,6 +16,7 @@ describe("cli", () => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it("prints health response JSON", async () => {
@@ -106,6 +107,8 @@ describe("cli", () => {
       "runtrail",
       "--task",
       "ship cli",
+      "--client-run-id",
+      "session-82",
       "--category",
       "implementation",
       "--tag",
@@ -193,6 +196,7 @@ describe("cli", () => {
         body: JSON.stringify({
           source: "codex",
           project: "runtrail",
+          clientRunId: "session-82",
           task: "ship cli",
           category: "implementation",
           tags: ["cli", "metadata"]
@@ -254,6 +258,68 @@ describe("cli", () => {
         })
       })
     );
+  });
+
+  it("reports stale runs by default and requires --apply to close them", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-09T12:00:00.000Z"));
+    const fetchMock = mockFetch({
+      dryRun: true,
+      updatedBefore: "2026-07-08T12:00:00.000Z",
+      candidateCount: 1,
+      closedCount: 0,
+      candidates: [{ id: "run_stale" }],
+      closed: []
+    });
+    const output = captureOutput();
+
+    await runCli(["node", "rt", "runs", "close-stale", "--older-than", "24h"]);
+    await runCli([
+      "node",
+      "rt",
+      "runs",
+      "close-stale",
+      "--older-than",
+      "7d",
+      "--limit",
+      "25",
+      "--apply"
+    ]);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      new URL("/runs/close-stale", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          updatedBefore: "2026-07-08T12:00:00.000Z",
+          apply: false,
+          limit: 100
+        })
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      new URL("/runs/close-stale", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          updatedBefore: "2026-07-02T12:00:00.000Z",
+          apply: true,
+          limit: 25
+        })
+      })
+    );
+    expect(JSON.parse(output[0] ?? "{}")).toEqual(expect.objectContaining({ candidateCount: 1 }));
+  });
+
+  it("rejects invalid stale-run durations before calling the API", async () => {
+    const fetchMock = mockFetch({ ok: true });
+
+    await expect(
+      runCli(["node", "rt", "runs", "close-stale", "--older-than", "yesterday"])
+    ).rejects.toThrow("Expected a duration such as 30m, 24h, or 7d");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("sends bearer token and reports useful HTTP errors", async () => {

@@ -37,8 +37,12 @@ Create a run:
 curl -X POST http://127.0.0.1:8787/runs \
   -H "authorization: Bearer $RUNTRAIL_TOKEN" \
   -H "content-type: application/json" \
-  -d '{"source":"codex","project":"runtrail","task":"implement runs API","category":"implementation","tags":["codex","issue-123"]}'
+  -d '{"source":"codex","project":"runtrail","clientRunId":"local-session-id","task":"implement runs API","category":"implementation","tags":["codex","issue-123"]}'
 ```
+
+`clientRunId` is optional. When supplied, repeated creates with the same source, project, and
+client identifier return the original run (`200`) instead of creating a duplicate; new runs return
+`201`. Replays never overwrite the original run.
 
 Attach an event:
 
@@ -86,7 +90,10 @@ curl -X POST http://127.0.0.1:8787/decisions \
 CLI equivalents:
 
 ```sh
-pnpm cli run create --source codex --project runtrail --task "implement CLI core" --category implementation --tag codex --tag issue-123
+pnpm cli run create --source codex --project runtrail --client-run-id local-session-id --task "implement CLI core" --category implementation --tag codex --tag issue-123
+pnpm cli runs close-stale --older-than 24h
+# After reviewing the dry-run candidates:
+pnpm cli runs close-stale --older-than 24h --apply
 pnpm cli event create --run-id run_abc123 --type progress --message "added command tests" --importance 5 --category implementation --tag tests
 pnpm cli loop add --type blocked --project runtrail --title "choose retention policy"
 pnpm cli loop resolve loop_abc123 --resolution "keep structured data in SQLite"

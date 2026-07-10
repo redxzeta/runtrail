@@ -45,6 +45,7 @@ describe("database", () => {
     );
     expect(indexes.map((index) => index.name)).toContain("idx_agent_run_tags_tag_run_id");
     expect(indexes.map((index) => index.name)).toContain("idx_handoff_tags_tag_handoff_id");
+    expect(indexes.map((index) => index.name)).toContain("idx_agent_runs_client_run_id");
   });
 
   it("adds collaboration and metadata columns to existing databases", () => {
@@ -108,7 +109,7 @@ describe("database", () => {
     db.close();
 
     expect(runColumns.map((column) => column.name)).toEqual(
-      expect.arrayContaining(["category", "tags_json"])
+      expect.arrayContaining(["category", "tags_json", "client_run_id"])
     );
     expect(eventColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining(["category", "tags_json", "prev_event_hash", "event_hash"])
@@ -119,5 +120,53 @@ describe("database", () => {
     expect(loopColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining(["owner", "source", "next_action", "blocker_ref", "source_run_id"])
     );
+  });
+
+  it("enforces client run uniqueness after migrating an existing database", () => {
+    const db = new Database(":memory:");
+    db.exec(`
+      CREATE TABLE agent_runs (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL,
+        project TEXT NOT NULL,
+        task TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+
+    migrate(db);
+    const insert = db.prepare(
+      `INSERT INTO agent_runs
+      (id, source, project, client_run_id, task, status, started_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?)`
+    );
+    const timestamp = "2026-07-01T00:00:00.000Z";
+    insert.run("run_1", "codex", "runtrail", "session-1", "first", timestamp, timestamp, timestamp);
+
+    expect(() =>
+      insert.run(
+        "run_2",
+        "codex",
+        "runtrail",
+        "session-1",
+        "second",
+        timestamp,
+        timestamp,
+        timestamp
+      )
+    ).toThrow(/UNIQUE constraint failed/);
+    expect(() =>
+      insert.run("run_3", "codex", "other", "session-1", "third", timestamp, timestamp, timestamp)
+    ).not.toThrow();
+    expect(() =>
+      insert.run("run_4", "codex", "runtrail", null, "fourth", timestamp, timestamp, timestamp)
+    ).not.toThrow();
+    expect(() =>
+      insert.run("run_5", "codex", "runtrail", null, "fifth", timestamp, timestamp, timestamp)
+    ).not.toThrow();
+    db.close();
   });
 });
