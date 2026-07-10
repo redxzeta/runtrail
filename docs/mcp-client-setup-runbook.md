@@ -38,6 +38,11 @@ fi
 exec node "$HOME/.local/share/runtrail-mcp/bridge.js"
 ```
 
+The MCP bridge provides explicit journal tools. For automatic structured lifecycle telemetry, use
+the separate first-party adapter in `examples/codex/`. It reads the same local-only secret boundary,
+never retrieves configuration through SSH or sudo, and remains fail-open when Runtrail is
+unavailable.
+
 ## OpenClaw
 
 OpenClaw also uses the stdio bridge:
