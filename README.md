@@ -170,6 +170,13 @@ pnpm cli run --source codex --project runtrail --task "fix retry logic" -- pnpm 
 pnpm cli run --source codex --project runtrail --task "fix retry logic" --category implementation --tag codex --tag issue-123 -- pnpm test
 ```
 
+## Codex Hooks
+
+Runtrail includes a fail-open Codex lifecycle adapter that uses the idempotent run API and emits
+typed command, test, file-change, and lifecycle events. See
+[examples/codex/README.md](examples/codex/README.md) for installation, local secret configuration,
+hook trust, verification, and rollback.
+
 ## MCP Adapter
 
 Runtrail can expose the HTTP API to MCP-compatible agents through MCP. Remote-capable
