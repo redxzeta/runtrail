@@ -1,6 +1,6 @@
 {
   "name": "runtrail",
-  "version": "1.22.2",
+  "version": "1.23.0",
   "description": "Self-hosted agent activity ledger",
   "type": "module",
   "private": true,

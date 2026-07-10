@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/redxzeta/runtrail/compare/v1.22.2...v1.23.0) (2026-07-10)
+
+
+### Features
+
+* **integrations:** add safe Codex hook adapter ([#100](https://github.com/redxzeta/runtrail/issues/100)) ([2f24f9c](https://github.com/redxzeta/runtrail/commit/2f24f9c8434817ce1bbb447d615b32ace2300d9a))
+
 ## [1.22.2](https://github.com/redxzeta/runtrail/compare/v1.22.1...v1.22.2) (2026-07-10)
 
 
