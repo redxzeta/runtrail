@@ -1,3 +1,10 @@
+## [1.22.2](https://github.com/redxzeta/runtrail/compare/v1.22.1...v1.22.2) (2026-07-10)
+
+
+### Bug Fixes
+
+* **runs:** make session lifecycle idempotent ([#84](https://github.com/redxzeta/runtrail/issues/84)) ([bf6ca12](https://github.com/redxzeta/runtrail/commit/bf6ca12434141156e1df8c518813b56249af93ec))
+
 ## [1.22.1](https://github.com/redxzeta/runtrail/compare/v1.22.0...v1.22.1) (2026-07-05)
 
 
