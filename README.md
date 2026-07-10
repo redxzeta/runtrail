@@ -31,6 +31,18 @@ Fetch compact agent context:
 pnpm cli context --project runtrail --limit 5 --min-importance 4
 ```
 
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before starting work. It documents the
+clean-clone setup, architecture map, issue-claiming workflow, validation
+commands, scope boundaries, secret-handling rules, and handoff format for
+humans and coding agents.
+
+Good starting points:
+
+- [good first issue](https://github.com/redxzeta/runtrail/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)
+- [help wanted](https://github.com/redxzeta/runtrail/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22help%20wanted%22)
+
 Create a run:
 
 ```sh
