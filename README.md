@@ -4,6 +4,56 @@ Runtrail is a self-hosted, LAN/VPN-accessible activity ledger for coding agents 
 
 The MVP is agent-first: structured runs, events, open loops, decisions, and compact context retrieval. Human-readable UI and deployment automation come later.
 
+## Set Up with a Coding Agent
+
+Give the following prompt to a coding agent that has shell access to the intended host. It keeps
+the installation within Runtrail's existing [systemd/LXC](docs/systemd-lxc.md) and
+[MCP client](docs/mcp-client-setup-runbook.md) runbooks while delegating the hands-on work.
+
+```text
+Set up Runtrail end to end from https://github.com/redxzeta/runtrail and connect it to my coding
+agent through MCP.
+
+Before changing anything:
+
+1. Inspect the target host, any existing Runtrail checkout or service, the OS and architecture,
+   installed Node/pnpm and container tooling, network reachability, and the MCP client I am using.
+2. Read README.md, AGENTS.md, docs/systemd-lxc.md, docs/mcp-client-setup-runbook.md,
+   config/runtrail.example.yaml, compose.yaml, and systemd/runtrail.service from the checkout.
+3. Present the detected setup and ask me only for choices that cannot be discovered safely. Get my
+   confirmation before using sudo, changing a service or firewall, binding beyond localhost, or
+   exposing Runtrail outside the host. Runtrail must remain limited to a trusted LAN or VPN.
+
+Install and configure it:
+
+- Use the documented non-root systemd path for an Ubuntu/Debian Proxmox LXC, or the existing
+  Docker/Podman Compose path when containers are the selected deployment method. Do not invent a
+  new deployment path or add an installer.
+- Use pnpm where repository commands are required. Keep non-secret defaults in the example YAML
+  configuration and host-specific values in environment variables.
+- Generate a strong random RUNTRAIL_TOKEN if one was not supplied through an existing secret
+  store. Save it only in an ignored environment file or secret store with restrictive permissions.
+  Never commit, log, or repeat the token in chat or in the final report.
+- Start Runtrail and confirm its health endpoint succeeds from every host that needs to reach it.
+- Configure my selected MCP client using the hosted Streamable HTTP endpoint when the client
+  supports it, or the documented local stdio bridge for Codex or OpenClaw. MCP startup must use
+  local environment/config only; it must not SSH, sudo, or scrape the server's environment file.
+
+Verify the finished setup:
+
+1. Confirm GET /health returns a successful response.
+2. Confirm the MCP client can discover the Runtrail tools.
+3. Make one authenticated read call, such as journal_search_runs with a limit of 1, and confirm it
+   succeeds. Do not create sample ledger records merely to prove connectivity.
+4. If a required check cannot be completed with the documented surfaces or available access, stop
+   and report the exact blocker instead of weakening authentication or network protections.
+
+Finish with a secret-free handoff that lists the deployment method, installed paths, service
+management commands, Runtrail and MCP URLs, MCP client configuration location, checks performed
+and their outcomes, and any remaining manual action. Do not include token values or raw
+configuration that contains secrets.
+```
+
 ## Local Development
 
 Install dependencies:
