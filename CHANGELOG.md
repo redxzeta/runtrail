@@ -1,3 +1,10 @@
+## [1.23.1](https://github.com/redxzeta/runtrail/compare/v1.23.0...v1.23.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* **context:** preserve compact metadata ([c463134](https://github.com/redxzeta/runtrail/commit/c463134489a4fd938381e99061c6cef3ffe16afe))
+
 # [1.23.0](https://github.com/redxzeta/runtrail/compare/v1.22.2...v1.23.0) (2026-07-10)
 
 
