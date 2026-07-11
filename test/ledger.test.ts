@@ -781,6 +781,12 @@ describe("ledger routes", () => {
       message: "pnpm test",
       importance: 5,
       data: {
+        argv: ["pnpm", "test"],
+        exitCode: 1,
+        durationMs: 1234,
+        logPath: "data/logs/run.log",
+        gitBefore: { commit: "abc" },
+        gitAfter: { commit: "def" },
         changedFiles: ["src/db/ledger.ts"],
         stdout: "x".repeat(1000)
       }
@@ -822,7 +828,15 @@ describe("ledger routes", () => {
         run: { id: string };
         events: Array<{ message: string; data?: unknown }>;
         changed_files: string[];
-        commands: Array<{ message: string }>;
+        commands: Array<{
+          message: string;
+          argv?: string[];
+          exitCode?: number;
+          durationMs?: number;
+          logPath?: string;
+          gitBefore?: Record<string, unknown>;
+          gitAfter?: Record<string, unknown>;
+        }>;
         tests: Array<{ message: string }>;
         open_loops: Array<{ title: string }>;
         handoffs: Array<{ summary: string }>;
@@ -834,7 +848,18 @@ describe("ledger routes", () => {
     expect(body.manifest.run.id).toBe(run.run.id);
     expect(body.manifest.changed_files).toEqual(["src/db/ledger.ts", "test/ledger.test.ts"]);
     expect(body.manifest.events[0]).not.toHaveProperty("data");
-    expect(body.manifest.commands).toEqual([expect.objectContaining({ message: "pnpm test" })]);
+    expect(body.manifest.commands).toEqual([
+      expect.objectContaining({
+        message: "pnpm test",
+        argv: ["pnpm", "test"],
+        exitCode: 1,
+        durationMs: 1234,
+        logPath: "data/logs/run.log",
+        gitBefore: { commit: "abc" },
+        gitAfter: { commit: "def" }
+      })
+    ]);
+    expect(body.manifest.commands[0]).not.toHaveProperty("stdout");
     expect(body.manifest.tests).toEqual([
       expect.objectContaining({ message: "ledger tests passed" })
     ]);

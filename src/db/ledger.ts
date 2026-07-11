@@ -1030,7 +1030,7 @@ export class LedgerRepository {
       changed_files: uniqueStrings(events.flatMap(readChangedFiles)),
       commands: events
         .filter((event) => event.type === "command_executed")
-        .map(({ id, message, createdAt }) => ({ id, message, createdAt })),
+        .map(projectCommandEvidence),
       tests: events
         .filter((event) => event.type.startsWith("test_"))
         .map(({ id, type, message, createdAt }) => ({ id, type, message, createdAt })),
@@ -1156,6 +1156,29 @@ function deriveCompletedAt(existing: AgentRun, input: UpdateRunRequest): string 
   }
 
   return existing.completedAt;
+}
+
+function projectCommandEvidence(event: AgentEvent): RunManifest["commands"][number] {
+  const data = isRecord(event.data) ? event.data : {};
+  const argv = Array.isArray(data.argv)
+    ? data.argv.filter((value): value is string => typeof value === "string")
+    : undefined;
+
+  return {
+    id: event.id,
+    message: event.message,
+    createdAt: event.createdAt,
+    argv,
+    exitCode: typeof data.exitCode === "number" ? data.exitCode : undefined,
+    durationMs: typeof data.durationMs === "number" ? data.durationMs : undefined,
+    logPath: typeof data.logPath === "string" ? data.logPath : undefined,
+    gitBefore: isRecord(data.gitBefore) ? data.gitBefore : undefined,
+    gitAfter: isRecord(data.gitAfter) ? data.gitAfter : undefined
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function deriveResolvedAt(existing: OpenLoop, input: UpdateOpenLoopRequest): string | undefined {

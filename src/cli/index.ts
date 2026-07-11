@@ -265,11 +265,46 @@ async function wrapRun(
 
   mkdirSync(config.storage.logDir, { recursive: true });
 
+  const commandStartedAt = Date.now();
   const exitCode = await runCommand(command, logPath);
+  const durationMs = Date.now() - commandStartedAt;
   const gitAfter = readGitSnapshot(cwd);
   const changedFiles = gitAfter.repoPath ? readChangedFiles(cwd) : [];
   const status = exitCode === 0 ? "completed" : "failed";
 
+  await requestJson("/events", {
+    method: "POST",
+    body: {
+      runId,
+      type: "command_executed",
+      message: `Executed ${path.basename(command[0] ?? "command")}`,
+      importance: exitCode === 0 ? 4 : 7,
+      category: options.category,
+      tags: options.tags,
+      data: {
+        argv: sanitizeCommandArgv(command),
+        exitCode,
+        durationMs,
+        logPath,
+        gitBefore,
+        gitAfter
+      }
+    }
+  });
+  if (changedFiles.length > 0) {
+    await requestJson("/events", {
+      method: "POST",
+      body: {
+        runId,
+        type: "files_changed",
+        message: `${changedFiles.length} file${changedFiles.length === 1 ? "" : "s"} changed`,
+        importance: 4,
+        category: options.category,
+        tags: options.tags,
+        data: { changedFiles }
+      }
+    });
+  }
   await requestJson("/events", {
     method: "POST",
     body: {
@@ -279,13 +314,7 @@ async function wrapRun(
       importance: exitCode === 0 ? 5 : 8,
       category: options.category,
       tags: options.tags,
-      data: {
-        exitCode,
-        logPath,
-        changedFiles,
-        gitBefore,
-        gitAfter
-      }
+      data: { exitCode }
     }
   });
   await requestJson(`/runs/${encodeURIComponent(runId)}`, {
@@ -872,6 +901,43 @@ async function runCommand(command: string[], logPath: string): Promise<number> {
       resolve(code ?? 1);
     });
   });
+}
+
+const secretBearingFlags = new Set([
+  "--api-key",
+  "--authorization",
+  "--password",
+  "--secret",
+  "--token",
+  "--webhook-url"
+]);
+
+function sanitizeCommandArgv(command: string[]): string[] {
+  const sanitized: string[] = [];
+  let redactNext = false;
+
+  for (const rawArg of command.slice(0, 100)) {
+    const arg = rawArg.slice(0, 1000);
+
+    if (redactNext) {
+      sanitized.push("[REDACTED]");
+      redactNext = false;
+      continue;
+    }
+
+    const separator = arg.indexOf("=");
+    const flag = (separator === -1 ? arg : arg.slice(0, separator)).toLowerCase();
+
+    if (secretBearingFlags.has(flag)) {
+      sanitized.push(separator === -1 ? arg : `${arg.slice(0, separator)}=[REDACTED]`);
+      redactNext = separator === -1;
+      continue;
+    }
+
+    sanitized.push(arg);
+  }
+
+  return sanitized;
 }
 
 function readGitSnapshot(cwd: string): {
