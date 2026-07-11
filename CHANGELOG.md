@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/redxzeta/runtrail/compare/v1.23.1...v1.24.0) (2026-07-11)
+
+
+### Features
+
+* **collaboration:** expose open-loop fields ([fec0a56](https://github.com/redxzeta/runtrail/commit/fec0a56983fa3774f50150d605ae89f637aaf6cc))
+
 ## [1.23.1](https://github.com/redxzeta/runtrail/compare/v1.23.0...v1.23.1) (2026-07-11)
 
 
