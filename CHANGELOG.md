@@ -1,3 +1,10 @@
+# [1.27.0](https://github.com/redxzeta/runtrail/compare/v1.26.0...v1.27.0) (2026-07-11)
+
+
+### Features
+
+* **ledger:** add append record idempotency ([#126](https://github.com/redxzeta/runtrail/issues/126)) ([98509c8](https://github.com/redxzeta/runtrail/commit/98509c8591acbec41efab0df3ce6cb168c23a00d))
+
 # [1.26.0](https://github.com/redxzeta/runtrail/compare/v1.25.0...v1.26.0) (2026-07-11)
 
 
