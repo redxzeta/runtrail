@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/redxzeta/runtrail/compare/v1.24.2...v1.25.0) (2026-07-11)
+
+
+### Features
+
+* **integrations:** audit session recovery ([b59a3be](https://github.com/redxzeta/runtrail/commit/b59a3beec950423236a31fac23f71c417fba41fe))
+
 ## [1.24.2](https://github.com/redxzeta/runtrail/compare/v1.24.1...v1.24.2) (2026-07-11)
 
 
