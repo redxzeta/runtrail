@@ -112,8 +112,13 @@ Attach an event:
 curl -X POST http://127.0.0.1:8787/events \
   -H "authorization: Bearer $RUNTRAIL_TOKEN" \
   -H "content-type: application/json" \
-  -d '{"runId":"run_abc123","type":"progress","message":"added tests","importance":4,"category":"implementation","tags":["tests"]}'
+  -d '{"runId":"run_abc123","clientRecordId":"event-local-1","type":"progress","message":"added tests","importance":4,"category":"implementation","tags":["tests"]}'
 ```
+
+`clientRecordId` is optional on event, open-loop, decision, handoff, and artifact creates. A keyed
+retry returns the original record. Events and artifacts scope keys to a run; open loops and handoffs
+scope them to a project; decisions scope them to a project or the global decision set. Omitted keys
+retain the existing append behavior. See `docs/agent-write-contract.md` for the full contract.
 
 Fetch recent runs:
 
@@ -156,7 +161,7 @@ pnpm cli run create --source codex --project runtrail --client-run-id local-sess
 pnpm cli runs close-stale --older-than 24h
 # After reviewing the dry-run candidates:
 pnpm cli runs close-stale --older-than 24h --apply
-pnpm cli event create --run-id run_abc123 --type progress --message "added command tests" --importance 5 --category implementation --tag tests
+pnpm cli event create --run-id run_abc123 --client-record-id event-local-1 --type progress --message "added command tests" --importance 5 --category implementation --tag tests
 pnpm cli loop add --type blocked --project runtrail --title "choose retention policy" \
   --owner maintainer --source codex --next-action "review options" \
   --blocker-ref "issue-123" --source-run-id run_abc123

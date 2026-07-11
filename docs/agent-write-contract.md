@@ -18,6 +18,19 @@ session. Runtrail scopes this identifier by `source` and `project`. The first `P
 task, status, git metadata, or timestamps. Continue that run through events and `PATCH /runs/:id`.
 Clients that omit `clientRunId` keep the non-idempotent create behavior.
 
+Append-oriented writes may include a stable, non-secret `clientRecordId`. A retry with the same key
+returns the original event, open loop, decision, handoff, or artifact without changing its payload
+or timestamps. The key is scoped by record type and its stable owner:
+
+- Events and artifacts: `runId` plus `clientRecordId`.
+- Open loops and handoffs: `project` plus `clientRecordId`.
+- Decisions: `project` (or the global decision scope) plus `clientRecordId`.
+
+The same key may be reused in a different record type, run, or project without collision. Clients
+that omit `clientRecordId` keep the existing append behavior. Keys are bounded identifiers, not
+payload hashes: never derive them from prompts, logs, environment values, credentials, or other
+secret-bearing content.
+
 Automatic session creation records an allowlisted recovery receipt in the selected run manifest.
 Receipts identify the client session, normalized workspace, selected run, action, optional previous
 run, and bounded stale reason. `create_new`, `reuse`, `reopen`, and `mark_stale` decisions remain

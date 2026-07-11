@@ -57,6 +57,7 @@ export const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS agent_events (
             id TEXT PRIMARY KEY,
             run_id TEXT NOT NULL,
+            client_record_id TEXT,
             type TEXT NOT NULL,
             message TEXT NOT NULL,
             importance INTEGER NOT NULL,
@@ -84,6 +85,7 @@ export const schemaStatements = [
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL,
     project TEXT NOT NULL,
+    client_record_id TEXT,
     title TEXT NOT NULL,
     description TEXT,
     owner TEXT,
@@ -105,6 +107,7 @@ export const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS decisions (
     id TEXT PRIMARY KEY,
     project TEXT,
+    client_record_id TEXT,
     title TEXT NOT NULL,
     decision TEXT NOT NULL,
     rationale TEXT,
@@ -117,6 +120,7 @@ export const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS handoffs (
     id TEXT PRIMARY KEY,
     source_run_id TEXT,
+    client_record_id TEXT,
     from_source TEXT NOT NULL,
     to_source TEXT,
     project TEXT NOT NULL,
@@ -143,6 +147,7 @@ export const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS artifacts (
     id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,
+    client_record_id TEXT,
     kind TEXT NOT NULL,
     path TEXT NOT NULL,
     size_bytes INTEGER,

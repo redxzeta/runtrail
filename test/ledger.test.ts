@@ -152,6 +152,136 @@ describe("ledger routes", () => {
     expect(new Set(bodies.map((body) => body.run.id))).toHaveProperty("size", 2);
   });
 
+  it("replays keyed append records without mutating their authoritative contents", async () => {
+    const app = createTestApp();
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+    const cases = [
+      {
+        path: "/events",
+        property: "event",
+        first: {
+          runId: run.run.id,
+          clientRecordId: "event-1",
+          type: "progress",
+          message: "original event",
+          createdAt: "2026-07-01T00:00:00.000Z"
+        },
+        replay: { type: "failed", message: "replacement event" }
+      },
+      {
+        path: "/open-loops",
+        property: "openLoop",
+        first: {
+          project: "runtrail",
+          clientRecordId: "loop-1",
+          type: "blocked",
+          title: "original loop",
+          createdAt: "2026-07-01T00:01:00.000Z"
+        },
+        replay: { type: "risk", title: "replacement loop" }
+      },
+      {
+        path: "/decisions",
+        property: "decision",
+        first: {
+          project: "runtrail",
+          clientRecordId: "decision-1",
+          title: "original decision",
+          decision: "keep the original",
+          createdAt: "2026-07-01T00:02:00.000Z"
+        },
+        replay: { title: "replacement decision", decision: "replace it" }
+      },
+      {
+        path: "/handoffs",
+        property: "handoff",
+        first: {
+          project: "runtrail",
+          clientRecordId: "handoff-1",
+          fromSource: "codex",
+          summary: "original handoff",
+          createdAt: "2026-07-01T00:03:00.000Z"
+        },
+        replay: { fromSource: "openclaw", summary: "replacement handoff" }
+      },
+      {
+        path: "/artifacts",
+        property: "artifact",
+        first: {
+          runId: run.run.id,
+          clientRecordId: "artifact-1",
+          kind: "log",
+          path: "original.log",
+          createdAt: "2026-07-01T00:04:00.000Z"
+        },
+        replay: { kind: "report", path: "replacement.md" }
+      }
+    ] as const;
+
+    for (const testCase of cases) {
+      const first = (await (await postJson(app, testCase.path, testCase.first)).json()) as Record<
+        string,
+        { id: string; clientRecordId: string; createdAt: string }
+      >;
+      const replay = (await (
+        await postJson(app, testCase.path, { ...testCase.first, ...testCase.replay })
+      ).json()) as Record<string, { id: string; clientRecordId: string; createdAt: string }>;
+
+      expect(replay[testCase.property]).toEqual(first[testCase.property]);
+      expect(replay[testCase.property]?.clientRecordId).toBe(testCase.first.clientRecordId);
+    }
+  });
+
+  it("scopes concurrent-looking keyed retries by record ownership", async () => {
+    const app = createTestApp();
+    const firstRun = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+    const secondRun = (await (
+      await postJson(app, "/runs", { ...validRunRequest(), task: "Second run" })
+    ).json()) as { run: { id: string } };
+    const eventPayload = {
+      runId: firstRun.run.id,
+      clientRecordId: "shared-key",
+      type: "progress",
+      message: "only once"
+    };
+    const responses = await Promise.all([
+      postJson(app, "/events", eventPayload),
+      postJson(app, "/events", eventPayload),
+      postJson(app, "/events", eventPayload)
+    ]);
+    const bodies = (await Promise.all(responses.map((response) => response.json()))) as Array<{
+      event: { id: string };
+    }>;
+    const otherRun = (await (
+      await postJson(app, "/events", { ...eventPayload, runId: secondRun.run.id })
+    ).json()) as { event: { id: string } };
+    const otherProject = (await (
+      await postJson(app, "/open-loops", {
+        project: "other",
+        clientRecordId: "shared-key",
+        type: "blocked",
+        title: "other project"
+      })
+    ).json()) as { openLoop: { id: string } };
+    const firstProject = (await (
+      await postJson(app, "/open-loops", {
+        project: "runtrail",
+        clientRecordId: "shared-key",
+        type: "blocked",
+        title: "first project"
+      })
+    ).json()) as { openLoop: { id: string } };
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 200, 201]);
+    expect(new Set(bodies.map((body) => body.event.id))).toHaveProperty("size", 1);
+    expect(otherRun.event.id).not.toBe(bodies[0]?.event.id);
+    expect(otherProject.openLoop.id).not.toBe(firstProject.openLoop.id);
+  });
+
   it("enforces explicit run lifecycle transitions and idempotent finish", async () => {
     const app = createTestApp();
     const created = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
@@ -1589,6 +1719,7 @@ describe("ledger routes", () => {
     });
     const failed = await postJson(app, "/events", {
       runId: run.run.id,
+      clientRecordId: "discord-failure-1",
       type: "failed",
       message: "Command failed",
       importance: 8,
@@ -1596,9 +1727,17 @@ describe("ledger routes", () => {
         changedFiles: ["src/cli/index.ts"]
       }
     });
+    const replay = await postJson(app, "/events", {
+      runId: run.run.id,
+      clientRecordId: "discord-failure-1",
+      type: "failed",
+      message: "Replacement failure",
+      importance: 9
+    });
 
     expect(lowSignal.status).toBe(201);
     expect(failed.status).toBe(201);
+    expect(replay.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://discord.test/webhook",

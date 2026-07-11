@@ -211,15 +211,17 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json(formatValidationError(parsed.error), 400);
     }
 
-    const event = ledger.createEvent(parsed.data);
+    const { event, created } = ledger.createEventResult(parsed.data);
 
     if (!event) {
       return c.json({ error: "Run not found" }, 404);
     }
 
-    notifyDiscord(options.config, ledger.getRun(event.runId), event);
+    if (created) {
+      notifyDiscord(options.config, ledger.getRun(event.runId), event);
+    }
 
-    return c.json({ event }, 201);
+    return c.json({ event }, created ? 201 : 200);
   });
 
   route.get("/events", (c) => {

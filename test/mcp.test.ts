@@ -151,6 +151,7 @@ describe("mcp adapter", () => {
       "journal_create_event",
       {
         runId: "run_1",
+        clientRecordId: "event-mcp-1",
         type: "completed",
         message: "Done",
         importance: 5,
@@ -165,6 +166,7 @@ describe("mcp adapter", () => {
       {
         type: "blocked",
         project: "runtrail",
+        clientRecordId: "loop-mcp-1",
         title: "Need decision",
         description: "Choose lifecycle shape",
         owner: "maintainer",
@@ -187,6 +189,7 @@ describe("mcp adapter", () => {
       "journal_record_decision",
       {
         project: "runtrail",
+        clientRecordId: "decision-mcp-1",
         title: "Use HTTP adapter",
         decision: "MCP calls the API"
       },
@@ -196,6 +199,7 @@ describe("mcp adapter", () => {
       "journal_create_handoff",
       {
         sourceRunId: "run_1",
+        clientRecordId: "handoff-mcp-1",
         fromSource: "codex",
         toSource: "openclaw",
         project: "runtrail",
@@ -222,6 +226,7 @@ describe("mcp adapter", () => {
         method: "POST",
         body: expect.objectContaining({
           category: "implementation",
+          clientRecordId: "event-mcp-1",
           tags: ["mcp", "docs"]
         })
       })
@@ -231,6 +236,7 @@ describe("mcp adapter", () => {
       body: {
         type: "blocked",
         project: "runtrail",
+        clientRecordId: "loop-mcp-1",
         title: "Need decision",
         description: "Choose lifecycle shape",
         owner: "maintainer",
@@ -254,7 +260,15 @@ describe("mcp adapter", () => {
     expect(client.requestJson).toHaveBeenNthCalledWith(
       4,
       "/decisions",
-      expect.objectContaining({ method: "POST" })
+      expect.objectContaining({
+        method: "POST",
+        body: {
+          project: "runtrail",
+          clientRecordId: "decision-mcp-1",
+          title: "Use HTTP adapter",
+          decision: "MCP calls the API"
+        }
+      })
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(
       5,
@@ -263,6 +277,7 @@ describe("mcp adapter", () => {
         method: "POST",
         body: {
           sourceRunId: "run_1",
+          clientRecordId: "handoff-mcp-1",
           fromSource: "codex",
           toSource: "openclaw",
           project: "runtrail",

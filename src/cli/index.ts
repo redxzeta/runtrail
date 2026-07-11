@@ -57,6 +57,7 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--run-id <runId>", "Run ID")
     .requiredOption("--type <type>", "Event type")
     .requiredOption("--message <message>", "Event message")
+    .option("--client-record-id <clientRecordId>", "Stable idempotency key")
     .option("--importance <importance>", "Importance from 0 to 10", parseInteger)
     .option("--category <category>", "Event category")
     .option("--tag <tag>", "Event tag", collectOption, [])
@@ -70,6 +71,7 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--type <type>", "Open loop type")
     .requiredOption("--project <project>", "Project name")
     .requiredOption("--title <title>", "Open loop title")
+    .option("--client-record-id <clientRecordId>", "Stable idempotency key")
     .option("--description <description>", "Open loop details")
     .option("--owner <owner>", "Responsible owner")
     .option("--source <source>", "Source integration")
@@ -90,6 +92,7 @@ export async function runCli(argv = process.argv): Promise<void> {
     .description("Record a decision")
     .requiredOption("--title <title>", "Decision title")
     .requiredOption("--decision <decision>", "Decision text")
+    .option("--client-record-id <clientRecordId>", "Stable idempotency key")
     .option("--project <project>", "Project name")
     .option("--rationale <rationale>", "Decision rationale")
     .action(addDecision);
@@ -101,6 +104,7 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--from-source <fromSource>", "Source handing off work")
     .requiredOption("--project <project>", "Project name")
     .requiredOption("--summary <summary>", "Handoff summary")
+    .option("--client-record-id <clientRecordId>", "Stable idempotency key")
     .option("--source-run-id <sourceRunId>", "Source run ID")
     .option("--to-source <toSource>", "Target source")
     .option("--next-action <nextAction>", "Recommended next action")
@@ -408,6 +412,7 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
 
 async function createEvent(options: {
   runId: string;
+  clientRecordId?: string;
   type: string;
   message: string;
   importance?: number;
@@ -420,6 +425,7 @@ async function createEvent(options: {
       method: "POST",
       body: compact({
         runId: options.runId,
+        clientRecordId: options.clientRecordId,
         type: options.type,
         message: options.message,
         importance: options.importance,
@@ -434,6 +440,7 @@ async function createEvent(options: {
 async function addLoop(options: {
   type: string;
   project: string;
+  clientRecordId?: string;
   title: string;
   description?: string;
   owner?: string;
@@ -448,6 +455,7 @@ async function addLoop(options: {
       body: compact({
         type: options.type,
         project: options.project,
+        clientRecordId: options.clientRecordId,
         title: options.title,
         description: options.description,
         owner: options.owner,
@@ -476,6 +484,7 @@ async function addDecision(options: {
   title: string;
   decision: string;
   project?: string;
+  clientRecordId?: string;
   rationale?: string;
 }): Promise<void> {
   printJson(
@@ -483,6 +492,7 @@ async function addDecision(options: {
       method: "POST",
       body: compact({
         project: options.project,
+        clientRecordId: options.clientRecordId,
         title: options.title,
         decision: options.decision,
         rationale: options.rationale
@@ -493,6 +503,7 @@ async function addDecision(options: {
 
 async function createHandoff(options: {
   sourceRunId?: string;
+  clientRecordId?: string;
   fromSource: string;
   toSource?: string;
   project: string;
@@ -507,6 +518,7 @@ async function createHandoff(options: {
       method: "POST",
       body: compact({
         sourceRunId: options.sourceRunId,
+        clientRecordId: options.clientRecordId,
         fromSource: options.fromSource,
         toSource: options.toSource,
         project: options.project,

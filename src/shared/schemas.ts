@@ -53,6 +53,7 @@ export const openLoopStatusSchema = z.enum(["open", "resolved", "cancelled"]);
 const tagSchema = z.string().trim().min(1).max(80);
 const tagsSchema = z.array(tagSchema).max(20).optional();
 const categorySchema = z.string().trim().min(1).max(80).optional();
+const clientRecordIdSchema = z.string().trim().min(1).max(255).optional();
 
 export const createRunRequestSchema = z.object({
   source: z.string().trim().min(1).max(80),
@@ -104,6 +105,7 @@ export const finishRunRequestSchema = z.object({
 
 export const createEventRequestSchema = z.object({
   runId: z.string().trim().min(1),
+  clientRecordId: clientRecordIdSchema,
   type: eventTypeSchema,
   message: z.string().trim().min(1).max(4000),
   importance: z.number().int().min(0).max(10).default(3),
@@ -131,6 +133,7 @@ export const listEventsQuerySchema = z.object({
 export const createOpenLoopRequestSchema = z.object({
   type: openLoopTypeSchema,
   project: z.string().trim().min(1).max(120),
+  clientRecordId: clientRecordIdSchema,
   title: z.string().trim().min(1).max(240),
   description: z.string().trim().min(1).max(4000).optional(),
   owner: z.string().trim().min(1).max(120).optional(),
@@ -170,6 +173,7 @@ export const listOpenLoopsQuerySchema = z.object({
 
 export const createDecisionRequestSchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
+  clientRecordId: clientRecordIdSchema,
   title: z.string().trim().min(1).max(240),
   decision: z.string().trim().min(1).max(4000),
   rationale: z.string().trim().min(1).max(4000).optional(),
@@ -184,6 +188,7 @@ export const listDecisionsQuerySchema = z.object({
 
 export const createHandoffRequestSchema = z.object({
   sourceRunId: z.string().trim().min(1).optional(),
+  clientRecordId: clientRecordIdSchema,
   fromSource: z.string().trim().min(1).max(80),
   toSource: z.string().trim().min(1).max(80).optional(),
   project: z.string().trim().min(1).max(120),
@@ -203,6 +208,7 @@ export const listHandoffsQuerySchema = z.object({
 
 export const createArtifactRequestSchema = z.object({
   runId: z.string().trim().min(1),
+  clientRecordId: clientRecordIdSchema,
   kind: z.string().trim().min(1).max(80),
   path: z.string().trim().min(1).max(1000),
   sizeBytes: z.number().int().nonnegative().optional(),
@@ -286,6 +292,7 @@ export type AgentRun = {
 export type AgentEvent = {
   id: string;
   runId: string;
+  clientRecordId?: string;
   type: EventType;
   message: string;
   importance: number;
@@ -301,6 +308,7 @@ export type OpenLoop = {
   id: string;
   type: OpenLoopType;
   project: string;
+  clientRecordId?: string;
   title: string;
   description?: string;
   owner?: string;
@@ -318,6 +326,7 @@ export type OpenLoop = {
 export type Decision = {
   id: string;
   project?: string;
+  clientRecordId?: string;
   title: string;
   decision: string;
   rationale?: string;
@@ -327,6 +336,7 @@ export type Decision = {
 export type Handoff = {
   id: string;
   sourceRunId?: string;
+  clientRecordId?: string;
   fromSource: string;
   toSource?: string;
   project: string;
@@ -343,6 +353,7 @@ export type HandoffSummary = Omit<Handoff, "context">;
 export type Artifact = {
   id: string;
   runId: string;
+  clientRecordId?: string;
   kind: string;
   path: string;
   sizeBytes?: number;

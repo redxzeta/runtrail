@@ -18,6 +18,9 @@ describe("database", () => {
     const migration = db.prepare("SELECT name FROM schema_migrations WHERE id = ?").get(1) as
       | { name: string }
       | undefined;
+    const idempotencyMigration = db
+      .prepare("SELECT name FROM schema_migrations WHERE id = ?")
+      .get(2) as { name: string } | undefined;
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as Array<{ name: string }>;
@@ -28,6 +31,7 @@ describe("database", () => {
 
     expect(existsSync(config.storage.dbPath)).toBe(true);
     expect(migration?.name).toBe("001_initial_schema");
+    expect(idempotencyMigration?.name).toBe("002_append_record_idempotency");
     expect(tables.map((table) => table.name)).toEqual([
       "agent_event_tags",
       "agent_events",
@@ -47,6 +51,7 @@ describe("database", () => {
     expect(indexes.map((index) => index.name)).toContain("idx_agent_run_tags_tag_run_id");
     expect(indexes.map((index) => index.name)).toContain("idx_handoff_tags_tag_handoff_id");
     expect(indexes.map((index) => index.name)).toContain("idx_agent_runs_client_run_id");
+    expect(indexes.map((index) => index.name)).toContain("idx_agent_events_client_record_id");
   });
 
   it("adds collaboration and metadata columns to existing databases", () => {
@@ -93,6 +98,23 @@ describe("database", () => {
         next_action TEXT,
         context_json TEXT,
         created_at TEXT NOT NULL
+      );
+      CREATE TABLE decisions (
+        id TEXT PRIMARY KEY,
+        project TEXT,
+        title TEXT NOT NULL,
+        decision TEXT NOT NULL,
+        rationale TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE artifacts (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        path TEXT NOT NULL,
+        size_bytes INTEGER,
+        sha256 TEXT,
+        created_at TEXT NOT NULL
       )
     `);
 
@@ -107,19 +129,52 @@ describe("database", () => {
     const loopColumns = db.prepare("PRAGMA table_info(open_loops)").all() as Array<{
       name: string;
     }>;
+    const decisionColumns = db.prepare("PRAGMA table_info(decisions)").all() as Array<{
+      name: string;
+    }>;
+    const artifactColumns = db.prepare("PRAGMA table_info(artifacts)").all() as Array<{
+      name: string;
+    }>;
+    const indexes = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
+      .all() as Array<{ name: string }>;
     db.close();
 
     expect(runColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining(["category", "tags_json", "client_run_id"])
     );
     expect(eventColumns.map((column) => column.name)).toEqual(
-      expect.arrayContaining(["category", "tags_json", "prev_event_hash", "event_hash"])
+      expect.arrayContaining([
+        "category",
+        "tags_json",
+        "prev_event_hash",
+        "event_hash",
+        "client_record_id"
+      ])
     );
     expect(handoffColumns.map((column) => column.name)).toEqual(
-      expect.arrayContaining(["category", "tags_json"])
+      expect.arrayContaining(["category", "tags_json", "client_record_id"])
     );
     expect(loopColumns.map((column) => column.name)).toEqual(
-      expect.arrayContaining(["owner", "source", "next_action", "blocker_ref", "source_run_id"])
+      expect.arrayContaining([
+        "owner",
+        "source",
+        "next_action",
+        "blocker_ref",
+        "source_run_id",
+        "client_record_id"
+      ])
+    );
+    expect(decisionColumns.map((column) => column.name)).toContain("client_record_id");
+    expect(artifactColumns.map((column) => column.name)).toContain("client_record_id");
+    expect(indexes.map((index) => index.name)).toEqual(
+      expect.arrayContaining([
+        "idx_agent_events_client_record_id",
+        "idx_open_loops_client_record_id",
+        "idx_decisions_client_record_id",
+        "idx_handoffs_client_record_id",
+        "idx_artifacts_client_record_id"
+      ])
     );
   });
 

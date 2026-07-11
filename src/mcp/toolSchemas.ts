@@ -41,6 +41,7 @@ export const mcpToolInputSchemas = {
   },
   event: {
     runId: createEventRequestSchema.shape.runId,
+    clientRecordId: createEventRequestSchema.shape.clientRecordId,
     type: createEventRequestSchema.shape.type,
     message: createEventRequestSchema.shape.message,
     importance: createEventRequestSchema.shape.importance.optional(),
@@ -51,6 +52,7 @@ export const mcpToolInputSchemas = {
   openLoop: {
     type: createOpenLoopRequestSchema.shape.type,
     project: createOpenLoopRequestSchema.shape.project,
+    clientRecordId: createOpenLoopRequestSchema.shape.clientRecordId,
     title: createOpenLoopRequestSchema.shape.title,
     description: createOpenLoopRequestSchema.shape.description,
     owner: createOpenLoopRequestSchema.shape.owner,
@@ -65,6 +67,7 @@ export const mcpToolInputSchemas = {
   },
   decision: {
     project: createDecisionRequestSchema.shape.project,
+    clientRecordId: createDecisionRequestSchema.shape.clientRecordId,
     title: createDecisionRequestSchema.shape.title,
     decision: createDecisionRequestSchema.shape.decision,
     rationale: createDecisionRequestSchema.shape.rationale
@@ -78,6 +81,7 @@ export const mcpToolInputSchemas = {
   },
   handoff: {
     sourceRunId: createHandoffRequestSchema.shape.sourceRunId,
+    clientRecordId: createHandoffRequestSchema.shape.clientRecordId,
     fromSource: createHandoffRequestSchema.shape.fromSource,
     toSource: createHandoffRequestSchema.shape.toSource,
     project: createHandoffRequestSchema.shape.project,
