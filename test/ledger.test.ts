@@ -152,6 +152,62 @@ describe("ledger routes", () => {
     expect(new Set(bodies.map((body) => body.run.id))).toHaveProperty("size", 2);
   });
 
+  it("enforces explicit run lifecycle transitions and idempotent finish", async () => {
+    const app = createTestApp();
+    const created = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+    const id = created.run.id;
+    expect(
+      (await app.request(`/runs/${id}/heartbeat`, { method: "POST", headers: authHeaders() }))
+        .status
+    ).toBe(200);
+    const eventsAfterHeartbeat = (await (
+      await app.request(`/events?runId=${id}`, { headers: authHeaders() })
+    ).json()) as { events: unknown[] };
+    expect(eventsAfterHeartbeat.events).toEqual([]);
+    const paused = await app.request(`/runs/${id}/pause`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ status: "needs_review", summary: "Review" })
+    });
+    expect((await paused.json()) as object).toEqual(
+      expect.objectContaining({ run: expect.objectContaining({ status: "needs_review" }) })
+    );
+    expect(
+      (await app.request(`/runs/${id}/resume`, { method: "POST", headers: authHeaders() })).status
+    ).toBe(200);
+    const finishBody = { status: "completed", summary: "Done" };
+    const finished = await app.request(`/runs/${id}/finish`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(finishBody)
+    });
+    expect((await finished.json()) as object).toEqual(
+      expect.objectContaining({ run: expect.objectContaining({ status: "completed" }) })
+    );
+    expect(
+      (
+        await app.request(`/runs/${id}/finish`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(finishBody)
+        })
+      ).status
+    ).toBe(200);
+    const invalid = await app.request(`/runs/${id}/pause`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ status: "paused" })
+    });
+    expect(invalid.status).toBe(409);
+    expect(await invalid.json()).toEqual({ error: "Cannot pause completed run" });
+    expect(
+      (await app.request(`/runs/${id}/heartbeat`, { method: "POST", headers: authHeaders() }))
+        .status
+    ).toBe(409);
+  });
+
   it("records recovery decisions without duplicating authoritative context", async () => {
     const app = createTestApp();
     const payload = {

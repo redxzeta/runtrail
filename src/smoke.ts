@@ -70,6 +70,13 @@ export async function runLifecycleSmoke(hooks: SmokeHooks = {}): Promise<void> {
       async () => await request(baseUrl, token, "/runs", { method: "POST", body: runPayload }, 201)
     );
     const runId = readId(created, "run");
+    await step(
+      "heartbeat run",
+      async () =>
+        await request(baseUrl, token, `/runs/${encodeURIComponent(runId)}/heartbeat`, {
+          method: "POST"
+        })
+    );
 
     for (const event of [
       { type: "progress", message: "Lifecycle started", importance: 4 },
@@ -175,8 +182,8 @@ export async function runLifecycleSmoke(hooks: SmokeHooks = {}): Promise<void> {
     await step(
       "finish run",
       async () =>
-        await request(baseUrl, token, `/runs/${encodeURIComponent(runId)}`, {
-          method: "PATCH",
+        await request(baseUrl, token, `/runs/${encodeURIComponent(runId)}/finish`, {
+          method: "POST",
           body: { status: "completed", summary: "Smoke lifecycle complete" }
         })
     );

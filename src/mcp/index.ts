@@ -14,6 +14,11 @@ export type RuntrailHttpClient = {
 export type RuntrailHttpClientConfig = Pick<RuntrailConfig, "url" | "security">;
 
 export const runtrailToolNames = [
+  "journal_start_run",
+  "journal_resume_run",
+  "journal_heartbeat_run",
+  "journal_pause_run",
+  "journal_finish_run",
   "journal_get_context",
   "journal_create_event",
   "journal_create_open_loop",
@@ -32,6 +37,8 @@ export function createRuntrailMcpServer(
     name: "runtrail",
     version: "1.0.0"
   });
+
+  registerLifecycleTools(server, client);
 
   server.registerTool(
     "journal_get_context",
@@ -162,6 +169,20 @@ export async function callRuntrailTool(
   client: RuntrailHttpClient
 ): Promise<unknown> {
   switch (name) {
+    case "journal_start_run":
+      return await client.requestJson("/runs", { method: "POST", body: compact(args) });
+    case "journal_resume_run":
+    case "journal_heartbeat_run":
+      return await client.requestJson(
+        `/runs/${encodeURIComponent(requireString(args, "runId"))}/${name === "journal_resume_run" ? "resume" : "heartbeat"}`,
+        { method: "POST" }
+      );
+    case "journal_pause_run":
+    case "journal_finish_run":
+      return await client.requestJson(
+        `/runs/${encodeURIComponent(requireString(args, "runId"))}/${name === "journal_pause_run" ? "pause" : "finish"}`,
+        { method: "POST", body: compact({ ...args, runId: undefined }) }
+      );
     case "journal_get_context": {
       const query = new URLSearchParams({
         project: requireString(args, "project")
@@ -264,6 +285,35 @@ export async function callRuntrailTool(
     }
     default:
       throw new Error(`Unknown tool: ${name}`);
+  }
+}
+
+function registerLifecycleTools(server: McpServer, client: RuntrailHttpClient): void {
+  for (const tool of [
+    ["journal_start_run", "Start or recover a bounded Runtrail run", mcpToolInputSchemas.startRun],
+    ["journal_resume_run", "Resume a paused or completed Runtrail run", mcpToolInputSchemas.runId],
+    [
+      "journal_heartbeat_run",
+      "Refresh run liveness without creating an event",
+      mcpToolInputSchemas.runId
+    ],
+    [
+      "journal_pause_run",
+      "Pause or flag an active run with an explicit status",
+      mcpToolInputSchemas.pauseRun
+    ],
+    [
+      "journal_finish_run",
+      "Finish a run with a terminal status and summary",
+      mcpToolInputSchemas.finishRun
+    ]
+  ] as const) {
+    server.registerTool(
+      tool[0],
+      { title: tool[0], description: tool[1], inputSchema: tool[2] },
+      async (args: Record<string, unknown>) =>
+        mcpText(await callRuntrailTool(tool[0], args, client))
+    );
   }
 }
 

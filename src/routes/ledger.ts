@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import type { RuntrailConfig } from "../config.js";
 import { LedgerRepository } from "../db/ledger.js";
 import {
@@ -13,6 +13,7 @@ import {
   createHandoffRequestSchema,
   createOpenLoopRequestSchema,
   createRunRequestSchema,
+  finishRunRequestSchema,
   journalSearchQuerySchema,
   listArtifactsQuerySchema,
   listDecisionsQuerySchema,
@@ -20,6 +21,7 @@ import {
   listHandoffsQuerySchema,
   listOpenLoopsQuerySchema,
   listRunsQuerySchema,
+  pauseRunRequestSchema,
   updateOpenLoopRequestSchema,
   updateRunRequestSchema
 } from "../shared/schemas.js";
@@ -124,6 +126,21 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       closedCount: result.closed.length,
       ...result
     });
+  });
+
+  route.post("/runs/:id/heartbeat", (c) =>
+    lifecycleResponse(c, ledger.heartbeatRun(c.req.param("id")))
+  );
+  route.post("/runs/:id/resume", (c) => lifecycleResponse(c, ledger.resumeRun(c.req.param("id"))));
+  route.post("/runs/:id/pause", async (c) => {
+    const parsed = pauseRunRequestSchema.safeParse(await readJson(c.req.raw));
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    return lifecycleResponse(c, ledger.pauseRun(c.req.param("id"), parsed.data));
+  });
+  route.post("/runs/:id/finish", async (c) => {
+    const parsed = finishRunRequestSchema.safeParse(await readJson(c.req.raw));
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    return lifecycleResponse(c, ledger.finishRun(c.req.param("id"), parsed.data));
   });
 
   route.patch("/runs/:id", async (c) => {
@@ -510,6 +527,14 @@ function notifyDiscord(config: RuntrailConfig, run: AgentRun | undefined, event:
 
 function isNotifiable(type: AgentEvent["type"]): boolean {
   return ["failed", "completed", "blocked", "needs_review", "decision_required"].includes(type);
+}
+
+function lifecycleResponse(c: Context, result: { run?: AgentRun; error?: string }): Response {
+  if (result.run) return c.json({ run: result.run });
+  return c.json(
+    { error: result.error ?? "Invalid lifecycle transition" },
+    result.error === "Run not found" ? 404 : 409
+  );
 }
 
 function readChangedFiles(data: unknown): string[] {

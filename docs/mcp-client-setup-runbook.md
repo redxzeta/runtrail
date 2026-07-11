@@ -49,7 +49,7 @@ OpenClaw also uses the stdio bridge:
 
 ```sh
 openclaw mcp set runtrail '{"command":"/home/<user>/.local/bin/runtrail-mcp","args":[]}'
-openclaw mcp tools runtrail --include "journal_get_context,journal_search,journal_search_runs,journal_get_run_manifest,journal_create_handoff,journal_create_event,journal_create_open_loop,journal_resolve_open_loop,journal_record_decision"
+openclaw mcp tools runtrail --include "journal_start_run,journal_resume_run,journal_heartbeat_run,journal_pause_run,journal_finish_run,journal_get_context,journal_search,journal_search_runs,journal_get_run_manifest,journal_create_handoff,journal_create_event,journal_create_open_loop,journal_resolve_open_loop,journal_record_decision"
 openclaw mcp reload
 ```
 

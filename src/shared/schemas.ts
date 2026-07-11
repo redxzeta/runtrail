@@ -89,6 +89,19 @@ export const updateRunRequestSchema = z
     message: "At least one field is required"
   });
 
+export const pauseRunRequestSchema = z.object({
+  status: z.enum(["paused", "blocked", "needs_review", "decision_required"]),
+  summary: z.string().trim().min(1).max(2000).optional()
+});
+
+export const finishRunRequestSchema = z.object({
+  status: z.enum(["completed", "failed", "cancelled"]),
+  summary: z.string().trim().min(1).max(2000),
+  completedAt: z.string().datetime().optional(),
+  gitBranch: z.string().trim().min(1).max(255).optional(),
+  gitCommit: z.string().trim().min(1).max(80).optional()
+});
+
 export const createEventRequestSchema = z.object({
   runId: z.string().trim().min(1),
   type: eventTypeSchema,
@@ -232,6 +245,8 @@ export type OpenLoopStatus = z.infer<typeof openLoopStatusSchema>;
 export type CreateRunRequest = z.infer<typeof createRunRequestSchema>;
 export type CloseStaleRunsRequest = z.infer<typeof closeStaleRunsRequestSchema>;
 export type UpdateRunRequest = z.infer<typeof updateRunRequestSchema>;
+export type PauseRunRequest = z.infer<typeof pauseRunRequestSchema>;
+export type FinishRunRequest = z.infer<typeof finishRunRequestSchema>;
 export type CreateEventRequest = z.infer<typeof createEventRequestSchema>;
 export type ListRunsQuery = z.infer<typeof listRunsQuerySchema>;
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;

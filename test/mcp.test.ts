@@ -20,6 +20,11 @@ describe("mcp adapter", () => {
 
     expect(server).toBeDefined();
     expect(runtrailToolNames).toEqual([
+      "journal_start_run",
+      "journal_resume_run",
+      "journal_heartbeat_run",
+      "journal_pause_run",
+      "journal_finish_run",
       "journal_get_context",
       "journal_create_event",
       "journal_create_open_loop",
@@ -29,6 +34,44 @@ describe("mcp adapter", () => {
       "journal_get_run_manifest",
       "journal_search",
       "journal_search_runs"
+    ]);
+  });
+
+  it("maps explicit lifecycle tools to narrow HTTP endpoints", async () => {
+    const client = mockClient({ run: { id: "run_1" } });
+    await callRuntrailTool(
+      "journal_start_run",
+      { source: "codex", project: "runtrail", clientRunId: "s1", task: "work" },
+      client
+    );
+    await callRuntrailTool("journal_resume_run", { runId: "run_1" }, client);
+    await callRuntrailTool("journal_heartbeat_run", { runId: "run_1" }, client);
+    await callRuntrailTool(
+      "journal_pause_run",
+      { runId: "run_1", status: "needs_review", summary: "Review" },
+      client
+    );
+    await callRuntrailTool(
+      "journal_finish_run",
+      { runId: "run_1", status: "completed", summary: "Done" },
+      client
+    );
+
+    expect(client.requestJson.mock.calls).toEqual([
+      [
+        "/runs",
+        {
+          method: "POST",
+          body: { source: "codex", project: "runtrail", clientRunId: "s1", task: "work" }
+        }
+      ],
+      ["/runs/run_1/resume", { method: "POST" }],
+      ["/runs/run_1/heartbeat", { method: "POST" }],
+      [
+        "/runs/run_1/pause",
+        { method: "POST", body: { status: "needs_review", summary: "Review" } }
+      ],
+      ["/runs/run_1/finish", { method: "POST", body: { status: "completed", summary: "Done" } }]
     ]);
   });
 
@@ -284,7 +327,7 @@ describe("mcp adapter", () => {
     });
 
     expect(server).toBeDefined();
-    expect(runtrailToolNames).toHaveLength(9);
+    expect(runtrailToolNames).toHaveLength(14);
   });
 
   it("fails fast when bridge config is missing", () => {
