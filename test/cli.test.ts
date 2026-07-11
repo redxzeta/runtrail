@@ -495,7 +495,11 @@ describe("cli", () => {
       "--",
       process.execPath,
       "-e",
-      "process.stdout.write('wrapped ok')"
+      "process.stdout.write('wrapped ok')",
+      "--",
+      "--token",
+      "super-secret",
+      "--api-key=also-secret"
     ]);
 
     expect(process.exitCode).toBe(0);
@@ -514,22 +518,40 @@ describe("cli", () => {
     };
     expect(createRunBody.category).toBe("implementation");
     expect(createRunBody.tags).toEqual(["codex", "issue-72"]);
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      new URL("/events", "http://runtrail.test"),
-      expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining('"exitCode":0')
-      })
-    );
-    const finalEventBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)) as {
+    const eventBodies = fetchMock.mock.calls
+      .filter(([url]) => (url as URL).pathname === "/events")
+      .map(([, init]) => JSON.parse(String(init?.body)) as Record<string, unknown>);
+    expect(eventBodies.map((body) => body.type)).toEqual([
+      "command_executed",
+      "files_changed",
+      "completed"
+    ]);
+    const commandEventBody = eventBodies[0] as {
       category?: string;
       tags?: string[];
+      data?: { argv?: string[]; exitCode?: number; durationMs?: number; logPath?: string };
     };
-    expect(finalEventBody.category).toBe("implementation");
-    expect(finalEventBody.tags).toEqual(["codex", "issue-72"]);
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+    expect(commandEventBody.category).toBe("implementation");
+    expect(commandEventBody.tags).toEqual(["codex", "issue-72"]);
+    expect(commandEventBody.data).toEqual(
+      expect.objectContaining({
+        argv: [
+          process.execPath,
+          "-e",
+          "process.stdout.write('wrapped ok')",
+          "--",
+          "--token",
+          "[REDACTED]",
+          "--api-key=[REDACTED]"
+        ],
+        exitCode: 0,
+        durationMs: expect.any(Number),
+        logPath: expect.any(String)
+      })
+    );
+    expect(JSON.stringify(commandEventBody)).not.toContain("super-secret");
+    expect(JSON.stringify(commandEventBody)).not.toContain("also-secret");
+    expect(fetchMock).toHaveBeenCalledWith(
       new URL("/runs/run_wrap", "http://runtrail.test"),
       expect.objectContaining({
         method: "PATCH",
@@ -567,16 +589,19 @@ describe("cli", () => {
     ]);
 
     expect(process.exitCode).toBe(7);
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      new URL("/events", "http://runtrail.test"),
+    const eventBodies = fetchMock.mock.calls
+      .filter(([url]) => (url as URL).pathname === "/events")
+      .map(([, init]) => JSON.parse(String(init?.body)) as Record<string, unknown>);
+    expect(eventBodies[0]).toEqual(
       expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining('"exitCode":7')
+        type: "command_executed",
+        data: expect.objectContaining({ exitCode: 7 })
       })
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+    expect(eventBodies.at(-1)).toEqual(
+      expect.objectContaining({ type: "failed", data: { exitCode: 7 } })
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
       new URL("/runs/run_wrap", "http://runtrail.test"),
       expect.objectContaining({
         method: "PATCH",

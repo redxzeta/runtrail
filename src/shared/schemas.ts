@@ -349,7 +349,16 @@ export type RunManifest = {
   run: AgentRun;
   events: Array<Omit<AgentEvent, "data">>;
   changed_files: string[];
-  commands: Array<Pick<AgentEvent, "id" | "message" | "createdAt">>;
+  commands: Array<
+    Pick<AgentEvent, "id" | "message" | "createdAt"> & {
+      argv?: string[];
+      exitCode?: number;
+      durationMs?: number;
+      logPath?: string;
+      gitBefore?: Record<string, unknown>;
+      gitAfter?: Record<string, unknown>;
+    }
+  >;
   tests: Array<Pick<AgentEvent, "id" | "type" | "message" | "createdAt">>;
   open_loops: OpenLoop[];
   handoffs: Handoff[];
