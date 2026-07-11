@@ -23,7 +23,7 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 | `journal_search` | Read-only | `GET /search` | `{ project?: string, source?: string, status?: string, category?: string, tag?: string, text?: string, date_from?: string, date_to?: string, limit?: number }` | Compact runs, events, open loops, handoffs, and decisions matching the filters |
 | `journal_create_event` | Write | `POST /events` | `{ runId: string, type: EventType, message: string, importance?: number, category?: string, tags?: string[], data?: object }` | `{ event: AgentEvent }` |
 | `journal_create_handoff` | Write | `POST /handoffs` | `{ sourceRunId?: string, fromSource: string, toSource?: string, project: string, summary: string, nextAction?: string, category?: string, tags?: string[], context?: object }` | `{ handoff: Handoff }` |
-| `journal_create_open_loop` | Write | `POST /open-loops` | `{ type: OpenLoopType, project: string, title: string, description?: string }` | `{ openLoop: OpenLoop }` |
+| `journal_create_open_loop` | Write | `POST /open-loops` | `{ type: OpenLoopType, project: string, title: string, description?: string, owner?: string, source?: string, nextAction?: string, blockerRef?: string, sourceRunId?: string }` | `{ openLoop: OpenLoop }` |
 | `journal_resolve_open_loop` | Write | `PATCH /open-loops/:id` | `{ id: string, resolution?: string }` | `{ openLoop: OpenLoop }` with status set to `resolved` |
 | `journal_record_decision` | Write | `POST /decisions` | `{ project?: string, title: string, decision: string, rationale?: string }` | `{ decision: Decision }` |
 

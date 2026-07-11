@@ -146,7 +146,19 @@ describe("cli", () => {
       "--project",
       "runtrail",
       "--title",
-      "Need review"
+      "Need review",
+      "--description",
+      "Review collaboration fields",
+      "--owner",
+      "maintainer",
+      "--source",
+      "codex",
+      "--next-action",
+      "Review payload",
+      "--blocker-ref",
+      "issue-105",
+      "--source-run-id",
+      "run_1"
     ]);
     await runCli(["node", "rt", "loop", "resolve", "loop_1", "--resolution", "Reviewed"]);
     await runCli([
@@ -222,7 +234,20 @@ describe("cli", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       new URL("/open-loops", "http://runtrail.test"),
-      expect.objectContaining({ method: "POST" })
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          type: "blocked",
+          project: "runtrail",
+          title: "Need review",
+          description: "Review collaboration fields",
+          owner: "maintainer",
+          source: "codex",
+          nextAction: "Review payload",
+          blockerRef: "issue-105",
+          sourceRunId: "run_1"
+        })
+      })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
@@ -639,6 +664,34 @@ describe("cli", () => {
     expect(output).toEqual([`Wrote ${outputPath}`]);
     expect(readFileSync(outputPath, "utf8")).toContain("# Decisions export");
     expect(readFileSync(outputPath, "utf8")).toContain("Markdown is generated from API data");
+  });
+
+  it("forwards collaboration filters for open-loop exports", async () => {
+    const fetchMock = mockFetch({ openLoops: [] });
+    captureOutput();
+
+    await runCli([
+      "node",
+      "rt",
+      "export",
+      "open-loops",
+      "--project",
+      "runtrail",
+      "--owner",
+      "maintainer",
+      "--source",
+      "codex",
+      "--source-run-id",
+      "run_1"
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL(
+        "/open-loops?project=runtrail&owner=maintainer&source=codex&sourceRunId=run_1",
+        "http://runtrail.test"
+      ),
+      expect.any(Object)
+    );
   });
 });
 

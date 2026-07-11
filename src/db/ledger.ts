@@ -646,6 +646,21 @@ export class LedgerRepository {
       params.type = query.type;
     }
 
+    if (query.owner) {
+      filters.push("owner = @owner");
+      params.owner = query.owner;
+    }
+
+    if (query.source) {
+      filters.push("source = @source");
+      params.source = query.source;
+    }
+
+    if (query.sourceRunId) {
+      filters.push("source_run_id = @sourceRunId");
+      params.sourceRunId = query.sourceRunId;
+    }
+
     const rows = this.db
       .prepare(
         `SELECT *

@@ -148,6 +148,9 @@ export const listOpenLoopsQuerySchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
   status: openLoopStatusSchema.default("open"),
   type: openLoopTypeSchema.optional(),
+  owner: z.string().trim().min(1).max(120).optional(),
+  source: z.string().trim().min(1).max(80).optional(),
+  sourceRunId: z.string().trim().min(1).optional(),
   limit: z.coerce.number().int().positive().max(100).default(50)
 });
 

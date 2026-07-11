@@ -520,6 +520,21 @@ describe("ledger routes", () => {
       })
     ]);
 
+    for (const filter of [
+      "owner=operator",
+      "source=codex",
+      `sourceRunId=${encodeURIComponent(run.run.id)}`
+    ]) {
+      const filteredResponse = await app.request(`/open-loops?project=runtrail&${filter}`, {
+        headers: authHeaders()
+      });
+      const filtered = (await filteredResponse.json()) as {
+        openLoops: Array<{ id: string }>;
+      };
+      expect(filteredResponse.status).toBe(200);
+      expect(filtered.openLoops).toEqual([expect.objectContaining({ id: created.openLoop.id })]);
+    }
+
     const cancelResponse = await app.request(`/open-loops/${cancelled.openLoop.id}`, {
       method: "PATCH",
       body: JSON.stringify({ status: "cancelled", resolution: "No longer needed" }),
@@ -854,6 +869,12 @@ describe("ledger routes", () => {
     const invalidDecision = await postJson(app, "/decisions", {
       title: "Missing decision"
     });
+    const missingSourceRun = await postJson(app, "/open-loops", {
+      type: "blocked",
+      project: "runtrail",
+      title: "Missing source run",
+      sourceRunId: "run_missing"
+    });
 
     expect(invalidLoop.status).toBe(400);
     expect(await invalidLoop.json()).toEqual(
@@ -863,6 +884,8 @@ describe("ledger routes", () => {
     );
     expect(missingLoop.status).toBe(404);
     expect(await missingLoop.json()).toEqual({ error: "Open loop not found" });
+    expect(missingSourceRun.status).toBe(404);
+    expect(await missingSourceRun.json()).toEqual({ error: "Source run not found" });
     expect(invalidDecision.status).toBe(400);
   });
 

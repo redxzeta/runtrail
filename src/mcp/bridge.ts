@@ -57,7 +57,12 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
         type: z.string(),
         project: z.string(),
         title: z.string(),
-        description: z.string().optional()
+        description: z.string().optional(),
+        owner: z.string().optional(),
+        source: z.string().optional(),
+        nextAction: z.string().optional(),
+        blockerRef: z.string().optional(),
+        sourceRunId: z.string().optional()
       }
     },
     async (args) => await forwardTool(client, "journal_create_open_loop", args)

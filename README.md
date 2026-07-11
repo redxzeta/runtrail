@@ -157,7 +157,9 @@ pnpm cli runs close-stale --older-than 24h
 # After reviewing the dry-run candidates:
 pnpm cli runs close-stale --older-than 24h --apply
 pnpm cli event create --run-id run_abc123 --type progress --message "added command tests" --importance 5 --category implementation --tag tests
-pnpm cli loop add --type blocked --project runtrail --title "choose retention policy"
+pnpm cli loop add --type blocked --project runtrail --title "choose retention policy" \
+  --owner maintainer --source codex --next-action "review options" \
+  --blocker-ref "issue-123" --source-run-id run_abc123
 pnpm cli loop resolve loop_abc123 --resolution "keep structured data in SQLite"
 pnpm cli decision add --project runtrail --title "SQLite remains source of truth" --decision "Markdown is export-only"
 pnpm cli handoff create --source-run-id run_abc123 --from-source codex --to-source openclaw --project runtrail --summary "metadata is ready" --next-action "continue with MCP tools" --category implementation --tag codex --tag issue-123

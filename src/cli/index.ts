@@ -71,6 +71,11 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--project <project>", "Project name")
     .requiredOption("--title <title>", "Open loop title")
     .option("--description <description>", "Open loop details")
+    .option("--owner <owner>", "Responsible owner")
+    .option("--source <source>", "Source integration")
+    .option("--next-action <nextAction>", "Recommended next action")
+    .option("--blocker-ref <blockerRef>", "Blocking issue or dependency")
+    .option("--source-run-id <sourceRunId>", "Source run ID")
     .action(addLoop);
   loop
     .command("resolve")
@@ -128,6 +133,9 @@ export async function runCli(argv = process.argv): Promise<void> {
     .command("open-loops")
     .description("Export open loops")
     .option("--project <project>", "Project name")
+    .option("--owner <owner>", "Filter by owner")
+    .option("--source <source>", "Filter by source")
+    .option("--source-run-id <sourceRunId>", "Filter by source run ID")
     .option("--output <path>", "Write Markdown to a file")
     .action(exportOpenLoops);
 
@@ -399,6 +407,11 @@ async function addLoop(options: {
   project: string;
   title: string;
   description?: string;
+  owner?: string;
+  source?: string;
+  nextAction?: string;
+  blockerRef?: string;
+  sourceRunId?: string;
 }): Promise<void> {
   printJson(
     await requestJson("/open-loops", {
@@ -407,7 +420,12 @@ async function addLoop(options: {
         type: options.type,
         project: options.project,
         title: options.title,
-        description: options.description
+        description: options.description,
+        owner: options.owner,
+        source: options.source,
+        nextAction: options.nextAction,
+        blockerRef: options.blockerRef,
+        sourceRunId: options.sourceRunId
       })
     })
   );
@@ -524,9 +542,18 @@ async function exportDecisions(options: { project?: string; output?: string }): 
   writeMarkdown(["# Decisions export", "", renderDecisions(decisions)].join("\n"), options.output);
 }
 
-async function exportOpenLoops(options: { project?: string; output?: string }): Promise<void> {
+async function exportOpenLoops(options: {
+  project?: string;
+  owner?: string;
+  source?: string;
+  sourceRunId?: string;
+  output?: string;
+}): Promise<void> {
   const query = new URLSearchParams();
   appendQuery(query, "project", options.project);
+  appendQuery(query, "owner", options.owner);
+  appendQuery(query, "source", options.source);
+  appendQuery(query, "sourceRunId", options.sourceRunId);
   const openLoops = readArray(
     await requestJson(`/open-loops${query.toString() ? `?${query.toString()}` : ""}`),
     "openLoops"
