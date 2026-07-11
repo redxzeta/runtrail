@@ -1,3 +1,10 @@
+## [1.24.1](https://github.com/redxzeta/runtrail/compare/v1.24.0...v1.24.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* **cli:** record wrapped command evidence ([bbeeab0](https://github.com/redxzeta/runtrail/commit/bbeeab070e31d3ba460296cf52dadfedb92e3e59))
+
 # [1.24.0](https://github.com/redxzeta/runtrail/compare/v1.23.1...v1.24.0) (2026-07-11)
 
 
