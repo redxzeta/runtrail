@@ -113,7 +113,13 @@ describe("mcp adapter", () => {
       {
         type: "blocked",
         project: "runtrail",
-        title: "Need decision"
+        title: "Need decision",
+        description: "Choose lifecycle shape",
+        owner: "maintainer",
+        source: "codex",
+        nextAction: "Review proposal",
+        blockerRef: "issue-105",
+        sourceRunId: "run_1"
       },
       client
     );
@@ -168,11 +174,20 @@ describe("mcp adapter", () => {
         })
       })
     );
-    expect(client.requestJson).toHaveBeenNthCalledWith(
-      2,
-      "/open-loops",
-      expect.objectContaining({ method: "POST" })
-    );
+    expect(client.requestJson).toHaveBeenNthCalledWith(2, "/open-loops", {
+      method: "POST",
+      body: {
+        type: "blocked",
+        project: "runtrail",
+        title: "Need decision",
+        description: "Choose lifecycle shape",
+        owner: "maintainer",
+        source: "codex",
+        nextAction: "Review proposal",
+        blockerRef: "issue-105",
+        sourceRunId: "run_1"
+      }
+    });
     expect(client.requestJson).toHaveBeenNthCalledWith(
       3,
       "/open-loops/loop_1",

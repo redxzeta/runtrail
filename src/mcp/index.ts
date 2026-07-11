@@ -74,7 +74,12 @@ export function createRuntrailMcpServer(
         type: z.string(),
         project: z.string(),
         title: z.string(),
-        description: z.string().optional()
+        description: z.string().optional(),
+        owner: z.string().optional(),
+        source: z.string().optional(),
+        nextAction: z.string().optional(),
+        blockerRef: z.string().optional(),
+        sourceRunId: z.string().optional()
       }
     },
     async (args) => mcpText(await callRuntrailTool("journal_create_open_loop", args, client))
@@ -243,7 +248,12 @@ export async function callRuntrailTool(
           type: requireString(args, "type"),
           project: requireString(args, "project"),
           title: requireString(args, "title"),
-          description: args.description
+          description: args.description,
+          owner: args.owner,
+          source: args.source,
+          nextAction: args.nextAction,
+          blockerRef: args.blockerRef,
+          sourceRunId: args.sourceRunId
         })
       });
     case "journal_resolve_open_loop":
