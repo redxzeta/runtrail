@@ -912,9 +912,18 @@ describe("ledger routes", () => {
     });
     await postJson(app, "/events", {
       runId: run.run.id,
+      type: "progress",
+      message: "metadata omitted",
+      importance: 4,
+      createdAt: "2026-06-26T10:04:00.000Z"
+    });
+    await postJson(app, "/events", {
+      runId: run.run.id,
       type: "blocked",
       message: "needs operator input",
       importance: 7,
+      category: "implementation",
+      tags: ["issue-104", "context", "issue-104"],
       createdAt: "2026-06-26T10:05:00.000Z",
       data: {
         largeLog: "x".repeat(1000)
@@ -945,10 +954,19 @@ describe("ledger routes", () => {
     await postJson(app, "/handoffs", {
       sourceRunId: run.run.id,
       fromSource: "codex",
+      project: "ice-council",
+      summary: "Metadata omitted",
+      createdAt: "2026-06-26T10:06:30.000Z"
+    });
+    await postJson(app, "/handoffs", {
+      sourceRunId: run.run.id,
+      fromSource: "codex",
       toSource: "openclaw",
       project: "ice-council",
       summary: "Continue from failed API run",
       nextAction: "Inspect failure event",
+      category: "handoff",
+      tags: ["issue-104", "openclaw", "issue-104"],
       context: {
         runId: run.run.id
       },
@@ -967,8 +985,19 @@ describe("ledger routes", () => {
       project: string;
       recent_runs: Array<{ id: string }>;
       failed_runs: Array<{ id: string; summary: string }>;
-      recent_events: Array<{ message: string; data?: unknown }>;
-      recent_handoffs: Array<{ summary: string; nextAction: string; context?: unknown }>;
+      recent_events: Array<{
+        message: string;
+        category?: string;
+        tags?: string[];
+        data?: unknown;
+      }>;
+      recent_handoffs: Array<{
+        summary: string;
+        nextAction: string;
+        category?: string;
+        tags?: string[];
+        context?: unknown;
+      }>;
       open_loops: Array<{ title: string }>;
       decisions: Array<{ title: string }>;
       next_actions: string[];
@@ -978,8 +1007,15 @@ describe("ledger routes", () => {
     expect(context.project).toBe("ice-council");
     expect(context.recent_runs).toEqual([expect.objectContaining({ id: run.run.id })]);
     expect(context.recent_events).toEqual([
-      expect.objectContaining({ message: "needs operator input" })
+      expect.objectContaining({
+        message: "needs operator input",
+        category: "implementation",
+        tags: ["issue-104", "context"]
+      }),
+      expect.objectContaining({ message: "metadata omitted" })
     ]);
+    expect(context.recent_events[1]).not.toHaveProperty("category");
+    expect(context.recent_events[1]).not.toHaveProperty("tags");
     expect(context.recent_events[0]).not.toHaveProperty("data");
     expect(context.failed_runs).toEqual([
       expect.objectContaining({ id: run.run.id, summary: "Needs follow-up" })
@@ -987,9 +1023,14 @@ describe("ledger routes", () => {
     expect(context.recent_handoffs).toEqual([
       expect.objectContaining({
         summary: "Continue from failed API run",
-        nextAction: "Inspect failure event"
-      })
+        nextAction: "Inspect failure event",
+        category: "handoff",
+        tags: ["issue-104", "openclaw"]
+      }),
+      expect.objectContaining({ summary: "Metadata omitted" })
     ]);
+    expect(context.recent_handoffs[1]).not.toHaveProperty("category");
+    expect(context.recent_handoffs[1]).not.toHaveProperty("tags");
     expect(context.recent_handoffs[0]).not.toHaveProperty("context");
     expect(context.open_loops).toEqual([
       expect.objectContaining({ title: "Confirm live host path" })

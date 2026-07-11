@@ -1053,6 +1053,8 @@ export class LedgerRepository {
           agent_events.type,
           agent_events.message,
           agent_events.importance,
+          agent_events.category,
+          agent_events.tags_json,
           NULL AS data_json,
           agent_events.created_at
         FROM agent_events
@@ -1099,6 +1101,8 @@ export class LedgerRepository {
           project,
           summary,
           next_action,
+          category,
+          tags_json,
           NULL AS context_json,
           created_at
         FROM handoffs
