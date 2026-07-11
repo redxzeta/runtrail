@@ -152,6 +152,99 @@ describe("ledger routes", () => {
     expect(new Set(bodies.map((body) => body.run.id))).toHaveProperty("size", 2);
   });
 
+  it("records recovery decisions without duplicating authoritative context", async () => {
+    const app = createTestApp();
+    const payload = {
+      ...validRunRequest(),
+      clientRunId: "recovery-session",
+      cwd: "/Workspace/Runtrail/",
+      gitRepoPath: "/Workspace/Runtrail/"
+    };
+    const createdResponse = await postJson(app, "/runs", payload);
+    const created = (await createdResponse.json()) as {
+      run: { id: string };
+      recovery: { action: string; workspaceIdentity: string; previousRunId?: string };
+    };
+    const reused = (await (await postJson(app, "/runs", payload)).json()) as {
+      recovery: { action: string };
+    };
+
+    expect(created.recovery).toEqual(
+      expect.objectContaining({ action: "create_new", workspaceIdentity: "/workspace/runtrail" })
+    );
+    expect(reused.recovery.action).toBe("reuse");
+
+    await app.request(`/runs/${created.run.id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ status: "completed" })
+    });
+    const reopened = (await (await postJson(app, "/runs", payload)).json()) as {
+      recovery: { action: string };
+    };
+    expect(reopened.recovery.action).toBe("reopen");
+
+    const next = (await (
+      await postJson(app, "/runs", { ...payload, clientRunId: "next-session" })
+    ).json()) as { recovery: { action: string; previousRunId?: string } };
+    expect(next.recovery).toEqual(
+      expect.objectContaining({ action: "create_new", previousRunId: created.run.id })
+    );
+
+    const context = (await (
+      await app.request("/agent/context?project=ice-council&min_importance=0", {
+        headers: authHeaders()
+      })
+    ).json()) as { recent_events: Array<{ runId: string; type: string }> };
+    expect(
+      context.recent_events.filter(
+        (event) => event.runId === created.run.id && event.type === "recovery_outcome"
+      )
+    ).toHaveLength(1);
+    expect(
+      context.recent_events.filter(
+        (event) => event.runId === created.run.id && event.type === "progress"
+      )
+    ).toHaveLength(0);
+
+    const manifest = (await (
+      await app.request(`/runs/${created.run.id}/manifest`, { headers: authHeaders() })
+    ).json()) as { manifest: { recovery_receipts: Array<{ action: string }> } };
+    expect(manifest.manifest.recovery_receipts.map((receipt) => receipt.action)).toEqual([
+      "create_new",
+      "reuse",
+      "reopen"
+    ]);
+  });
+
+  it("records a bounded stale recovery receipt", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-01T00:00:00.000Z"));
+    const app = createTestApp();
+    const created = (await (
+      await postJson(app, "/runs", { ...validRunRequest(), clientRunId: "stale-session" })
+    ).json()) as { run: { id: string } };
+    vi.setSystemTime(new Date("2026-07-03T00:00:00.000Z"));
+
+    await postJson(app, "/runs/close-stale", {
+      updatedBefore: "2026-07-02T00:00:00.000Z",
+      apply: true
+    });
+    const manifest = (await (
+      await app.request(`/runs/${created.run.id}/manifest`, { headers: authHeaders() })
+    ).json()) as {
+      manifest: { recovery_receipts: Array<{ action: string; staleReason?: string }> };
+    };
+    expect(manifest.manifest.recovery_receipts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "mark_stale",
+          staleReason: "No activity since before 2026-07-02T00:00:00.000Z"
+        })
+      ])
+    );
+  });
+
   it("reports stale runs by default and applies only across the strict activity boundary", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-01T00:00:00.000Z"));

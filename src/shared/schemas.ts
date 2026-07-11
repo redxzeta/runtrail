@@ -35,7 +35,8 @@ export const eventTypeSchema = z.enum([
   "completed",
   "failed",
   "blocked",
-  "cancelled"
+  "cancelled",
+  "recovery_outcome"
 ]);
 
 export const openLoopTypeSchema = z.enum([
@@ -345,6 +346,17 @@ export type AgentContext = {
   next_actions: string[];
 };
 
+export type RecoveryReceipt = {
+  id: string;
+  clientRunId: string;
+  workspaceIdentity: string;
+  selectedRunId: string;
+  previousRunId?: string;
+  action: "reuse" | "reopen" | "mark_stale" | "create_new";
+  staleReason?: string;
+  createdAt: string;
+};
+
 export type RunManifest = {
   run: AgentRun;
   events: Array<Omit<AgentEvent, "data">>;
@@ -363,6 +375,7 @@ export type RunManifest = {
   open_loops: OpenLoop[];
   handoffs: Handoff[];
   artifacts: Artifact[];
+  recovery_receipts: RecoveryReceipt[];
 };
 
 export type JournalSearchResults = {

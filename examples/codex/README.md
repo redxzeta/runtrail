@@ -7,6 +7,9 @@ error produces one concise local diagnostic and exits successfully so Codex work
 Codex may launch matching hooks concurrently. The adapter sends Codex's `session_id` as
 `clientRunId`, relies on Runtrail's idempotent create contract, and atomically writes one local state
 file per hashed session identifier. It never uses one shared active-run file.
+Runtrail records the resulting recovery decision in the run manifest and exposes one compact
+`recovery_outcome` for the session, so concurrent or replayed hooks do not multiply authoritative
+context.
 
 ## Install
 
