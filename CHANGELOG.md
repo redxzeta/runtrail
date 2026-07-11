@@ -1,3 +1,10 @@
+## [1.24.2](https://github.com/redxzeta/runtrail/compare/v1.24.1...v1.24.2) (2026-07-11)
+
+
+### Bug Fixes
+
+* **mcp:** enforce strict tool contracts ([792d50e](https://github.com/redxzeta/runtrail/commit/792d50e784dd2ee932ea67fd75e128135fc346bb))
+
 ## [1.24.1](https://github.com/redxzeta/runtrail/compare/v1.24.0...v1.24.1) (2026-07-11)
 
 
