@@ -1,0 +1,101 @@
+name: Agent-ready implementation task
+description: Propose one bounded implementation task that a contributor or coding agent can execute.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep this task limited to one issue and one phase. Never include tokens, webhook URLs, authorization headers, prompts, environment values, private ledger data, raw tool output, or host-only paths.
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: State the concrete outcome in one or two sentences.
+    validations: {required: true}
+  - type: textarea
+    id: value
+    attributes:
+      label: Value
+      description: Explain who benefits and why this work matters now.
+    validations: {required: true}
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: List prerequisite issues or write "None".
+    validations: {required: true}
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and current behavior
+      description: Provide concise, sanitized facts that demonstrate the gap.
+    validations: {required: true}
+  - type: textarea
+    id: read_first
+    attributes:
+      label: Read-first files
+      description: List the smallest set of repository files needed to understand the task.
+    validations: {required: true}
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: List the required implementation changes.
+    validations: {required: true}
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: Name adjacent work that must not be included.
+    validations: {required: true}
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Record compatibility, architecture, security, and phase boundaries.
+    validations: {required: true}
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Provide an objectively verifiable checklist.
+      placeholder: "- [ ] Expected behavior is covered"
+    validations: {required: true}
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: List exact commands and expected results.
+      value: |
+        - `pnpm lint`
+        - `pnpm typecheck`
+        - `pnpm test`
+        - `pnpm build`
+        - `git diff --check`
+    validations: {required: true}
+  - type: textarea
+    id: handoff
+    attributes:
+      label: Required handoff
+      description: List the evidence and outcomes the implementer must report.
+    validations: {required: true}
+  - type: textarea
+    id: blocked
+    attributes:
+      label: Blocked condition
+      description: State exactly when implementation must stop and request maintainer direction.
+    validations: {required: true}
+  - type: dropdown
+    id: pr
+    attributes:
+      label: Willing to submit a pull request?
+      options: ["Yes", "No", "Maybe, with guidance"]
+    validations: {required: true}
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed secrets, prompts, private ledger data, environment values, authorization headers, and raw tool output.
+          required: true
