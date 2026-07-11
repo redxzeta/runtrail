@@ -18,6 +18,11 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 | Tool | Mode | HTTP route | Input | Output |
 | --- | --- | --- | --- | --- |
 | `journal_search_runs` | Read-only | `GET /runs` | `{ project?: string, status?: string, category?: string, tag?: string, limit?: number }` | `{ runs: AgentRun[] }` capped and ordered by recent update |
+| `journal_start_run` | Write | `POST /runs` | Bounded run identity and task fields | `{ run, recovery? }` |
+| `journal_resume_run` | Write | `POST /runs/:id/resume` | `{ runId }` | `{ run }` |
+| `journal_heartbeat_run` | Write | `POST /runs/:id/heartbeat` | `{ runId }` | `{ run }` without a new event |
+| `journal_pause_run` | Write | `POST /runs/:id/pause` | `{ runId, status, summary? }` | `{ run }` |
+| `journal_finish_run` | Write | `POST /runs/:id/finish` | `{ runId, status, summary, completedAt?, gitBranch?, gitCommit? }` | `{ run }` |
 | `journal_get_run_manifest` | Read-only | `GET /runs/:id/manifest` | `{ runId: string }` | Compact run manifest with linked events, changed files, commands, tests, open loops, handoffs, and artifacts |
 | `journal_get_context` | Read-only | `GET /agent/context` | `{ project: string, limit?: number, min_importance?: number }` | Compact project context with recent runs, failed runs, compact events, compact handoffs, open loops, decisions, and next actions |
 | `journal_search` | Read-only | `GET /search` | `{ project?: string, source?: string, status?: string, category?: string, tag?: string, text?: string, date_from?: string, date_to?: string, limit?: number }` | Compact runs, events, open loops, handoffs, and decisions matching the filters |

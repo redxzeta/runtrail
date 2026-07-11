@@ -15,6 +15,7 @@ import type {
   CreateOpenLoopRequest,
   CreateRunRequest,
   Decision,
+  FinishRunRequest,
   Handoff,
   JournalSearchQuery,
   JournalSearchResults,
@@ -25,6 +26,7 @@ import type {
   ListOpenLoopsQuery,
   ListRunsQuery,
   OpenLoop,
+  PauseRunRequest,
   RecoveryReceipt,
   RunManifest,
   UpdateOpenLoopRequest,
@@ -289,6 +291,51 @@ export class LedgerRepository {
       });
 
     return updated;
+  }
+
+  heartbeatRun(id: string): LifecycleResult {
+    const run = this.getRun(id);
+    if (!run) return { error: "Run not found" };
+    if (isTerminal(run.status)) return { error: `Cannot heartbeat ${run.status} run` };
+    return { run: this.updateRun(id, { summary: run.summary ?? null }) as AgentRun };
+  }
+
+  resumeRun(id: string): LifecycleResult {
+    const run = this.getRun(id);
+    if (!run) return { error: "Run not found" };
+    if (run.status === "cancelled") return { error: "Cannot resume cancelled run" };
+    if (run.status === "running") return { run };
+    return {
+      run: this.updateRun(id, { status: "running", summary: null, completedAt: null }) as AgentRun
+    };
+  }
+
+  pauseRun(id: string, input: PauseRunRequest): LifecycleResult {
+    const run = this.getRun(id);
+    if (!run) return { error: "Run not found" };
+    if (isTerminal(run.status)) return { error: `Cannot pause ${run.status} run` };
+    return {
+      run: this.updateRun(id, { status: input.status, summary: input.summary }) as AgentRun
+    };
+  }
+
+  finishRun(id: string, input: FinishRunRequest): LifecycleResult {
+    const run = this.getRun(id);
+    if (!run) return { error: "Run not found" };
+    if (isTerminal(run.status)) {
+      return run.status === input.status
+        ? { run }
+        : { error: `Run already terminal as ${run.status}` };
+    }
+    return {
+      run: this.updateRun(id, {
+        status: input.status,
+        summary: input.summary,
+        completedAt: input.completedAt,
+        gitBranch: input.gitBranch,
+        gitCommit: input.gitCommit
+      }) as AgentRun
+    };
   }
 
   listRuns(query: ListRunsQuery): AgentRun[] {
@@ -1241,6 +1288,12 @@ type RecoveryReceiptRow = {
   stale_reason: string | null;
   created_at: string;
 };
+
+type LifecycleResult = { run: AgentRun; error?: never } | { run?: never; error: string };
+
+function isTerminal(status: AgentRun["status"]): boolean {
+  return ["completed", "failed", "cancelled"].includes(status);
+}
 
 function mapRecoveryReceipt(row: RecoveryReceiptRow): RecoveryReceipt {
   return {

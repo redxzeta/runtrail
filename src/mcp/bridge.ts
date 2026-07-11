@@ -16,6 +16,24 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
     version: "1.0.0"
   });
 
+  for (const tool of [
+    ["journal_start_run", mcpToolInputSchemas.startRun],
+    ["journal_resume_run", mcpToolInputSchemas.runId],
+    ["journal_heartbeat_run", mcpToolInputSchemas.runId],
+    ["journal_pause_run", mcpToolInputSchemas.pauseRun],
+    ["journal_finish_run", mcpToolInputSchemas.finishRun]
+  ] as const) {
+    server.registerTool(
+      tool[0],
+      {
+        title: tool[0],
+        description: "Manage an explicit Runtrail run lifecycle transition",
+        inputSchema: tool[1]
+      },
+      async (args: Record<string, unknown>) => await forwardTool(client, tool[0], args)
+    );
+  }
+
   server.registerTool(
     "journal_get_context",
     {

@@ -5,9 +5,12 @@ import {
   createEventRequestSchema,
   createHandoffRequestSchema,
   createOpenLoopRequestSchema,
+  createRunRequestSchema,
+  finishRunRequestSchema,
   journalSearchQuerySchema,
   listRunsQuerySchema,
   openLoopStatusSchema,
+  pauseRunRequestSchema,
   runStatusSchema,
   updateOpenLoopRequestSchema
 } from "../shared/schemas.js";
@@ -16,6 +19,21 @@ const idSchema = z.string().trim().min(1);
 const mcpLimitSchema = z.number().int().positive().max(50).optional();
 
 export const mcpToolInputSchemas = {
+  startRun: {
+    source: createRunRequestSchema.shape.source,
+    project: createRunRequestSchema.shape.project,
+    clientRunId: createRunRequestSchema.shape.clientRunId,
+    task: createRunRequestSchema.shape.task,
+    cwd: createRunRequestSchema.shape.cwd,
+    gitRepoPath: createRunRequestSchema.shape.gitRepoPath,
+    gitBranch: createRunRequestSchema.shape.gitBranch,
+    gitCommit: createRunRequestSchema.shape.gitCommit,
+    category: createRunRequestSchema.shape.category,
+    tags: createRunRequestSchema.shape.tags
+  },
+  runId: { runId: idSchema },
+  pauseRun: { runId: idSchema, ...pauseRunRequestSchema.shape },
+  finishRun: { runId: idSchema, ...finishRunRequestSchema.shape },
   context: {
     project: agentContextQuerySchema.shape.project,
     limit: mcpLimitSchema,
