@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/redxzeta/runtrail/compare/v1.25.0...v1.26.0) (2026-07-11)
+
+
+### Features
+
+* **mcp:** add complete run lifecycle ([14ac479](https://github.com/redxzeta/runtrail/commit/14ac4795475011455652aec91b015bff83050f71))
+
 # [1.25.0](https://github.com/redxzeta/runtrail/compare/v1.24.2...v1.25.0) (2026-07-11)
 
 
