@@ -2,7 +2,8 @@ import type Database from "better-sqlite3";
 import { nowIso } from "../shared/time.js";
 import { schemaStatements } from "./schema.js";
 
-const migrationName = "001_initial_schema";
+const initialMigrationName = "001_initial_schema";
+const idempotencyMigrationName = "002_append_record_idempotency";
 
 export function migrate(db: Database.Database): void {
   const transaction = db.transaction(() => {
@@ -22,8 +23,13 @@ export function migrate(db: Database.Database): void {
     addColumnIfMissing(db, "agent_events", "tags_json", "tags_json TEXT");
     addColumnIfMissing(db, "agent_events", "prev_event_hash", "prev_event_hash TEXT");
     addColumnIfMissing(db, "agent_events", "event_hash", "event_hash TEXT");
+    addColumnIfMissing(db, "agent_events", "client_record_id", "client_record_id TEXT");
+    addColumnIfMissing(db, "open_loops", "client_record_id", "client_record_id TEXT");
+    addColumnIfMissing(db, "decisions", "client_record_id", "client_record_id TEXT");
     addColumnIfMissing(db, "handoffs", "category", "category TEXT");
     addColumnIfMissing(db, "handoffs", "tags_json", "tags_json TEXT");
+    addColumnIfMissing(db, "handoffs", "client_record_id", "client_record_id TEXT");
+    addColumnIfMissing(db, "artifacts", "client_record_id", "client_record_id TEXT");
     db.exec(
       "CREATE INDEX IF NOT EXISTS idx_agent_runs_category_updated_at ON agent_runs (category, updated_at DESC)"
     );
@@ -38,10 +44,38 @@ export function migrate(db: Database.Database): void {
       ON agent_runs (source, project, client_run_id)
       WHERE client_run_id IS NOT NULL`
     );
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_events_client_record_id
+      ON agent_events (run_id, client_record_id)
+      WHERE client_record_id IS NOT NULL`
+    );
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_open_loops_client_record_id
+      ON open_loops (project, client_record_id)
+      WHERE client_record_id IS NOT NULL`
+    );
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_decisions_client_record_id
+      ON decisions (COALESCE(project, ''), client_record_id)
+      WHERE client_record_id IS NOT NULL`
+    );
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_handoffs_client_record_id
+      ON handoffs (project, client_record_id)
+      WHERE client_record_id IS NOT NULL`
+    );
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_artifacts_client_record_id
+      ON artifacts (run_id, client_record_id)
+      WHERE client_record_id IS NOT NULL`
+    );
 
     db.prepare(
       "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
-    ).run(1, migrationName, nowIso());
+    ).run(1, initialMigrationName, nowIso());
+    db.prepare(
+      "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
+    ).run(2, idempotencyMigrationName, nowIso());
   });
 
   transaction();

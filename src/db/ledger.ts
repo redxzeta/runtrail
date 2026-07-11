@@ -472,16 +472,24 @@ export class LedgerRepository {
   }
 
   createEvent(input: CreateEventRequest): AgentEvent | undefined {
+    return this.createEventResult(input).event;
+  }
+
+  createEventResult(input: CreateEventRequest): {
+    event: AgentEvent | undefined;
+    created: boolean;
+  } {
     const run = this.getRun(input.runId);
 
     if (!run) {
-      return undefined;
+      return { event: undefined, created: false };
     }
 
     const tags = normalizeTags(input.tags);
     const event: AgentEvent = {
       id: createId("evt"),
       runId: input.runId,
+      clientRecordId: input.clientRecordId,
       type: input.type,
       message: input.message,
       importance: input.importance,
@@ -497,6 +505,7 @@ export class LedgerRepository {
           `INSERT INTO agent_events (
             id,
             run_id,
+            client_record_id,
             type,
             message,
             importance,
@@ -509,6 +518,7 @@ export class LedgerRepository {
           ) VALUES (
             @id,
             @runId,
+            @clientRecordId,
             @type,
             @message,
             @importance,
@@ -522,6 +532,7 @@ export class LedgerRepository {
         )
         .run({
           ...event,
+          clientRecordId: toSqlValue(event.clientRecordId),
           category: toSqlValue(event.category),
           tagsJson: tagsToJson(event.tags),
           dataJson: event.data === undefined ? null : JSON.stringify(event.data)
@@ -535,12 +546,28 @@ export class LedgerRepository {
       this.recomputeEventHashes(event.runId);
     });
 
-    transaction();
+    try {
+      transaction();
+    } catch (error) {
+      if (!input.clientRecordId || !isUniqueConstraint(error)) {
+        throw error;
+      }
+
+      const existing = this.db
+        .prepare("SELECT * FROM agent_events WHERE run_id = ? AND client_record_id = ?")
+        .get(input.runId, input.clientRecordId) as EventRow | undefined;
+
+      if (!existing) {
+        throw error;
+      }
+
+      return { event: mapEventRow(existing), created: false };
+    }
 
     const stored = this.db
       .prepare("SELECT * FROM agent_events WHERE id = ?")
       .get(event.id) as EventRow;
-    return mapEventRow(stored);
+    return { event: mapEventRow(stored), created: true };
   }
 
   private replaceTags(
@@ -628,6 +655,7 @@ export class LedgerRepository {
       id: createId("loop"),
       type: input.type,
       project: input.project,
+      clientRecordId: input.clientRecordId,
       title: input.title,
       description: input.description,
       owner: input.owner,
@@ -640,53 +668,42 @@ export class LedgerRepository {
       updatedAt: timestamp
     };
 
-    this.db
-      .prepare(
-        `INSERT INTO open_loops (
-          id,
-          type,
-          project,
-          title,
-          description,
-          owner,
-          source,
-          next_action,
-          blocker_ref,
-          source_run_id,
-          status,
-          resolution,
-          created_at,
-          updated_at,
-          resolved_at
-        ) VALUES (
-          @id,
-          @type,
-          @project,
-          @title,
-          @description,
-          @owner,
-          @source,
-          @nextAction,
-          @blockerRef,
-          @sourceRunId,
-          @status,
-          @resolution,
-          @createdAt,
-          @updatedAt,
-          @resolvedAt
-        )`
-      )
-      .run({
-        ...openLoop,
-        description: toSqlValue(openLoop.description),
-        owner: toSqlValue(openLoop.owner),
-        source: toSqlValue(openLoop.source),
-        nextAction: toSqlValue(openLoop.nextAction),
-        blockerRef: toSqlValue(openLoop.blockerRef),
-        sourceRunId: toSqlValue(openLoop.sourceRunId),
-        resolution: null,
-        resolvedAt: null
-      });
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO open_loops (
+            id, type, project, client_record_id, title, description, owner, source,
+            next_action, blocker_ref, source_run_id, status, resolution, created_at,
+            updated_at, resolved_at
+          ) VALUES (
+            @id, @type, @project, @clientRecordId, @title, @description, @owner, @source,
+            @nextAction, @blockerRef, @sourceRunId, @status, @resolution, @createdAt,
+            @updatedAt, @resolvedAt
+          )`
+        )
+        .run({
+          ...openLoop,
+          clientRecordId: toSqlValue(openLoop.clientRecordId),
+          description: toSqlValue(openLoop.description),
+          owner: toSqlValue(openLoop.owner),
+          source: toSqlValue(openLoop.source),
+          nextAction: toSqlValue(openLoop.nextAction),
+          blockerRef: toSqlValue(openLoop.blockerRef),
+          sourceRunId: toSqlValue(openLoop.sourceRunId),
+          resolution: null,
+          resolvedAt: null
+        });
+    } catch (error) {
+      if (!input.clientRecordId || !isUniqueConstraint(error)) {
+        throw error;
+      }
+
+      const existing = this.db
+        .prepare("SELECT * FROM open_loops WHERE project = ? AND client_record_id = ?")
+        .get(input.project, input.clientRecordId) as OpenLoopRow | undefined;
+      if (!existing) throw error;
+      return mapOpenLoopRow(existing);
+    }
 
     return openLoop;
   }
@@ -812,35 +829,39 @@ export class LedgerRepository {
     const decision: Decision = {
       id: createId("dec"),
       project: input.project,
+      clientRecordId: input.clientRecordId,
       title: input.title,
       decision: input.decision,
       rationale: input.rationale,
       createdAt: input.createdAt ?? nowIso()
     };
 
-    this.db
-      .prepare(
-        `INSERT INTO decisions (
-          id,
-          project,
-          title,
-          decision,
-          rationale,
-          created_at
-        ) VALUES (
-          @id,
-          @project,
-          @title,
-          @decision,
-          @rationale,
-          @createdAt
-        )`
-      )
-      .run({
-        ...decision,
-        project: toSqlValue(decision.project),
-        rationale: toSqlValue(decision.rationale)
-      });
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO decisions (
+            id, project, client_record_id, title, decision, rationale, created_at
+          ) VALUES (
+            @id, @project, @clientRecordId, @title, @decision, @rationale, @createdAt
+          )`
+        )
+        .run({
+          ...decision,
+          project: toSqlValue(decision.project),
+          clientRecordId: toSqlValue(decision.clientRecordId),
+          rationale: toSqlValue(decision.rationale)
+        });
+    } catch (error) {
+      if (!input.clientRecordId || !isUniqueConstraint(error)) {
+        throw error;
+      }
+
+      const existing = this.db
+        .prepare("SELECT * FROM decisions WHERE project IS ? AND client_record_id = ?")
+        .get(input.project ?? null, input.clientRecordId) as DecisionRow | undefined;
+      if (!existing) throw error;
+      return mapDecisionRow(existing);
+    }
 
     return decision;
   }
@@ -883,6 +904,7 @@ export class LedgerRepository {
     const handoff: Handoff = {
       id: createId("handoff"),
       sourceRunId: input.sourceRunId,
+      clientRecordId: input.clientRecordId,
       fromSource: input.fromSource,
       toSource: input.toSource,
       project: input.project,
@@ -900,6 +922,7 @@ export class LedgerRepository {
           `INSERT INTO handoffs (
             id,
             source_run_id,
+            client_record_id,
             from_source,
             to_source,
             project,
@@ -912,6 +935,7 @@ export class LedgerRepository {
           ) VALUES (
             @id,
             @sourceRunId,
+            @clientRecordId,
             @fromSource,
             @toSource,
             @project,
@@ -926,6 +950,7 @@ export class LedgerRepository {
         .run({
           ...handoff,
           sourceRunId: toSqlValue(handoff.sourceRunId),
+          clientRecordId: toSqlValue(handoff.clientRecordId),
           toSource: toSqlValue(handoff.toSource),
           nextAction: toSqlValue(handoff.nextAction),
           category: toSqlValue(handoff.category),
@@ -935,7 +960,19 @@ export class LedgerRepository {
       this.replaceTags("handoff_tags", "handoff_id", handoff.id, handoff.tags);
     });
 
-    transaction();
+    try {
+      transaction();
+    } catch (error) {
+      if (!input.clientRecordId || !isUniqueConstraint(error)) {
+        throw error;
+      }
+
+      const existing = this.db
+        .prepare("SELECT * FROM handoffs WHERE project = ? AND client_record_id = ?")
+        .get(input.project, input.clientRecordId) as HandoffRow | undefined;
+      if (!existing) throw error;
+      return mapHandoffRow(existing);
+    }
 
     return handoff;
   }
@@ -985,6 +1022,7 @@ export class LedgerRepository {
     const artifact: Artifact = {
       id: createId("art"),
       runId: input.runId,
+      clientRecordId: input.clientRecordId,
       kind: input.kind,
       path: input.path,
       sizeBytes: input.sizeBytes,
@@ -992,31 +1030,32 @@ export class LedgerRepository {
       createdAt: input.createdAt ?? nowIso()
     };
 
-    this.db
-      .prepare(
-        `INSERT INTO artifacts (
-          id,
-          run_id,
-          kind,
-          path,
-          size_bytes,
-          sha256,
-          created_at
-        ) VALUES (
-          @id,
-          @runId,
-          @kind,
-          @path,
-          @sizeBytes,
-          @sha256,
-          @createdAt
-        )`
-      )
-      .run({
-        ...artifact,
-        sizeBytes: toSqlValue(artifact.sizeBytes),
-        sha256: toSqlValue(artifact.sha256)
-      });
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO artifacts (
+            id, run_id, client_record_id, kind, path, size_bytes, sha256, created_at
+          ) VALUES (
+            @id, @runId, @clientRecordId, @kind, @path, @sizeBytes, @sha256, @createdAt
+          )`
+        )
+        .run({
+          ...artifact,
+          clientRecordId: toSqlValue(artifact.clientRecordId),
+          sizeBytes: toSqlValue(artifact.sizeBytes),
+          sha256: toSqlValue(artifact.sha256)
+        });
+    } catch (error) {
+      if (!input.clientRecordId || !isUniqueConstraint(error)) {
+        throw error;
+      }
+
+      const existing = this.db
+        .prepare("SELECT * FROM artifacts WHERE run_id = ? AND client_record_id = ?")
+        .get(input.runId, input.clientRecordId) as ArtifactRow | undefined;
+      if (!existing) throw error;
+      return mapArtifactRow(existing);
+    }
 
     return artifact;
   }

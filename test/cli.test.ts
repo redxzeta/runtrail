@@ -127,6 +127,8 @@ describe("cli", () => {
       "progress",
       "--message",
       "wired commands",
+      "--client-record-id",
+      "event-cli-1",
       "--importance",
       "5",
       "--category",
@@ -147,6 +149,8 @@ describe("cli", () => {
       "runtrail",
       "--title",
       "Need review",
+      "--client-record-id",
+      "loop-cli-1",
       "--description",
       "Review collaboration fields",
       "--owner",
@@ -171,7 +175,9 @@ describe("cli", () => {
       "--title",
       "Use CLI",
       "--decision",
-      "Expose HTTP API through rt"
+      "Expose HTTP API through rt",
+      "--client-record-id",
+      "decision-cli-1"
     ]);
     await runCli([
       "node",
@@ -188,6 +194,8 @@ describe("cli", () => {
       "runtrail",
       "--summary",
       "Continue CLI metadata",
+      "--client-record-id",
+      "handoff-cli-1",
       "--next-action",
       "Verify wrapper flags",
       "--category",
@@ -222,6 +230,7 @@ describe("cli", () => {
         method: "POST",
         body: JSON.stringify({
           runId: "run_1",
+          clientRecordId: "event-cli-1",
           type: "progress",
           message: "wired commands",
           importance: 5,
@@ -239,6 +248,7 @@ describe("cli", () => {
         body: JSON.stringify({
           type: "blocked",
           project: "runtrail",
+          clientRecordId: "loop-cli-1",
           title: "Need review",
           description: "Review collaboration fields",
           owner: "maintainer",
@@ -263,7 +273,15 @@ describe("cli", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       5,
       new URL("/decisions", "http://runtrail.test"),
-      expect.objectContaining({ method: "POST" })
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          project: "runtrail",
+          clientRecordId: "decision-cli-1",
+          title: "Use CLI",
+          decision: "Expose HTTP API through rt"
+        })
+      })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       6,
@@ -272,6 +290,7 @@ describe("cli", () => {
         method: "POST",
         body: JSON.stringify({
           sourceRunId: "run_1",
+          clientRecordId: "handoff-cli-1",
           fromSource: "codex",
           toSource: "openclaw",
           project: "runtrail",

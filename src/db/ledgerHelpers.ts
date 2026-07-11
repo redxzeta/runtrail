@@ -33,6 +33,7 @@ export type RunRow = {
 export type EventRow = {
   id: string;
   run_id: string;
+  client_record_id: string | null;
   type: AgentEvent["type"];
   message: string;
   importance: number;
@@ -48,6 +49,7 @@ export type OpenLoopRow = {
   id: string;
   type: OpenLoop["type"];
   project: string;
+  client_record_id: string | null;
   title: string;
   description: string | null;
   owner: string | null;
@@ -65,6 +67,7 @@ export type OpenLoopRow = {
 export type DecisionRow = {
   id: string;
   project: string | null;
+  client_record_id: string | null;
   title: string;
   decision: string;
   rationale: string | null;
@@ -74,6 +77,7 @@ export type DecisionRow = {
 export type HandoffRow = {
   id: string;
   source_run_id: string | null;
+  client_record_id: string | null;
   from_source: string;
   to_source: string | null;
   project: string;
@@ -88,6 +92,7 @@ export type HandoffRow = {
 export type ArtifactRow = {
   id: string;
   run_id: string;
+  client_record_id: string | null;
   kind: string;
   path: string;
   size_bytes: number | null;
@@ -126,6 +131,7 @@ export function mapEventRow(row: EventRow): AgentEvent {
   return {
     id: row.id,
     runId: row.run_id,
+    clientRecordId: row.client_record_id ?? undefined,
     type: row.type,
     message: row.message,
     importance: row.importance,
@@ -142,6 +148,7 @@ export function mapEventContextRow(row: EventRow): Omit<AgentEvent, "data"> {
   return stripEventData({
     id: row.id,
     runId: row.run_id,
+    clientRecordId: row.client_record_id ?? undefined,
     type: row.type,
     message: row.message,
     importance: row.importance,
@@ -156,6 +163,7 @@ export function mapOpenLoopRow(row: OpenLoopRow): OpenLoop {
     id: row.id,
     type: row.type,
     project: row.project,
+    clientRecordId: row.client_record_id ?? undefined,
     title: row.title,
     description: row.description ?? undefined,
     owner: row.owner ?? undefined,
@@ -175,6 +183,7 @@ export function mapDecisionRow(row: DecisionRow): Decision {
   return {
     id: row.id,
     project: row.project ?? undefined,
+    clientRecordId: row.client_record_id ?? undefined,
     title: row.title,
     decision: row.decision,
     rationale: row.rationale ?? undefined,
@@ -186,6 +195,7 @@ export function mapHandoffRow(row: HandoffRow): Handoff {
   return {
     id: row.id,
     sourceRunId: row.source_run_id ?? undefined,
+    clientRecordId: row.client_record_id ?? undefined,
     fromSource: row.from_source,
     toSource: row.to_source ?? undefined,
     project: row.project,
@@ -202,6 +212,7 @@ export function mapHandoffSummaryRow(row: HandoffRow): HandoffSummary {
   return {
     id: row.id,
     sourceRunId: row.source_run_id ?? undefined,
+    clientRecordId: row.client_record_id ?? undefined,
     fromSource: row.from_source,
     toSource: row.to_source ?? undefined,
     project: row.project,
@@ -217,6 +228,7 @@ export function mapArtifactRow(row: ArtifactRow): Artifact {
   return {
     id: row.id,
     runId: row.run_id,
+    clientRecordId: row.client_record_id ?? undefined,
     kind: row.kind,
     path: row.path,
     sizeBytes: row.size_bytes ?? undefined,
@@ -229,6 +241,7 @@ export function stripEventData(event: AgentEvent): Omit<AgentEvent, "data"> {
   return {
     id: event.id,
     runId: event.runId,
+    clientRecordId: event.clientRecordId,
     type: event.type,
     message: event.message,
     importance: event.importance,

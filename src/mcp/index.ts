@@ -196,6 +196,7 @@ export async function callRuntrailTool(
         method: "POST",
         body: compact({
           runId: requireString(args, "runId"),
+          clientRecordId: args.clientRecordId,
           type: requireString(args, "type"),
           message: requireString(args, "message"),
           importance: args.importance,
@@ -210,6 +211,7 @@ export async function callRuntrailTool(
         body: compact({
           type: requireString(args, "type"),
           project: requireString(args, "project"),
+          clientRecordId: args.clientRecordId,
           title: requireString(args, "title"),
           description: args.description,
           owner: args.owner,
@@ -235,6 +237,7 @@ export async function callRuntrailTool(
         method: "POST",
         body: compact({
           project: args.project,
+          clientRecordId: args.clientRecordId,
           title: requireString(args, "title"),
           decision: requireString(args, "decision"),
           rationale: args.rationale
@@ -245,6 +248,7 @@ export async function callRuntrailTool(
         method: "POST",
         body: compact({
           sourceRunId: args.sourceRunId,
+          clientRecordId: args.clientRecordId,
           fromSource: requireString(args, "fromSource"),
           toSource: args.toSource,
           project: requireString(args, "project"),
