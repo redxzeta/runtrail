@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Contribution questions
+    url: https://github.com/redxzeta/runtrail/blob/main/CONTRIBUTING.md
+    about: Read the contribution contract before asking how to claim, scope, validate, or hand off work.

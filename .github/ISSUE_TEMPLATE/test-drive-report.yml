@@ -1,0 +1,76 @@
+name: Test-drive report
+description: Report a bounded Runtrail test drive with reproducible, sanitized results.
+title: "test: "
+labels: ["help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report one test scenario. Never paste tokens, webhook URLs, authorization headers, prompts, environment values, private ledger data, raw tool output, or host-only paths.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v1.24.1 or commit SHA
+    validations: {required: true}
+  - type: input
+    id: platform
+    attributes:
+      label: OS and architecture
+      placeholder: Ubuntu 24.04, x86_64
+    validations: {required: true}
+  - type: input
+    id: runtime
+    attributes:
+      label: Node.js and pnpm versions
+      placeholder: Node 22.x, pnpm 11.5.2
+    validations: {required: true}
+  - type: input
+    id: client
+    attributes:
+      label: Agent client and transport
+      description: Include the client and MCP transport when applicable; otherwise write "Not applicable".
+    validations: {required: true}
+  - type: textarea
+    id: config
+    attributes:
+      label: Sanitized configuration shape
+      description: Describe enabled surfaces and non-secret settings without values from private environments.
+    validations: {required: true}
+  - type: textarea
+    id: objective
+    attributes:
+      label: Test objective
+      description: State the behavior being evaluated.
+    validations: {required: true}
+  - type: textarea
+    id: steps
+    attributes:
+      label: Exact steps
+      description: Provide a minimal ordered reproduction using placeholders for sensitive values.
+    validations: {required: true}
+  - type: textarea
+    id: results
+    attributes:
+      label: Results and sanitized evidence
+      description: State pass/fail outcomes and concise evidence; do not paste raw tool output.
+    validations: {required: true}
+  - type: textarea
+    id: untested
+    attributes:
+      label: Untested scenarios
+      description: List relevant paths that were not exercised.
+    validations: {required: true}
+  - type: dropdown
+    id: pr
+    attributes:
+      label: Willing to submit a pull request for confirmed findings?
+      options: ["Yes", "No", "Maybe, with guidance"]
+    validations: {required: true}
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed secrets, prompts, private ledger data, environment values, authorization headers, and raw tool output.
+          required: true
