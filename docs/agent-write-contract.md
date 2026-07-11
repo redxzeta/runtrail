@@ -18,6 +18,13 @@ session. Runtrail scopes this identifier by `source` and `project`. The first `P
 task, status, git metadata, or timestamps. Continue that run through events and `PATCH /runs/:id`.
 Clients that omit `clientRunId` keep the non-idempotent create behavior.
 
+Automatic session creation records an allowlisted recovery receipt in the selected run manifest.
+Receipts identify the client session, normalized workspace, selected run, action, optional previous
+run, and bounded stale reason. `create_new`, `reuse`, `reopen`, and `mark_stale` decisions remain
+auditable, while compact context contains only one `recovery_outcome` event for the authoritative
+run. Retries must not be reported as fresh progress, and receipts never contain prompts, tool output,
+credentials, environment values, or arbitrary hook payloads.
+
 When available, wrappers should also capture host, cwd, git repo path, branch, commit, changed files, command exit code, and log path.
 
 ## When To Write

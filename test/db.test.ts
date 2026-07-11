@@ -38,6 +38,7 @@ describe("database", () => {
       "handoff_tags",
       "handoffs",
       "open_loops",
+      "recovery_receipts",
       "schema_migrations"
     ]);
     expect(indexes.map((index) => index.name)).toContain(

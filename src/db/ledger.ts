@@ -25,6 +25,7 @@ import type {
   ListOpenLoopsQuery,
   ListRunsQuery,
   OpenLoop,
+  RecoveryReceipt,
   RunManifest,
   UpdateOpenLoopRequest,
   UpdateRunRequest
@@ -71,7 +72,11 @@ function isUniqueConstraint(error: unknown): boolean {
 export class LedgerRepository {
   constructor(private readonly db: Database.Database) {}
 
-  createRun(input: CreateRunRequest): { run: AgentRun; created: boolean } {
+  createRun(input: CreateRunRequest): {
+    run: AgentRun;
+    created: boolean;
+    recovery?: RecoveryReceipt;
+  } {
     const timestamp = nowIso();
     const tags = normalizeTags(input.tags);
     const run: AgentRun = {
@@ -155,7 +160,11 @@ export class LedgerRepository {
 
     try {
       transaction();
-      return { run, created: true };
+      const recovery = input.clientRunId
+        ? this.recordRecovery(run, "create_new", this.findPreviousRun(run))
+        : undefined;
+      if (recovery) this.ensureRecoveryOutcome(run, recovery);
+      return { run, created: true, recovery };
     } catch (error) {
       if (!input.clientRunId || !isUniqueConstraint(error)) {
         throw error;
@@ -167,7 +176,10 @@ export class LedgerRepository {
         throw error;
       }
 
-      return { run: existing, created: false };
+      const action = existing.status === "running" ? "reuse" : "reopen";
+      const recovery = this.recordRecovery(existing, action);
+      this.ensureRecoveryOutcome(existing, recovery);
+      return { run: existing, created: false, recovery };
     }
   }
 
@@ -216,6 +228,14 @@ export class LedgerRepository {
           const updated = this.getRun(candidate.id);
 
           if (updated) {
+            if (updated.clientRunId) {
+              this.recordRecovery(
+                updated,
+                "mark_stale",
+                undefined,
+                `No activity since before ${updatedBefore}`
+              );
+            }
             results.push(updated);
           }
         }
@@ -342,6 +362,66 @@ export class LedgerRepository {
       )
       .get(source, project, clientRunId) as RunRow | undefined;
     return row ? mapRunRow(row) : undefined;
+  }
+
+  private recordRecovery(
+    run: AgentRun,
+    action: RecoveryReceipt["action"],
+    previousRunId?: string,
+    staleReason?: string
+  ): RecoveryReceipt {
+    const receipt: RecoveryReceipt = {
+      id: createId("rcv"),
+      clientRunId: run.clientRunId ?? "",
+      workspaceIdentity: normalizeWorkspaceIdentity(run),
+      selectedRunId: run.id,
+      previousRunId,
+      action,
+      staleReason,
+      createdAt: nowIso()
+    };
+    this.db
+      .prepare(
+        `INSERT OR IGNORE INTO recovery_receipts
+      (id, client_run_id, workspace_identity, selected_run_id, previous_run_id, action, stale_reason, created_at)
+      VALUES (@id, @clientRunId, @workspaceIdentity, @selectedRunId, @previousRunId, @action, @staleReason, @createdAt)`
+      )
+      .run({
+        ...receipt,
+        previousRunId: toSqlValue(receipt.previousRunId),
+        staleReason: toSqlValue(receipt.staleReason)
+      });
+    return this.listRecoveryReceipts(run.id).find((item) => item.action === action) ?? receipt;
+  }
+
+  private ensureRecoveryOutcome(run: AgentRun, receipt: RecoveryReceipt): void {
+    const existing = this.db
+      .prepare("SELECT id FROM agent_events WHERE run_id = ? AND type = 'recovery_outcome' LIMIT 1")
+      .get(run.id);
+    if (existing) return;
+    this.createEvent({
+      runId: run.id,
+      type: "recovery_outcome",
+      message: "Authoritative session run selected",
+      importance: 4,
+      category: "recovery",
+      tags: ["recovery", receipt.action],
+      data: { workspaceIdentity: receipt.workspaceIdentity }
+    });
+  }
+
+  private findPreviousRun(run: AgentRun): string | undefined {
+    const identity = normalizeWorkspaceIdentity(run);
+    return this.listRuns({ project: run.project, limit: 100 }).find(
+      (candidate) => candidate.id !== run.id && normalizeWorkspaceIdentity(candidate) === identity
+    )?.id;
+  }
+
+  private listRecoveryReceipts(runId: string): RecoveryReceipt[] {
+    const rows = this.db
+      .prepare("SELECT * FROM recovery_receipts WHERE selected_run_id = ? ORDER BY rowid ASC")
+      .all(runId) as RecoveryReceiptRow[];
+    return rows.map(mapRecoveryReceipt);
   }
 
   createEvent(input: CreateEventRequest): AgentEvent | undefined {
@@ -1036,7 +1116,8 @@ export class LedgerRepository {
         .map(({ id, type, message, createdAt }) => ({ id, type, message, createdAt })),
       open_loops: openLoops.map(mapOpenLoopRow),
       handoffs: this.listHandoffs({ sourceRunId: id, limit: 100 }),
-      artifacts: this.listArtifacts({ runId: id, limit: 100 })
+      artifacts: this.listArtifacts({ runId: id, limit: 100 }),
+      recovery_receipts: this.listRecoveryReceipts(id)
     };
   }
 
@@ -1148,6 +1229,35 @@ export class LedgerRepository {
       next_actions: openLoops.map((loop) => loop.next_action ?? loop.title)
     };
   }
+}
+
+type RecoveryReceiptRow = {
+  id: string;
+  client_run_id: string;
+  workspace_identity: string;
+  selected_run_id: string;
+  previous_run_id: string | null;
+  action: RecoveryReceipt["action"];
+  stale_reason: string | null;
+  created_at: string;
+};
+
+function mapRecoveryReceipt(row: RecoveryReceiptRow): RecoveryReceipt {
+  return {
+    id: row.id,
+    clientRunId: row.client_run_id,
+    workspaceIdentity: row.workspace_identity,
+    selectedRunId: row.selected_run_id,
+    previousRunId: row.previous_run_id ?? undefined,
+    action: row.action,
+    staleReason: row.stale_reason ?? undefined,
+    createdAt: row.created_at
+  };
+}
+
+function normalizeWorkspaceIdentity(run: AgentRun): string {
+  const value = run.gitRepoPath ?? run.cwd ?? run.project;
+  return value.trim().replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
 }
 
 function deriveCompletedAt(existing: AgentRun, input: UpdateRunRequest): string | undefined {

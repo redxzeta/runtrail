@@ -30,6 +30,22 @@ export const schemaStatements = [
     ON agent_runs (status, updated_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_agent_runs_project_status_updated_at
     ON agent_runs (project, status, updated_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS recovery_receipts (
+    id TEXT PRIMARY KEY,
+    client_run_id TEXT NOT NULL,
+    workspace_identity TEXT NOT NULL,
+    selected_run_id TEXT NOT NULL,
+    previous_run_id TEXT,
+    action TEXT NOT NULL,
+    stale_reason TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (selected_run_id) REFERENCES agent_runs (id) ON DELETE CASCADE,
+    FOREIGN KEY (previous_run_id) REFERENCES agent_runs (id) ON DELETE SET NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_recovery_receipts_decision
+    ON recovery_receipts (client_run_id, selected_run_id, action)`,
+  `CREATE INDEX IF NOT EXISTS idx_recovery_receipts_run_created_at
+    ON recovery_receipts (selected_run_id, created_at ASC)`,
   `CREATE TABLE IF NOT EXISTS agent_run_tags (
     run_id TEXT NOT NULL,
     tag TEXT NOT NULL,

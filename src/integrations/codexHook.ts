@@ -30,6 +30,7 @@ type RunResponse = {
     id: string;
     status: string;
   };
+  recovery?: { action: "reuse" | "reopen" | "mark_stale" | "create_new" };
 };
 
 type SessionState = {
@@ -95,6 +96,9 @@ export async function handleCodexHook(rawInput: unknown, runtime: HookRuntime = 
   switch (input.eventName) {
     case "SessionStart":
       await markRunning(config, fetchImpl, run.run);
+      if (run.recovery?.action === "reuse") {
+        return;
+      }
       await createEvent(config, fetchImpl, run.run.id, {
         type: "started",
         message: `Codex session ${input.source ?? "started"}`,
