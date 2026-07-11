@@ -6,6 +6,7 @@ import {
   createRuntrailMcpServer,
   runtrailToolNames
 } from "../src/mcp/index.js";
+import { mcpToolInputSchemas } from "../src/mcp/toolSchemas.js";
 
 describe("mcp adapter", () => {
   afterEach(() => {
@@ -29,6 +30,14 @@ describe("mcp adapter", () => {
       "journal_search",
       "journal_search_runs"
     ]);
+  });
+
+  it("reuses strict shared schemas and bounds list limits", () => {
+    expect(mcpToolInputSchemas.event.type.safeParse("not-an-event").success).toBe(false);
+    expect(mcpToolInputSchemas.openLoop.type.safeParse("not-a-loop").success).toBe(false);
+    expect(mcpToolInputSchemas.runSearch.status.safeParse("not-a-status").success).toBe(false);
+    expect(mcpToolInputSchemas.journalSearch.limit.safeParse(51).success).toBe(false);
+    expect(mcpToolInputSchemas.journalSearch.limit.safeParse(50).success).toBe(true);
   });
 
   it("constructs the default server from env without requiring a config file", () => {
@@ -243,6 +252,30 @@ describe("mcp adapter", () => {
     const [, init] = fetchMock.mock.calls[0] as unknown as [URL, { headers: Headers }];
     expect(fetchMock).toHaveBeenCalledWith(new URL("/health", "http://runtrail.test"), init);
     expect(init.headers.get("authorization")).toBe("Bearer secret-token");
+  });
+
+  it("preserves bounded API diagnostics without exposing authorization secrets", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: "Invalid request using secret-token or Bearer leaked-value",
+              issues: [{ path: ["type"], message: "Invalid enum value" }]
+            }),
+            { status: 400 }
+          )
+      )
+    );
+    const client = createHttpClient({
+      url: "http://runtrail.test",
+      security: { authRequired: true, token: "secret-token" }
+    });
+
+    await expect(client.requestJson("/events")).rejects.toThrow(
+      "Runtrail HTTP 400: Invalid request using [REDACTED] or Bearer [REDACTED] type: Invalid enum value"
+    );
   });
 
   it("constructs the bridge server with the Runtrail tool set", () => {

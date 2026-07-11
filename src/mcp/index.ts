@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
 import { loadConfig, type RuntrailConfig } from "../config.js";
+import { mcpToolInputSchemas } from "./toolSchemas.js";
 
 export type RuntrailHttpClient = {
   requestJson(
@@ -37,12 +37,8 @@ export function createRuntrailMcpServer(
     "journal_get_context",
     {
       title: "Get Runtrail context",
-      description: "Get compact project context from Runtrail",
-      inputSchema: {
-        project: z.string(),
-        limit: z.number().int().positive().optional(),
-        min_importance: z.number().int().min(0).max(10).optional()
-      }
+      description: "Recover bounded, compact context before starting or resuming project work",
+      inputSchema: mcpToolInputSchemas.context
     },
     async (args) => mcpText(await callRuntrailTool("journal_get_context", args, client))
   );
@@ -51,16 +47,8 @@ export function createRuntrailMcpServer(
     "journal_create_event",
     {
       title: "Create Runtrail event",
-      description: "Create an event for an existing Runtrail run",
-      inputSchema: {
-        runId: z.string(),
-        type: z.string(),
-        message: z.string(),
-        importance: z.number().int().min(0).max(10).optional(),
-        category: z.string().optional(),
-        tags: z.array(z.string()).optional(),
-        data: z.record(z.string(), z.unknown()).optional()
-      }
+      description: "Append a typed progress, result, or exception event to an existing run",
+      inputSchema: mcpToolInputSchemas.event
     },
     async (args) => mcpText(await callRuntrailTool("journal_create_event", args, client))
   );
@@ -69,18 +57,8 @@ export function createRuntrailMcpServer(
     "journal_create_open_loop",
     {
       title: "Create Runtrail open loop",
-      description: "Create an open loop in Runtrail",
-      inputSchema: {
-        type: z.string(),
-        project: z.string(),
-        title: z.string(),
-        description: z.string().optional(),
-        owner: z.string().optional(),
-        source: z.string().optional(),
-        nextAction: z.string().optional(),
-        blockerRef: z.string().optional(),
-        sourceRunId: z.string().optional()
-      }
+      description: "Record unresolved work with optional ownership and continuation metadata",
+      inputSchema: mcpToolInputSchemas.openLoop
     },
     async (args) => mcpText(await callRuntrailTool("journal_create_open_loop", args, client))
   );
@@ -90,10 +68,7 @@ export function createRuntrailMcpServer(
     {
       title: "Resolve Runtrail open loop",
       description: "Resolve an existing Runtrail open loop",
-      inputSchema: {
-        id: z.string(),
-        resolution: z.string().optional()
-      }
+      inputSchema: mcpToolInputSchemas.resolveOpenLoop
     },
     async (args) => mcpText(await callRuntrailTool("journal_resolve_open_loop", args, client))
   );
@@ -103,12 +78,7 @@ export function createRuntrailMcpServer(
     {
       title: "Record Runtrail decision",
       description: "Record a project or global decision in Runtrail",
-      inputSchema: {
-        project: z.string().optional(),
-        title: z.string(),
-        decision: z.string(),
-        rationale: z.string().optional()
-      }
+      inputSchema: mcpToolInputSchemas.decision
     },
     async (args) => mcpText(await callRuntrailTool("journal_record_decision", args, client))
   );
@@ -118,13 +88,7 @@ export function createRuntrailMcpServer(
     {
       title: "Search Runtrail runs",
       description: "Search recent Runtrail runs",
-      inputSchema: {
-        project: z.string().optional(),
-        status: z.string().optional(),
-        category: z.string().optional(),
-        tag: z.string().optional(),
-        limit: z.number().int().positive().optional()
-      }
+      inputSchema: mcpToolInputSchemas.runSearch
     },
     async (args) => mcpText(await callRuntrailTool("journal_search_runs", args, client))
   );
@@ -134,17 +98,7 @@ export function createRuntrailMcpServer(
     {
       title: "Create Runtrail handoff",
       description: "Create a handoff for another agent or source",
-      inputSchema: {
-        fromSource: z.string(),
-        project: z.string(),
-        summary: z.string(),
-        sourceRunId: z.string().optional(),
-        toSource: z.string().optional(),
-        nextAction: z.string().optional(),
-        category: z.string().optional(),
-        tags: z.array(z.string()).optional(),
-        context: z.record(z.string(), z.unknown()).optional()
-      }
+      inputSchema: mcpToolInputSchemas.handoff
     },
     async (args) => mcpText(await callRuntrailTool("journal_create_handoff", args, client))
   );
@@ -154,9 +108,7 @@ export function createRuntrailMcpServer(
     {
       title: "Get Runtrail run manifest",
       description: "Get compact linked records for one Runtrail run",
-      inputSchema: {
-        runId: z.string()
-      }
+      inputSchema: mcpToolInputSchemas.manifest
     },
     async (args) => mcpText(await callRuntrailTool("journal_get_run_manifest", args, client))
   );
@@ -166,17 +118,7 @@ export function createRuntrailMcpServer(
     {
       title: "Search Runtrail journal",
       description: "Search Runtrail runs, events, open loops, handoffs, and decisions",
-      inputSchema: {
-        project: z.string().optional(),
-        source: z.string().optional(),
-        status: z.string().optional(),
-        category: z.string().optional(),
-        tag: z.string().optional(),
-        text: z.string().optional(),
-        date_from: z.string().optional(),
-        date_to: z.string().optional(),
-        limit: z.number().int().positive().optional()
-      }
+      inputSchema: mcpToolInputSchemas.journalSearch
     },
     async (args) => mcpText(await callRuntrailTool("journal_search", args, client))
   );
@@ -203,10 +145,10 @@ export function createHttpClient(config: RuntrailHttpClientConfig): RuntrailHttp
         body: options.body ? JSON.stringify(options.body) : undefined
       });
       const text = await response.text();
-      const body = text ? JSON.parse(text) : undefined;
+      const body = parseJson(text);
 
       if (!response.ok) {
-        throw new Error(`Runtrail HTTP ${response.status}`);
+        throw new Error(formatHttpError(response.status, body, config.security.token));
       }
 
       return body;
@@ -330,10 +272,56 @@ function mcpText(value: unknown) {
     content: [
       {
         type: "text" as const,
-        text: JSON.stringify(value, null, 2)
+        text: JSON.stringify(value)
       }
     ]
   };
+}
+
+function parseJson(text: string): unknown {
+  if (!text) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function formatHttpError(status: number, body: unknown, token?: string): string {
+  const detail = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const error = typeof detail.error === "string" ? detail.error : undefined;
+  const issues = Array.isArray(detail.issues)
+    ? detail.issues
+        .slice(0, 10)
+        .map((issue) => formatValidationIssue(issue))
+        .filter((issue): issue is string => issue !== undefined)
+    : [];
+  const diagnostics = [error, ...issues].filter(Boolean).join("; ");
+  return redactSecrets(`Runtrail HTTP ${status}${diagnostics ? `: ${diagnostics}` : ""}`, token);
+}
+
+function redactSecrets(message: string, token?: string): string {
+  let redacted = message.replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]");
+
+  if (token) {
+    redacted = redacted.replaceAll(token, "[REDACTED]");
+  }
+
+  return redacted;
+}
+
+function formatValidationIssue(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const issue = value as Record<string, unknown>;
+  const path = Array.isArray(issue.path) ? issue.path.map(String).join(".") : "";
+  const message = typeof issue.message === "string" ? issue.message : undefined;
+  return message ? `${path ? `${path}: ` : ""}${message}` : undefined;
 }
 
 function requireString(args: Record<string, unknown>, name: string): string {
