@@ -1,3 +1,10 @@
+# [1.29.0](https://github.com/redxzeta/runtrail/compare/v1.28.0...v1.29.0) (2026-07-12)
+
+
+### Features
+
+* **runs:** add canonical work key conflicts ([#130](https://github.com/redxzeta/runtrail/issues/130)) ([95e88b8](https://github.com/redxzeta/runtrail/commit/95e88b80507ed615c3c328f7071c0241b4ff56a0))
+
 # [1.28.0](https://github.com/redxzeta/runtrail/compare/v1.27.0...v1.28.0) (2026-07-12)
 
 
