@@ -39,6 +39,44 @@ describe("ledger routes", () => {
     expect(invalidToken.status).toBe(401);
   });
 
+  it("authenticates browser navigation with an HttpOnly same-site cookie", async () => {
+    const app = createTestApp({ authRequired: true, token: "secret-token" });
+    const rejectedPage = await app.request("/today", {
+      headers: { accept: "text/html" }
+    });
+    const invalidLogin = await app.request("/login", {
+      method: "POST",
+      body: new URLSearchParams({ token: "wrong-token" }),
+      headers: { "content-type": "application/x-www-form-urlencoded" }
+    });
+    const login = await app.request("/login", {
+      method: "POST",
+      body: new URLSearchParams({ token: "secret-token" }),
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-forwarded-proto": "https"
+      }
+    });
+    const cookie = login.headers.get("set-cookie") ?? "";
+    const sessionCookie = cookie.split(";")[0] ?? "";
+    const dashboard = await app.request("/today", {
+      headers: { accept: "text/html", cookie: sessionCookie }
+    });
+
+    expect(rejectedPage.status).toBe(302);
+    expect(rejectedPage.headers.get("location")).toBe("/login");
+    expect(invalidLogin.status).toBe(401);
+    expect(await invalidLogin.text()).toContain("Invalid token");
+    expect(login.status).toBe(302);
+    expect(login.headers.get("location")).toBe("/today");
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("SameSite=Strict");
+    expect(cookie).toContain("Secure");
+    expect(cookie).not.toContain("secret-token");
+    expect(dashboard.status).toBe(200);
+    expect(await dashboard.text()).toContain("Completed today");
+  });
+
   it("creates, lists, fetches, and updates runs", async () => {
     const app = createTestApp();
     const createdResponse = await postJson(app, "/runs", validRunRequest());
