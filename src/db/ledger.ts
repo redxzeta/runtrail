@@ -28,6 +28,7 @@ import type {
   OpenLoop,
   PauseRunRequest,
   RecoveryReceipt,
+  RunConflict,
   RunManifest,
   UpdateOpenLoopRequest,
   UpdateRunRequest
@@ -78,6 +79,7 @@ export class LedgerRepository {
     run: AgentRun;
     created: boolean;
     recovery?: RecoveryReceipt;
+    conflicts: RunConflict[];
   } {
     const timestamp = nowIso();
     const tags = normalizeTags(input.tags);
@@ -86,6 +88,7 @@ export class LedgerRepository {
       source: input.source,
       project: input.project,
       clientRunId: input.clientRunId,
+      workKey: input.workKey,
       task: input.task,
       status: input.status,
       hostname: input.hostname,
@@ -109,6 +112,7 @@ export class LedgerRepository {
             source,
             project,
             client_run_id,
+            work_key,
             task,
             status,
             hostname,
@@ -128,6 +132,7 @@ export class LedgerRepository {
             @source,
             @project,
             @clientRunId,
+            @workKey,
             @task,
             @status,
             @hostname,
@@ -147,6 +152,7 @@ export class LedgerRepository {
         .run({
           ...run,
           clientRunId: toSqlValue(run.clientRunId),
+          workKey: toSqlValue(run.workKey),
           hostname: toSqlValue(run.hostname),
           cwd: toSqlValue(run.cwd),
           gitRepoPath: toSqlValue(run.gitRepoPath),
@@ -166,7 +172,7 @@ export class LedgerRepository {
         ? this.recordRecovery(run, "create_new", this.findPreviousRun(run))
         : undefined;
       if (recovery) this.ensureRecoveryOutcome(run, recovery);
-      return { run, created: true, recovery };
+      return { run, created: true, recovery, conflicts: this.findActiveWorkConflicts(run) };
     } catch (error) {
       if (!input.clientRunId || !isUniqueConstraint(error)) {
         throw error;
@@ -181,7 +187,12 @@ export class LedgerRepository {
       const action = existing.status === "running" ? "reuse" : "reopen";
       const recovery = this.recordRecovery(existing, action);
       this.ensureRecoveryOutcome(existing, recovery);
-      return { run: existing, created: false, recovery };
+      return {
+        run: existing,
+        created: false,
+        recovery,
+        conflicts: this.findActiveWorkConflicts(existing)
+      };
     }
   }
 
@@ -349,6 +360,11 @@ export class LedgerRepository {
       params.project = query.project;
     }
 
+    if (query.workKey) {
+      filters.push("work_key = @workKey");
+      params.workKey = query.workKey;
+    }
+
     if (query.status) {
       filters.push("status = @status");
       params.status = query.status;
@@ -388,6 +404,31 @@ export class LedgerRepository {
       .all(params) as RunRow[];
 
     return rows.map(mapRunRow);
+  }
+
+  private findActiveWorkConflicts(run: AgentRun): RunConflict[] {
+    if (!run.workKey) return [];
+
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM agent_runs
+        WHERE project = @project
+          AND work_key = @workKey
+          AND id != @id
+          AND status NOT IN ('completed', 'failed', 'cancelled')
+        ORDER BY updated_at DESC
+        LIMIT 10`
+      )
+      .all({ project: run.project, workKey: run.workKey, id: run.id }) as RunRow[];
+    return rows.map(mapRunRow).map(({ id, source, project, workKey, task, status, updatedAt }) => ({
+      id,
+      source,
+      project,
+      workKey,
+      task,
+      status,
+      updatedAt
+    }));
   }
 
   getRun(id: string): AgentRun | undefined {
@@ -1192,6 +1233,7 @@ export class LedgerRepository {
 
     return {
       run,
+      advisory_conflicts: this.findActiveWorkConflicts(run),
       events: events.map(stripEventData),
       changed_files: uniqueStrings(events.flatMap(readChangedFiles)),
       commands: events

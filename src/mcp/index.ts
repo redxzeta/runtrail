@@ -280,6 +280,7 @@ export async function callRuntrailTool(
     case "journal_search_runs": {
       const query = new URLSearchParams();
       appendOptional(query, "project", args.project);
+      appendOptional(query, "workKey", args.workKey);
       appendOptional(query, "status", args.status);
       appendOptional(query, "category", args.category);
       appendOptional(query, "tag", args.tag);

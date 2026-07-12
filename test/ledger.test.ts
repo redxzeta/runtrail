@@ -156,6 +156,76 @@ describe("ledger routes", () => {
     );
   });
 
+  it("returns advisory conflicts for active runs sharing a canonical work key", async () => {
+    const app = createTestApp();
+    const workKey = "github:redxzeta/runtrail#110";
+    const first = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        clientRunId: "work-key-first",
+        workKey
+      })
+    ).json()) as {
+      run: { id: string; workKey: string };
+      conflicts: Array<{ id: string }>;
+    };
+    const second = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        clientRunId: "work-key-second",
+        workKey
+      })
+    ).json()) as {
+      run: { id: string };
+      conflicts: Array<{ id: string; workKey: string }>;
+    };
+    const replay = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        clientRunId: "work-key-first",
+        workKey
+      })
+    ).json()) as { run: { id: string }; conflicts: Array<{ id: string }> };
+    const filtered = (await (
+      await app.request(`/runs?project=ice-council&workKey=${encodeURIComponent(workKey)}`, {
+        headers: authHeaders()
+      })
+    ).json()) as { runs: Array<{ id: string }> };
+    const manifest = (await (
+      await app.request(`/runs/${first.run.id}/manifest`, { headers: authHeaders() })
+    ).json()) as { manifest: { advisory_conflicts: Array<{ id: string }> } };
+
+    expect(first.run.workKey).toBe(workKey);
+    expect(first.conflicts).toEqual([]);
+    expect(second.conflicts).toEqual([expect.objectContaining({ id: first.run.id, workKey })]);
+    expect(replay.run.id).toBe(first.run.id);
+    expect(replay.conflicts).toEqual([expect.objectContaining({ id: second.run.id })]);
+    expect(filtered.runs.map((run) => run.id).sort()).toEqual([first.run.id, second.run.id].sort());
+    expect(manifest.manifest.advisory_conflicts).toEqual([
+      expect.objectContaining({ id: second.run.id })
+    ]);
+
+    for (const [id, status, summary] of [
+      [first.run.id, "completed", "Done"],
+      [second.run.id, "cancelled", "Duplicate"]
+    ] as const) {
+      await app.request(`/runs/${id}/finish`, {
+        method: "POST",
+        body: JSON.stringify({ status, summary }),
+        headers: { ...authHeaders(), "content-type": "application/json" }
+      });
+    }
+
+    const afterTerminal = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        clientRunId: "work-key-third",
+        workKey
+      })
+    ).json()) as { conflicts: unknown[] };
+    expect(afterTerminal.conflicts).toEqual([]);
+  });
+
   it("creates exactly one run for concurrent requests with the same client identity", async () => {
     const app = createTestApp();
     const payload = { ...validRunRequest(), clientRunId: "concurrent-session" };

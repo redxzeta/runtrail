@@ -17,8 +17,8 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 
 | Tool | Mode | HTTP route | Input | Output |
 | --- | --- | --- | --- | --- |
-| `journal_search_runs` | Read-only | `GET /runs` | `{ project?: string, status?: string, category?: string, tag?: string, limit?: number }` | `{ runs: AgentRun[] }` capped and ordered by recent update |
-| `journal_start_run` | Write | `POST /runs` | Bounded run identity and task fields | `{ run, recovery? }` |
+| `journal_search_runs` | Read-only | `GET /runs` | `{ project?: string, workKey?: string, status?: string, category?: string, tag?: string, limit?: number }` | `{ runs: AgentRun[] }` capped and ordered by recent update |
+| `journal_start_run` | Write | `POST /runs` | Bounded run identity and task fields, including optional `workKey` | `{ run, recovery?, conflicts }` |
 | `journal_resume_run` | Write | `POST /runs/:id/resume` | `{ runId }` | `{ run }` |
 | `journal_heartbeat_run` | Write | `POST /runs/:id/heartbeat` | `{ runId }` | `{ run }` without a new event |
 | `journal_pause_run` | Write | `POST /runs/:id/pause` | `{ runId, status, summary? }` | `{ run }` |
@@ -39,6 +39,11 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 - Compact handoff output means `id`, `sourceRunId`, `fromSource`, `toSource`, `project`, `summary`, `nextAction`, `category`, `tags`, and `createdAt`; omit `context` unless a future explicit detail tool is added.
 - Date filters use ISO datetimes and are normalized by the service before SQLite comparisons.
 - `clientRecordId` is an optional non-secret idempotency key. Its ownership scope is documented in `docs/agent-write-contract.md`.
+- `workKey` is an optional stable work identifier. Prefer a namespaced canonical value such as
+  `github:owner/repository#123`, `linear:TEAM-123`, or `internal:project/item`; Runtrail does not
+  require a specific external issue system.
+- Start-run conflicts are advisory, limited to ten recently updated nonterminal runs in the same
+  project with the same work key, and never include the authoritative run returned by a replay.
 
 ## Guardrails
 

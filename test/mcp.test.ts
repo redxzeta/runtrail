@@ -41,7 +41,13 @@ describe("mcp adapter", () => {
     const client = mockClient({ run: { id: "run_1" } });
     await callRuntrailTool(
       "journal_start_run",
-      { source: "codex", project: "runtrail", clientRunId: "s1", task: "work" },
+      {
+        source: "codex",
+        project: "runtrail",
+        clientRunId: "s1",
+        workKey: "github:redxzeta/runtrail#110",
+        task: "work"
+      },
       client
     );
     await callRuntrailTool("journal_resume_run", { runId: "run_1" }, client);
@@ -62,7 +68,13 @@ describe("mcp adapter", () => {
         "/runs",
         {
           method: "POST",
-          body: { source: "codex", project: "runtrail", clientRunId: "s1", task: "work" }
+          body: {
+            source: "codex",
+            project: "runtrail",
+            clientRunId: "s1",
+            workKey: "github:redxzeta/runtrail#110",
+            task: "work"
+          }
         }
       ],
       ["/runs/run_1/resume", { method: "POST" }],
@@ -122,6 +134,7 @@ describe("mcp adapter", () => {
       "journal_search_runs",
       {
         project: "runtrail",
+        workKey: "github:redxzeta/runtrail#110",
         status: "failed",
         category: "implementation",
         tag: "mcp",
@@ -140,7 +153,7 @@ describe("mcp adapter", () => {
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(
       3,
-      "/runs?project=runtrail&status=failed&category=implementation&tag=mcp&limit=10"
+      "/runs?project=runtrail&workKey=github%3Aredxzeta%2Fruntrail%23110&status=failed&category=implementation&tag=mcp&limit=10"
     );
   });
 

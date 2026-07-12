@@ -4,6 +4,7 @@ import { schemaStatements } from "./schema.js";
 
 const initialMigrationName = "001_initial_schema";
 const idempotencyMigrationName = "002_append_record_idempotency";
+const workKeyMigrationName = "003_run_work_keys";
 
 export function migrate(db: Database.Database): void {
   const transaction = db.transaction(() => {
@@ -19,6 +20,7 @@ export function migrate(db: Database.Database): void {
     addColumnIfMissing(db, "agent_runs", "category", "category TEXT");
     addColumnIfMissing(db, "agent_runs", "tags_json", "tags_json TEXT");
     addColumnIfMissing(db, "agent_runs", "client_run_id", "client_run_id TEXT");
+    addColumnIfMissing(db, "agent_runs", "work_key", "work_key TEXT");
     addColumnIfMissing(db, "agent_events", "category", "category TEXT");
     addColumnIfMissing(db, "agent_events", "tags_json", "tags_json TEXT");
     addColumnIfMissing(db, "agent_events", "prev_event_hash", "prev_event_hash TEXT");
@@ -43,6 +45,10 @@ export function migrate(db: Database.Database): void {
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_runs_client_run_id
       ON agent_runs (source, project, client_run_id)
       WHERE client_run_id IS NOT NULL`
+    );
+    db.exec(
+      `CREATE INDEX IF NOT EXISTS idx_agent_runs_project_work_key_status
+      ON agent_runs (project, work_key, status, updated_at DESC)`
     );
     db.exec(
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_events_client_record_id
@@ -76,6 +82,9 @@ export function migrate(db: Database.Database): void {
     db.prepare(
       "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
     ).run(2, idempotencyMigrationName, nowIso());
+    db.prepare(
+      "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
+    ).run(3, workKeyMigrationName, nowIso());
   });
 
   transaction();

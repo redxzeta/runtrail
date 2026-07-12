@@ -23,6 +23,7 @@ export const mcpToolInputSchemas = {
     source: createRunRequestSchema.shape.source,
     project: createRunRequestSchema.shape.project,
     clientRunId: createRunRequestSchema.shape.clientRunId,
+    workKey: createRunRequestSchema.shape.workKey,
     task: createRunRequestSchema.shape.task,
     cwd: createRunRequestSchema.shape.cwd,
     gitRepoPath: createRunRequestSchema.shape.gitRepoPath,
@@ -74,6 +75,7 @@ export const mcpToolInputSchemas = {
   },
   runSearch: {
     project: listRunsQuerySchema.shape.project,
+    workKey: listRunsQuerySchema.shape.workKey,
     status: listRunsQuerySchema.shape.status,
     category: listRunsQuerySchema.shape.category,
     tag: listRunsQuerySchema.shape.tag,
