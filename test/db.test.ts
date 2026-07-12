@@ -51,6 +51,7 @@ describe("database", () => {
     expect(indexes.map((index) => index.name)).toContain("idx_agent_run_tags_tag_run_id");
     expect(indexes.map((index) => index.name)).toContain("idx_handoff_tags_tag_handoff_id");
     expect(indexes.map((index) => index.name)).toContain("idx_agent_runs_client_run_id");
+    expect(indexes.map((index) => index.name)).toContain("idx_agent_runs_project_work_key_status");
     expect(indexes.map((index) => index.name)).toContain("idx_agent_events_client_record_id");
   });
 
@@ -141,7 +142,7 @@ describe("database", () => {
     db.close();
 
     expect(runColumns.map((column) => column.name)).toEqual(
-      expect.arrayContaining(["category", "tags_json", "client_run_id"])
+      expect.arrayContaining(["category", "tags_json", "client_run_id", "work_key"])
     );
     expect(eventColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining([

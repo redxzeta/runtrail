@@ -35,6 +35,7 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--project <project>", "Project name")
     .requiredOption("--task <task>", "Task summary")
     .option("--client-run-id <clientRunId>", "Stable client session identifier")
+    .option("--work-key <workKey>", "Canonical external work identifier")
     .option("--status <status>", "Initial status")
     .option("--summary <summary>", "Run summary")
     .option("--category <category>", "Run category")
@@ -181,6 +182,7 @@ async function createRun(options: {
   project: string;
   task: string;
   clientRunId?: string;
+  workKey?: string;
   status?: string;
   summary?: string;
   category?: string;
@@ -193,6 +195,7 @@ async function createRun(options: {
         source: options.source,
         project: options.project,
         clientRunId: options.clientRunId,
+        workKey: options.workKey,
         task: options.task,
         status: options.status,
         summary: options.summary,

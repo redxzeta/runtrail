@@ -137,7 +137,10 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     }
 
     const result = ledger.createRun(parsed.data);
-    return c.json({ run: result.run, recovery: result.recovery }, result.created ? 201 : 200);
+    return c.json(
+      { run: result.run, recovery: result.recovery, conflicts: result.conflicts },
+      result.created ? 201 : 200
+    );
   });
 
   route.post("/runs/close-stale", async (c) => {

@@ -54,11 +54,13 @@ const tagSchema = z.string().trim().min(1).max(80);
 const tagsSchema = z.array(tagSchema).max(20).optional();
 const categorySchema = z.string().trim().min(1).max(80).optional();
 const clientRecordIdSchema = z.string().trim().min(1).max(255).optional();
+const workKeySchema = z.string().trim().min(1).max(500).optional();
 
 export const createRunRequestSchema = z.object({
   source: z.string().trim().min(1).max(80),
   project: z.string().trim().min(1).max(120),
   clientRunId: z.string().trim().min(1).max(255).optional(),
+  workKey: workKeySchema,
   task: z.string().trim().min(1).max(1000),
   status: runStatusSchema.default("running"),
   hostname: z.string().trim().min(1).max(255).optional(),
@@ -117,6 +119,7 @@ export const createEventRequestSchema = z.object({
 
 export const listRunsQuerySchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
+  workKey: workKeySchema,
   status: runStatusSchema.optional(),
   category: categorySchema,
   tag: tagSchema.optional(),
@@ -273,6 +276,7 @@ export type AgentRun = {
   source: string;
   project: string;
   clientRunId?: string;
+  workKey?: string;
   task: string;
   status: RunStatus;
   hostname?: string;
@@ -288,6 +292,11 @@ export type AgentRun = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type RunConflict = Pick<
+  AgentRun,
+  "id" | "source" | "project" | "workKey" | "task" | "status" | "updatedAt"
+>;
 
 export type AgentEvent = {
   id: string;
@@ -385,6 +394,7 @@ export type RecoveryReceipt = {
 
 export type RunManifest = {
   run: AgentRun;
+  advisory_conflicts: RunConflict[];
   events: Array<Omit<AgentEvent, "data">>;
   changed_files: string[];
   commands: Array<
