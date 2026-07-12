@@ -19,16 +19,38 @@ export function page(title: string, sections: string[]): string {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)} - Runtrail</title>
   <style>
-    body { color: #1f2933; font: 15px/1.5 system-ui, sans-serif; margin: 0; background: #f7f8fa; }
-    header, main { margin: 0 auto; max-width: 960px; padding: 24px; }
-    header { border-bottom: 1px solid #d9dee7; }
-    nav a, main a { color: #0f5e9c; margin-right: 14px; }
+    :root { color-scheme: light; --ink: #18212f; --muted: #667085; --line: #d8dee8; --brand: #175cd3; --panel: #fff; }
+    * { box-sizing: border-box; }
+    body { color: var(--ink); font: 15px/1.5 system-ui, sans-serif; margin: 0; background: #f4f6f8; }
+    header, main { margin: 0 auto; max-width: 1120px; padding: 24px; }
+    header { background: var(--panel); border-bottom: 1px solid var(--line); max-width: none; }
+    header > * { margin-left: auto; margin-right: auto; max-width: 1072px; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+    nav a, main a { color: var(--brand); }
     h1 { font-size: 28px; margin: 0 0 12px; }
     h2 { font-size: 18px; margin: 24px 0 8px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border-bottom: 1px solid #d9dee7; padding: 8px; text-align: left; vertical-align: top; }
-    .meta { color: #5b6776; font-size: 13px; }
-    .empty { color: #5b6776; }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin: 18px 0; overflow-x: auto; padding: 0 18px 14px; }
+    table { border-collapse: collapse; min-width: 680px; width: 100%; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 8px; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+    button { background: var(--brand); border: 0; border-radius: 6px; color: white; cursor: pointer; padding: 8px 12px; }
+    input { border: 1px solid #98a2b3; border-radius: 6px; font: inherit; max-width: 100%; padding: 8px; }
+    .meta, .empty { color: var(--muted); }
+    .meta { font-size: 13px; }
+    .badge { background: #eef4ff; border-radius: 999px; color: #1849a9; display: inline-block; font-size: 12px; font-weight: 650; padding: 2px 8px; }
+    .cards { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    .card strong { display: block; font-size: 26px; }
+    .card span { color: var(--muted); }
+    .login { margin: 10vh auto; max-width: 420px; }
+    .login label, .login input { display: block; width: 100%; }
+    .login button { margin-top: 14px; width: 100%; }
+    @media (max-width: 700px) {
+      header, main { padding: 16px; }
+      h1 { font-size: 24px; }
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      table { min-width: 600px; }
+    }
   </style>
 </head>
 <body>
@@ -48,6 +70,23 @@ export function page(title: string, sections: string[]): string {
 </html>`;
 }
 
+export function dashboardSummary(items: Array<{ label: string; value: number }>): string {
+  return `<div class="cards">${items
+    .map(
+      (item) =>
+        `<div class="card"><strong>${item.value}</strong><span>${escapeHtml(item.label)}</span></div>`
+    )
+    .join("")}</div>`;
+}
+
+export function loginPage(error?: string): string {
+  return page("Sign in", [
+    `<section class="login"><p>Use the configured Runtrail token to open the dashboard.</p>${
+      error ? `<p role="alert">${escapeHtml(error)}</p>` : ""
+    }<form method="post" action="/login"><label>Runtrail token<input type="password" name="token" required autocomplete="current-password"></label><button type="submit">Sign in</button></form></section>`
+  ]);
+}
+
 export function runList(runs: AgentRun[], title = "Runs"): string {
   if (runs.length === 0) {
     return section(title, ['<p class="empty">No runs found.</p>']);
@@ -61,7 +100,7 @@ export function runList(runs: AgentRun[], title = "Runs"): string {
         .map(
           (run) => `<tr>
             <td>${link(`/runs/${encodeURIComponent(run.id)}`, run.task)}</td>
-            <td>${escapeHtml(run.status)}</td>
+            <td><span class="badge">${escapeHtml(run.status)}</span></td>
             <td>${escapeHtml(run.summary ?? "")}</td>
             <td>${link(`/projects/${encodeURIComponent(run.project)}`, run.project)}</td>
             <td class="meta">${escapeHtml(run.updatedAt)}</td>
@@ -128,7 +167,7 @@ export function openLoopList(openLoops: OpenLoop[], title = "Open loops"): strin
         .map(
           (loop) => `<tr>
             <td>${escapeHtml(loop.title)}</td>
-            <td>${escapeHtml(loop.type)}</td>
+            <td><span class="badge">${escapeHtml(loop.type)}</span></td>
             <td>${escapeHtml(loop.nextAction ?? "")}</td>
             <td>${link(`/projects/${encodeURIComponent(loop.project)}`, loop.project)}</td>
             <td class="meta">${escapeHtml(loop.updatedAt)}</td>

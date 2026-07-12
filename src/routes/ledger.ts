@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type Database from "better-sqlite3";
 import { type Context, Hono } from "hono";
 import type { RuntrailConfig } from "../config.js";
@@ -26,9 +27,11 @@ import {
   updateRunRequestSchema
 } from "../shared/schemas.js";
 import {
+  dashboardSummary,
   decisionList,
   groupedOpenLoopList,
   handoffList,
+  loginPage,
   openLoopList,
   page,
   runDetail,
@@ -47,6 +50,20 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
   const route = new Hono();
   const ledger = new LedgerRepository(options.db);
 
+  route.get("/login", (c) => c.html(loginPage()));
+  route.post("/login", async (c) => {
+    const body = await c.req.parseBody();
+    const token = body.token;
+    const expectedToken = options.config.security.token;
+
+    if (typeof token !== "string" || !expectedToken || !safeEqual(token, expectedToken)) {
+      return c.html(loginPage("Invalid token."), 401);
+    }
+
+    c.header("Set-Cookie", browserCookie(expectedToken, c.req.header("x-forwarded-proto")));
+    return c.redirect("/today");
+  });
+
   route.use("*", async (c, next) => {
     if (!options.config.security.authRequired) {
       await next();
@@ -55,8 +72,15 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
 
     const expectedToken = options.config.security.token;
     const authorization = c.req.header("authorization");
+    const browserAuthenticated = readCookie(c.req.header("cookie"), "runtrail_session")
+      ? safeEqual(
+          readCookie(c.req.header("cookie"), "runtrail_session") ?? "",
+          sessionValue(expectedToken ?? "")
+        )
+      : false;
 
-    if (!expectedToken || authorization !== `Bearer ${expectedToken}`) {
+    if (!expectedToken || (authorization !== `Bearer ${expectedToken}` && !browserAuthenticated)) {
+      if (wantsHtml(c.req.raw)) return c.redirect("/login");
       return c.json({ error: "Unauthorized" }, 401);
     }
 
@@ -79,6 +103,12 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
 
     return c.html(
       page("Today", [
+        dashboardSummary([
+          { label: "In progress", value: inProgress.length },
+          { label: "Completed today", value: completedToday.length },
+          { label: "Failed today", value: failedToday.length },
+          { label: "Open loops", value: openLoops.length }
+        ]),
         runList(inProgress, "In progress"),
         runList(completedToday, "Completed today"),
         runList(failedToday, "Failed today"),
@@ -482,6 +512,32 @@ function formatValidationError(error: {
 
 function wantsHtml(request: Request): boolean {
   return request.headers.get("accept")?.includes("text/html") ?? false;
+}
+
+function sessionValue(token: string): string {
+  return createHmac("sha256", token).update("runtrail-browser-session-v1").digest("base64url");
+}
+
+function browserCookie(token: string, forwardedProto?: string): string {
+  const secure = forwardedProto === "https" ? "; Secure" : "";
+  return `runtrail_session=${sessionValue(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200${secure}`;
+}
+
+function readCookie(header: string | undefined, name: string): string | undefined {
+  return header
+    ?.split(";")
+    .map((part) => part.trim().split("="))
+    .find(([key]) => key === name)
+    ?.slice(1)
+    .join("=");
+}
+
+function safeEqual(actual: string, expected: string): boolean {
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  return (
+    actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)
+  );
 }
 
 function notifyDiscord(config: RuntrailConfig, run: AgentRun | undefined, event: AgentEvent): void {

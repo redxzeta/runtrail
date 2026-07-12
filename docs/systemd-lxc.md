@@ -71,4 +71,10 @@ Check health:
 curl http://127.0.0.1:8787/health
 ```
 
+Open `http://<trusted-host>:8787/` in a browser and sign in with the same `RUNTRAIL_TOKEN`
+configured in the service environment. A successful sign-in stores a 12-hour `HttpOnly`,
+`SameSite=Strict` session cookie; HTTPS deployments also mark it `Secure`. Confirm that an invalid
+token is rejected, then verify dashboard navigation and open-loop resolution. Bearer authentication
+for API and MCP clients is unchanged.
+
 Expose Runtrail only on a trusted LAN or VPN.
