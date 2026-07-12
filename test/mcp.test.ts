@@ -332,7 +332,7 @@ describe("mcp adapter", () => {
     });
 
     await expect(client.requestJson("/events")).rejects.toThrow(
-      "Runtrail HTTP 400: Invalid request using [REDACTED] or Bearer [REDACTED] type: Invalid enum value"
+      "Runtrail GET /events HTTP 400 (validation): Invalid request using [REDACTED] or Bearer [REDACTED] type: Invalid enum value"
     );
   });
 

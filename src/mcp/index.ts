@@ -2,6 +2,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig, type RuntrailConfig } from "../config.js";
+import {
+  fetchWithTimeout,
+  formatClientFailure,
+  formatHttpFailure,
+  parseJsonBody,
+  readRequestTimeoutMs
+} from "../shared/httpClient.js";
 import { mcpToolInputSchemas } from "./toolSchemas.js";
 
 export type RuntrailHttpClient = {
@@ -136,6 +143,8 @@ export function createRuntrailMcpServer(
 export function createHttpClient(config: RuntrailHttpClientConfig): RuntrailHttpClient {
   return {
     async requestJson(path, options = {}) {
+      const timeoutMs = readRequestTimeoutMs();
+      const method = options.method ?? "GET";
       const headers = new Headers();
 
       if (options.body) {
@@ -146,16 +155,28 @@ export function createHttpClient(config: RuntrailHttpClientConfig): RuntrailHttp
         headers.set("authorization", `Bearer ${config.security.token}`);
       }
 
-      const response = await fetch(new URL(path, config.url), {
-        method: options.method,
-        headers,
-        body: options.body ? JSON.stringify(options.body) : undefined
-      });
+      const context = { method, path, token: config.security.token };
+      let response: Response;
+
+      try {
+        response = await fetchWithTimeout(
+          new URL(path, config.url),
+          {
+            method: options.method,
+            headers,
+            body: options.body ? JSON.stringify(options.body) : undefined
+          },
+          timeoutMs
+        );
+      } catch (error) {
+        throw formatClientFailure(error, timeoutMs, context);
+      }
+
       const text = await response.text();
-      const body = parseJson(text);
+      const body = text ? parseJsonBody(text) : undefined;
 
       if (!response.ok) {
-        throw new Error(formatHttpError(response.status, body, config.security.token));
+        throw formatHttpFailure(response.status, body, context);
       }
 
       return body;
@@ -330,52 +351,6 @@ function mcpText(value: unknown) {
       }
     ]
   };
-}
-
-function parseJson(text: string): unknown {
-  if (!text) {
-    return undefined;
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-}
-
-function formatHttpError(status: number, body: unknown, token?: string): string {
-  const detail = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-  const error = typeof detail.error === "string" ? detail.error : undefined;
-  const issues = Array.isArray(detail.issues)
-    ? detail.issues
-        .slice(0, 10)
-        .map((issue) => formatValidationIssue(issue))
-        .filter((issue): issue is string => issue !== undefined)
-    : [];
-  const diagnostics = [error, ...issues].filter(Boolean).join("; ");
-  return redactSecrets(`Runtrail HTTP ${status}${diagnostics ? `: ${diagnostics}` : ""}`, token);
-}
-
-function redactSecrets(message: string, token?: string): string {
-  let redacted = message.replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]");
-
-  if (token) {
-    redacted = redacted.replaceAll(token, "[REDACTED]");
-  }
-
-  return redacted;
-}
-
-function formatValidationIssue(value: unknown): string | undefined {
-  if (!value || typeof value !== "object") {
-    return undefined;
-  }
-
-  const issue = value as Record<string, unknown>;
-  const path = Array.isArray(issue.path) ? issue.path.map(String).join(".") : "";
-  const message = typeof issue.message === "string" ? issue.message : undefined;
-  return message ? `${path ? `${path}: ` : ""}${message}` : undefined;
 }
 
 function requireString(args: Record<string, unknown>, name: string): string {

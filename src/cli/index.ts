@@ -5,6 +5,13 @@ import { hostname } from "node:os";
 import path from "node:path";
 import { Command } from "commander";
 import { loadConfig } from "../config.js";
+import {
+  fetchWithTimeout,
+  formatClientFailure,
+  formatHttpFailure,
+  parseJsonBody,
+  readRequestTimeoutMs
+} from "../shared/httpClient.js";
 import { verifyEventChain } from "../shared/receipts.js";
 import { type AgentEvent, healthResponseSchema } from "../shared/schemas.js";
 
@@ -620,6 +627,8 @@ async function requestJson(
   options: { method?: string; body?: Record<string, unknown> } = {}
 ): Promise<unknown> {
   const config = loadConfig();
+  const timeoutMs = readRequestTimeoutMs();
+  const method = options.method ?? "GET";
   const headers = new Headers();
 
   if (options.body) {
@@ -630,16 +639,28 @@ async function requestJson(
     headers.set("authorization", `Bearer ${config.security.token}`);
   }
 
-  const response = await fetch(new URL(path, config.url), {
-    method: options.method,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-    headers
-  });
+  const context = { method, path, token: config.security.token };
+  let response: Response;
+
+  try {
+    response = await fetchWithTimeout(
+      new URL(path, config.url),
+      {
+        method: options.method,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        headers
+      },
+      timeoutMs
+    );
+  } catch (error) {
+    throw formatClientFailure(error, timeoutMs, context);
+  }
+
   const text = await response.text();
-  const body = text ? parseResponseBody(text) : undefined;
+  const body = text ? parseJsonBody(text) : undefined;
 
   if (!response.ok) {
-    throw new Error(formatHttpError(response.status, body));
+    throw formatHttpFailure(response.status, body, context);
   }
 
   return body;
@@ -695,26 +716,6 @@ function parseJsonOption(value: string, optionName: string): unknown {
   } catch {
     throw new Error(`Invalid JSON for ${optionName}`);
   }
-}
-
-function parseResponseBody(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-function formatHttpError(status: number, body: unknown): string {
-  if (body && typeof body === "object" && "error" in body) {
-    return `HTTP ${status}: ${String(body.error)}`;
-  }
-
-  if (typeof body === "string" && body.length > 0) {
-    return `HTTP ${status}: ${body}`;
-  }
-
-  return `HTTP ${status}`;
 }
 
 function printJson(value: unknown): void {

@@ -4,11 +4,16 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  fetchWithTimeout,
+  formatClientFailure,
+  readRequestTimeoutMs,
+  safePath
+} from "../shared/httpClient.js";
 import type { runtrailToolNames } from "./index.js";
 import { mcpToolInputSchemas } from "./toolSchemas.js";
 
 type RemoteRuntrailClient = Pick<Client, "callTool">;
-const bridgeFetchTimeoutMs = 5_000;
 
 export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): McpServer {
   const server = new McpServer({
@@ -142,8 +147,9 @@ async function forwardTool(
 
 async function start(): Promise<void> {
   const { token, url } = loadBridgeConfig();
+  const timeoutMs = readRequestTimeoutMs();
   const remoteTransport = new StreamableHTTPClientTransport(new URL(url), {
-    fetch: fetchWithTimeout,
+    fetch: (input: string | URL, init: RequestInit = {}) => bridgeFetch(input, init, timeoutMs),
     requestInit: {
       headers: {
         accept: "application/json, text/event-stream",
@@ -161,19 +167,18 @@ async function start(): Promise<void> {
   await server.connect(new StdioServerTransport());
 }
 
-async function fetchWithTimeout(url: string | URL, init: RequestInit = {}): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), bridgeFetchTimeoutMs);
-
-  init.signal?.addEventListener("abort", () => controller.abort(), { once: true });
-
+async function bridgeFetch(
+  url: string | URL,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
   try {
-    return await fetch(url, {
-      ...init,
-      signal: controller.signal
+    return await fetchWithTimeout(url, init, timeoutMs);
+  } catch (error) {
+    throw formatClientFailure(error, timeoutMs, {
+      method: init.method ?? "GET",
+      path: safePath(url)
     });
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
