@@ -1,3 +1,10 @@
+# [1.28.0](https://github.com/redxzeta/runtrail/compare/v1.27.0...v1.28.0) (2026-07-12)
+
+
+### Features
+
+* **ui:** add operational dashboard access ([#129](https://github.com/redxzeta/runtrail/issues/129)) ([fc66c47](https://github.com/redxzeta/runtrail/commit/fc66c4771e9938efb4b9f85969f3d98301501cbf))
+
 # [1.27.0](https://github.com/redxzeta/runtrail/compare/v1.26.0...v1.27.0) (2026-07-11)
 
 
