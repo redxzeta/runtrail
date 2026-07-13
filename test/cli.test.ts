@@ -375,7 +375,7 @@ describe("cli", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(runCli(["node", "rt", "context", "--project", "runtrail"])).rejects.toThrow(
-      "HTTP 401: Unauthorized"
+      "Runtrail GET /agent/context HTTP 401 (authentication): Unauthorized"
     );
 
     const [, init] = fetchMock.mock.calls[0] as unknown as [URL, { headers: Headers }];

@@ -316,8 +316,14 @@ RUNTRAIL_DB_PATH=./data/runtrail.sqlite
 RUNTRAIL_LOG_DIR=./data/logs
 RUNTRAIL_TOKEN=change-me-to-a-long-random-secret
 RUNTRAIL_URL=http://127.0.0.1:8787
+RUNTRAIL_REQUEST_TIMEOUT_MS=15000
 DISCORD_WEBHOOK_URL=
 ```
+
+`RUNTRAIL_REQUEST_TIMEOUT_MS` bounds CLI, MCP, and MCP-bridge HTTP requests. Unreachable
+services fail promptly, and errors distinguish between timeouts, connection failures,
+authentication, validation, and server responses without exposing tokens or authorization
+headers.
 
 Do not commit real tokens or webhook URLs.
 
