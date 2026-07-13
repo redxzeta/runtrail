@@ -1,3 +1,10 @@
+## [1.29.1](https://github.com/redxzeta/runtrail/compare/v1.29.0...v1.29.1) (2026-07-13)
+
+
+### Bug Fixes
+
+* **client:** add bounded HTTP timeouts and actionable connection diagnostics ([#127](https://github.com/redxzeta/runtrail/issues/127)) ([3be962b](https://github.com/redxzeta/runtrail/commit/3be962b56bbb41513c53d574e9ba38e6b61e18c0)), closes [#116](https://github.com/redxzeta/runtrail/issues/116)
+
 # [1.29.0](https://github.com/redxzeta/runtrail/compare/v1.28.0...v1.29.0) (2026-07-12)
 
 
