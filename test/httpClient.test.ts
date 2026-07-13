@@ -69,6 +69,23 @@ describe("shared httpClient", () => {
     expect(capturedSignal?.aborted).toBe(true);
   });
 
+  it("rejects immediately when the caller signal is already aborted", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const externalController = new AbortController();
+    externalController.abort();
+
+    await expect(
+      fetchWithTimeout(
+        "http://runtrail.test/events",
+        { method: "POST", signal: externalController.signal },
+        60_000
+      )
+    ).rejects.toBeInstanceOf(RequestAbortedError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("distinguishes caller-triggered aborts from configured timeouts", async () => {
     vi.stubGlobal(
       "fetch",

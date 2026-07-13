@@ -47,6 +47,12 @@ export async function fetchWithTimeout(
   init: RequestInit,
   timeoutMs: number
 ): Promise<Response> {
+  const externalSignal = init.signal ?? undefined;
+
+  if (externalSignal?.aborted) {
+    throw new RequestAbortedError();
+  }
+
   const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
@@ -55,7 +61,6 @@ export async function fetchWithTimeout(
   }, timeoutMs);
   timer.unref?.();
 
-  const externalSignal = init.signal ?? undefined;
   const onExternalAbort = () => controller.abort();
   externalSignal?.addEventListener("abort", onExternalAbort);
 
