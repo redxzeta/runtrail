@@ -4,7 +4,10 @@ import {
   fetchWithTimeout,
   formatClientFailure,
   formatHttpFailure,
-  readRequestTimeoutMs
+  RequestAbortedError,
+  RequestTimeoutError,
+  readRequestTimeoutMs,
+  safePath
 } from "../src/shared/httpClient.js";
 
 const clientConfig = {
@@ -61,9 +64,55 @@ describe("shared httpClient", () => {
     );
     await vi.advanceTimersByTimeAsync(500);
     const settled = await pending;
-    expect(settled).toBeInstanceOf(Error);
-    expect((settled as Error).message).toBe("aborted");
+    expect(settled).toBeInstanceOf(RequestTimeoutError);
+    expect((settled as Error).message).toBe("request timed out after 500ms");
     expect(capturedSignal?.aborted).toBe(true);
+  });
+
+  it("distinguishes caller-triggered aborts from configured timeouts", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_: unknown, init: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener(
+              "abort",
+              () => {
+                reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+              },
+              { once: true }
+            );
+          })
+      )
+    );
+
+    const externalController = new AbortController();
+    const pending = fetchWithTimeout(
+      "http://runtrail.test/events",
+      { signal: externalController.signal },
+      60_000
+    ).catch((error) => error);
+    externalController.abort();
+    const settled = await pending;
+    expect(settled).toBeInstanceOf(RequestAbortedError);
+    expect((settled as Error).message).toBe("request aborted by caller");
+  });
+
+  it("removes the external abort listener after a successful request", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}", { status: 200 }))
+    );
+    const externalController = new AbortController();
+    const removeSpy = vi.spyOn(externalController.signal, "removeEventListener");
+
+    const response = await fetchWithTimeout(
+      "http://runtrail.test/health",
+      { signal: externalController.signal },
+      5_000
+    );
+    expect(response.status).toBe(200);
+    expect(removeSpy).toHaveBeenCalledWith("abort", expect.any(Function));
   });
 
   it("clears the abort timer when the fetch resolves before the timeout", async () => {
@@ -81,13 +130,35 @@ describe("shared httpClient", () => {
   });
 
   it("returns a timeout diagnostic that names the method and safe path", () => {
-    const abortError = Object.assign(new Error("aborted"), { name: "AbortError" });
-    const error = formatClientFailure(abortError, 1500, {
-      method: "post",
-      path: "/events",
-      token: "secret-token"
-    });
+    const error = formatClientFailure(
+      new RequestTimeoutError("request timed out after 1500ms"),
+      1500,
+      { method: "post", path: "/events", token: "secret-token" }
+    );
     expect(error.message).toBe("Runtrail POST /events timeout after 1500ms");
+  });
+
+  it("returns an abort diagnostic distinct from timeouts for caller-initiated aborts", () => {
+    const error = formatClientFailure(new RequestAbortedError(), 1500, {
+      method: "get",
+      path: "/events"
+    });
+    expect(error.message).toBe("Runtrail GET /events aborted by caller");
+  });
+
+  it("strips query strings from diagnostic paths", () => {
+    expect(safePath("/agent/context?project=runtrail")).toBe("/agent/context");
+    expect(safePath(new URL("http://runtrail.test/agent/context?project=runtrail"))).toBe(
+      "/agent/context"
+    );
+    const error = formatHttpFailure(
+      401,
+      { error: "Unauthorized" },
+      { method: "GET", path: "/agent/context?project=runtrail" }
+    );
+    expect(error.message).toBe(
+      "Runtrail GET /agent/context HTTP 401 (authentication): Unauthorized"
+    );
   });
 
   it("labels connection failures with the underlying error code and redacts secrets", () => {

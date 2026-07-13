@@ -28,33 +28,69 @@ export function readRequestTimeoutMs(
   return Math.floor(parsed);
 }
 
+export class RequestTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RequestTimeoutError";
+  }
+}
+
+export class RequestAbortedError extends Error {
+  constructor(message = "request aborted by caller") {
+    super(message);
+    this.name = "RequestAbortedError";
+  }
+}
+
 export async function fetchWithTimeout(
   url: string | URL,
   init: RequestInit,
   timeoutMs: number
 ): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   timer.unref?.();
 
-  init.signal?.addEventListener("abort", () => controller.abort(), { once: true });
+  const externalSignal = init.signal ?? undefined;
+  const onExternalAbort = () => controller.abort();
+  externalSignal?.addEventListener("abort", onExternalAbort);
 
   try {
     return await fetch(url, {
       ...init,
       signal: controller.signal
     });
+  } catch (error) {
+    if (timedOut) {
+      throw new RequestTimeoutError(`request timed out after ${timeoutMs}ms`);
+    }
+
+    if (externalSignal?.aborted) {
+      throw new RequestAbortedError();
+    }
+
+    throw error;
   } finally {
     clearTimeout(timer);
+    externalSignal?.removeEventListener("abort", onExternalAbort);
   }
 }
 
 export function safePath(url: string | URL): string {
+  if (url instanceof URL) {
+    return url.pathname;
+  }
+
   try {
-    const parsed = url instanceof URL ? url : new URL(url);
-    return parsed.pathname + (parsed.search ?? "");
+    return new URL(url).pathname;
   } catch {
-    return typeof url === "string" ? url : String(url);
+    const raw = String(url);
+    const questionMark = raw.indexOf("?");
+    return questionMark >= 0 ? raw.slice(0, questionMark) : raw;
   }
 }
 
@@ -67,8 +103,12 @@ export function formatClientFailure(
   const path = safePath(context.path);
   const label = `Runtrail ${method} ${path}`;
 
-  if (isTimeoutError(error)) {
+  if (error instanceof RequestTimeoutError) {
     return new Error(redactSecrets(`${label} timeout after ${timeoutMs}ms`, context.token));
+  }
+
+  if (error instanceof RequestAbortedError) {
+    return new Error(redactSecrets(`${label} aborted by caller`, context.token));
   }
 
   const code = extractErrorCode(error);
@@ -165,24 +205,6 @@ export function redactSecrets(message: string, token?: string): string {
   }
 
   return redacted;
-}
-
-export function isTimeoutError(error: unknown): boolean {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-
-  const err = error as { name?: unknown; code?: unknown };
-
-  if (err.name === "AbortError" || err.name === "TimeoutError") {
-    return true;
-  }
-
-  if (err.code === "ABORT_ERR" || err.code === "UND_ERR_HEADERS_TIMEOUT") {
-    return true;
-  }
-
-  return false;
 }
 
 function extractErrorCode(error: unknown): string | undefined {
