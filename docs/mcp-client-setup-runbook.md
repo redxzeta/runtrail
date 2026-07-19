@@ -16,7 +16,16 @@ RUNTRAIL_TOKEN=<set-outside-source-control>
 
 ## Codex
 
-Codex uses a stdio bridge. Put the token in a local env file, then point Codex at a local wrapper:
+Codex uses a stdio bridge. Build and link the bridge executable from a trusted Runtrail checkout:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+pnpm link --global
+command -v runtrail-mcp-bridge
+```
+
+Put the token in a local env file, then point Codex at a local wrapper:
 
 ```toml
 [mcp_servers.runtrail]
@@ -35,7 +44,7 @@ if [ -f "$env_file" ]; then
   . "$env_file"
   set +a
 fi
-exec node "$HOME/.local/share/runtrail-mcp/bridge.js"
+exec runtrail-mcp-bridge
 ```
 
 The MCP bridge provides explicit journal tools. For automatic structured lifecycle telemetry, use
@@ -96,6 +105,19 @@ Verify OpenClaw can see Runtrail tools:
 openclaw mcp status
 openclaw mcp probe runtrail
 ```
+
+Verify Codex loaded the configured stdio bridge, then approve one bounded read call in a Codex
+session:
+
+```sh
+codex mcp get runtrail
+codex
+# Ask Codex: Use Runtrail journal_search_runs for project <project> with limit 1.
+```
+
+The result should contain at most one run for the requested project. If the tool is absent, check
+the wrapper path and `command -v runtrail-mcp-bridge`. If startup fails, verify Runtrail health and
+the local `RUNTRAIL_MCP_URL` before changing client configuration.
 
 Verify one MCP read call from a Node environment with `@modelcontextprotocol/sdk` installed:
 
