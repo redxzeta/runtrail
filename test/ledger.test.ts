@@ -1470,6 +1470,224 @@ describe("ledger routes", () => {
     );
   });
 
+  it("accepts a handoff exactly once and atomically creates its receiving run", async () => {
+    const app = createTestApp();
+    const sourceResponse = await postJson(app, "/runs", {
+      ...validRunRequest(),
+      workflowId: "workflow-handoff"
+    });
+    const source = (await sourceResponse.json()) as { run: { id: string } };
+    const createResponse = await postJson(app, "/handoffs", {
+      sourceRunId: source.run.id,
+      fromSource: "codex",
+      toSource: "openclaw",
+      project: "ice-council",
+      summary: "Continue the workflow",
+      context: { immutable: true }
+    });
+    const created = (await createResponse.json()) as {
+      handoff: { id: string; version: number; status: string };
+    };
+
+    const acceptResponse = await postJson(app, `/handoffs/${created.handoff.id}/accept`, {
+      expectedVersion: 1,
+      acceptedBy: "openclaw-agent",
+      run: {
+        source: "openclaw",
+        project: "ice-council",
+        task: "Continue the workflow"
+      }
+    });
+    const accepted = (await acceptResponse.json()) as {
+      handoff: {
+        status: string;
+        version: number;
+        acceptedBy: string;
+        targetRunId: string;
+        context: { immutable: boolean };
+      };
+      targetRun: { id: string; continuedFromRunId: string; workflowId: string };
+    };
+
+    expect(acceptResponse.status).toBe(200);
+    expect(accepted.handoff).toEqual(
+      expect.objectContaining({
+        status: "accepted",
+        version: 2,
+        acceptedBy: "openclaw-agent",
+        targetRunId: accepted.targetRun.id,
+        context: { immutable: true }
+      })
+    );
+    expect(accepted.targetRun).toEqual(
+      expect.objectContaining({
+        continuedFromRunId: source.run.id,
+        workflowId: "workflow-handoff"
+      })
+    );
+
+    const staleAcceptance = await postJson(app, `/handoffs/${created.handoff.id}/accept`, {
+      expectedVersion: 1,
+      acceptedBy: "other-agent",
+      targetRunId: accepted.targetRun.id
+    });
+    expect(staleAcceptance.status).toBe(409);
+    expect(await staleAcceptance.json()).toEqual(
+      expect.objectContaining({
+        error: "Version conflict",
+        recordType: "handoff",
+        expectedVersion: 1,
+        current: expect.objectContaining({ status: "accepted", version: 2 }),
+        action: "reread"
+      })
+    );
+    const duplicateAcceptance = await postJson(app, `/handoffs/${created.handoff.id}/accept`, {
+      expectedVersion: 2,
+      acceptedBy: "other-agent",
+      targetRunId: accepted.targetRun.id
+    });
+    expect(duplicateAcceptance.status).toBe(409);
+    expect(await duplicateAcceptance.json()).toEqual({
+      error: "Cannot accept accepted handoff"
+    });
+
+    const defaultInbox = await app.request("/handoffs?project=ice-council", {
+      headers: authHeaders()
+    });
+    expect(await defaultInbox.json()).toEqual({ handoffs: [] });
+    const history = await app.request("/handoffs?project=ice-council&status=all", {
+      headers: authHeaders()
+    });
+    expect(await history.json()).toEqual({
+      handoffs: [expect.objectContaining({ id: created.handoff.id, status: "accepted" })]
+    });
+    const contextResponse = await app.request("/agent/context?project=ice-council", {
+      headers: authHeaders()
+    });
+    const context = (await contextResponse.json()) as {
+      pending_handoffs: Array<{ id: string }>;
+      recent_handoffs: Array<{ id: string; status: string }>;
+    };
+    expect(context.pending_handoffs).toEqual([]);
+    expect(context.recent_handoffs).toEqual([
+      expect.objectContaining({ id: created.handoff.id, status: "accepted" })
+    ]);
+
+    const completeResponse = await postJson(app, `/handoffs/${created.handoff.id}/complete`, {
+      expectedVersion: 2
+    });
+    expect(completeResponse.status).toBe(200);
+    expect(await completeResponse.json()).toEqual({
+      handoff: expect.objectContaining({
+        status: "completed",
+        version: 3,
+        completedAt: expect.any(String)
+      })
+    });
+  });
+
+  it("accepts a handoff by linking an existing receiving run in the same project", async () => {
+    const app = createTestApp();
+    const source = (await (
+      await postJson(app, "/runs", { ...validRunRequest(), workflowId: "workflow-link" })
+    ).json()) as { run: { id: string } };
+    const target = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        source: "openclaw",
+        task: "Receive linked handoff",
+        continuedFromRunId: source.run.id
+      })
+    ).json()) as { run: { id: string } };
+    const created = (await (
+      await postJson(app, "/handoffs", {
+        sourceRunId: source.run.id,
+        fromSource: "codex",
+        toSource: "openclaw",
+        project: "ice-council",
+        summary: "Link the existing receiver"
+      })
+    ).json()) as { handoff: { id: string } };
+
+    const response = await postJson(app, `/handoffs/${created.handoff.id}/accept`, {
+      expectedVersion: 1,
+      acceptedBy: "openclaw-agent",
+      targetRunId: target.run.id
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      handoff: expect.objectContaining({
+        status: "accepted",
+        targetRunId: target.run.id,
+        sourceRunId: source.run.id
+      }),
+      targetRun: expect.objectContaining({ id: target.run.id })
+    });
+  });
+
+  it("enforces decline and expiration transitions while retaining history", async () => {
+    const app = createTestApp();
+    const declinedResponse = await postJson(app, "/handoffs", {
+      fromSource: "codex",
+      project: "ice-council",
+      summary: "Decline this handoff"
+    });
+    const declined = (await declinedResponse.json()) as { handoff: { id: string } };
+    const declineResponse = await postJson(app, `/handoffs/${declined.handoff.id}/decline`, {
+      expectedVersion: 1,
+      reason: "No matching capability"
+    });
+    expect(await declineResponse.json()).toEqual({
+      handoff: expect.objectContaining({
+        status: "declined",
+        declineReason: "No matching capability",
+        version: 2
+      })
+    });
+
+    const invalidComplete = await postJson(app, `/handoffs/${declined.handoff.id}/complete`, {
+      expectedVersion: 2
+    });
+    expect(invalidComplete.status).toBe(409);
+    expect(await invalidComplete.json()).toEqual({
+      error: "Cannot mark declined handoff as completed"
+    });
+
+    const expiringResponse = await postJson(app, "/handoffs", {
+      fromSource: "codex",
+      toSource: "openclaw",
+      project: "ice-council",
+      summary: "Expire this handoff"
+    });
+    const expiring = (await expiringResponse.json()) as { handoff: { id: string } };
+    const expireResponse = await postJson(app, `/handoffs/${expiring.handoff.id}/expire`, {
+      expectedVersion: 1
+    });
+    expect(await expireResponse.json()).toEqual({
+      handoff: expect.objectContaining({ status: "expired", version: 2 })
+    });
+
+    const history = await app.request("/handoffs?project=ice-council&status=all", {
+      headers: authHeaders()
+    });
+    const historyBody = (await history.json()) as { handoffs: Array<{ status: string }> };
+    expect(historyBody.handoffs.map((handoff) => handoff.status).sort()).toEqual([
+      "declined",
+      "expired"
+    ]);
+
+    const search = await app.request("/search?project=ice-council&status=declined", {
+      headers: authHeaders()
+    });
+    const searchBody = (await search.json()) as {
+      results: { handoffs: Array<{ id: string; status: string }> };
+    };
+    expect(searchBody.results.handoffs).toEqual([
+      expect.objectContaining({ id: declined.handoff.id, status: "declined" })
+    ]);
+  });
+
   it("creates and lists artifact metadata", async () => {
     const app = createTestApp();
     const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
@@ -1787,6 +2005,7 @@ describe("ledger routes", () => {
         tags?: string[];
         context?: unknown;
       }>;
+      pending_handoffs: Array<{ summary: string; status: string }>;
       open_loops: Array<{ title: string }>;
       decisions: Array<{ title: string }>;
       next_actions: string[];
@@ -1821,6 +2040,10 @@ describe("ledger routes", () => {
     expect(context.recent_handoffs[1]).not.toHaveProperty("category");
     expect(context.recent_handoffs[1]).not.toHaveProperty("tags");
     expect(context.recent_handoffs[0]).not.toHaveProperty("context");
+    expect(context.pending_handoffs).toEqual([
+      expect.objectContaining({ summary: "Continue from failed API run", status: "pending" }),
+      expect.objectContaining({ summary: "Metadata omitted", status: "pending" })
+    ]);
     expect(context.open_loops).toEqual([
       expect.objectContaining({ title: "Confirm live host path" })
     ]);

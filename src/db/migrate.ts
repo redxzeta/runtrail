@@ -7,6 +7,7 @@ const idempotencyMigrationName = "002_append_record_idempotency";
 const workKeyMigrationName = "003_run_work_keys";
 const optimisticConcurrencyMigrationName = "004_optimistic_concurrency";
 const workflowRelationshipsMigrationName = "005_workflow_relationships";
+const handoffLifecycleMigrationName = "006_handoff_lifecycle";
 
 export function migrate(db: Database.Database): void {
   const transaction = db.transaction(() => {
@@ -38,6 +39,15 @@ export function migrate(db: Database.Database): void {
     addColumnIfMissing(db, "handoffs", "category", "category TEXT");
     addColumnIfMissing(db, "handoffs", "tags_json", "tags_json TEXT");
     addColumnIfMissing(db, "handoffs", "client_record_id", "client_record_id TEXT");
+    addColumnIfMissing(db, "handoffs", "status", "status TEXT NOT NULL DEFAULT 'pending'");
+    addColumnIfMissing(db, "handoffs", "accepted_by", "accepted_by TEXT");
+    addColumnIfMissing(db, "handoffs", "accepted_at", "accepted_at TEXT");
+    addColumnIfMissing(db, "handoffs", "target_run_id", "target_run_id TEXT");
+    addColumnIfMissing(db, "handoffs", "completed_at", "completed_at TEXT");
+    addColumnIfMissing(db, "handoffs", "decline_reason", "decline_reason TEXT");
+    addColumnIfMissing(db, "handoffs", "version", "version INTEGER NOT NULL DEFAULT 1");
+    addColumnIfMissing(db, "handoffs", "updated_at", "updated_at TEXT NOT NULL DEFAULT ''");
+    db.exec("UPDATE handoffs SET updated_at = created_at WHERE updated_at = ''");
     addColumnIfMissing(db, "artifacts", "client_record_id", "client_record_id TEXT");
     db.exec(
       "CREATE INDEX IF NOT EXISTS idx_agent_runs_category_updated_at ON agent_runs (category, updated_at DESC)"
@@ -47,6 +57,9 @@ export function migrate(db: Database.Database): void {
     );
     db.exec(
       "CREATE INDEX IF NOT EXISTS idx_handoffs_category_created_at ON handoffs (category, created_at DESC)"
+    );
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_handoffs_project_status_updated_at ON handoffs (project, status, updated_at DESC)"
     );
     db.exec(
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_runs_client_run_id
@@ -102,6 +115,9 @@ export function migrate(db: Database.Database): void {
     db.prepare(
       "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
     ).run(5, workflowRelationshipsMigrationName, nowIso());
+    db.prepare(
+      "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
+    ).run(6, handoffLifecycleMigrationName, nowIso());
   });
 
   transaction();

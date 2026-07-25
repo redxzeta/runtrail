@@ -33,16 +33,16 @@ secret-bearing content.
 
 ## Mutable Record Versions
 
-Runs and open loops include a positive integer `version`, initialized to `1`. Clients should reread
-the record, send that value as `expectedVersion` with lifecycle or update requests, and retain the
-new version returned after a successful mutation. A successful mutation increments the version
-exactly once. Append-only event creation does not increment it.
+Runs, open loops, and handoffs include a positive integer `version`, initialized to `1`. Clients
+should reread the record, send that value as `expectedVersion` with lifecycle or update requests,
+and retain the new version returned after a successful mutation. A successful mutation increments
+the version exactly once. Append-only event creation does not increment it.
 
-During rollout, `expectedVersion` remains optional so existing clients continue to work with
-last-write-wins behavior. New and upgraded clients should provide it. A stale precondition returns
-`409 Conflict` with `recordType`, `expectedVersion`, compact current `id`, `status`, `version`, and
-`updatedAt` fields, plus `action: "reread"`. On conflict, reread the record and decide whether the
-mutation is still valid; do not retry blindly with a substituted version.
+For run and open-loop updates, `expectedVersion` remains optional during rollout so existing clients
+continue to work with last-write-wins behavior. Handoff transitions require it. A stale precondition
+returns `409 Conflict` with `recordType`, `expectedVersion`, compact current `id`, `status`,
+`version`, and `updatedAt` fields, plus `action: "reread"`. On conflict, reread the record and decide
+whether the mutation is still valid; do not retry blindly with a substituted version.
 
 ## Workflow Relationships
 
@@ -61,6 +61,20 @@ is not a continuation; create a new run with `continuedFromRunId` for a new agen
 
 Use `GET /workflows/:workflowId/runs?project=<project>` or `journal_get_workflow` for a bounded,
 oldest-first summary of the related runs.
+
+## Handoff Lifecycle
+
+New handoffs start as `pending`. Their summary, context, source run, and routing metadata remain
+immutable. The recipient accepts with the current `expectedVersion`, its bounded `acceptedBy`
+identity, and either an existing `targetRunId` or a receiving-run create payload. Server-created
+receiving runs continue from the handoff's source run and inherit its workflow relationship.
+
+Only explicit transitions are allowed: `pending` to `accepted`, `declined`, or `expired`, and
+`accepted` to `completed`. Acceptance uses a compare-and-swap update, so concurrent recipients
+cannot both accept the same version. The default handoff list and `journal_list_pending_handoffs`
+return only actionable pending records; use `status=all`, another explicit status, or journal search
+for audit history. Project context exposes `pending_handoffs` separately from
+`recent_handoffs`.
 
 Automatic session creation records an allowlisted recovery receipt in the selected run manifest.
 Receipts identify the client session, normalized workspace, selected run, action, optional previous

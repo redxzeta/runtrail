@@ -7,7 +7,9 @@ import {
   createOpenLoopRequestSchema,
   createRunRequestSchema,
   finishRunRequestSchema,
+  handoffStatusSchema,
   journalSearchQuerySchema,
+  listHandoffsQuerySchema,
   listRunsQuerySchema,
   openLoopStatusSchema,
   pauseRunRequestSchema,
@@ -104,11 +106,32 @@ export const mcpToolInputSchemas = {
     tags: createHandoffRequestSchema.shape.tags,
     context: z.record(z.string(), z.unknown()).optional()
   },
+  pendingHandoffs: {
+    project: listHandoffsQuerySchema.shape.project,
+    toSource: listHandoffsQuerySchema.shape.toSource,
+    limit: mcpLimitSchema
+  },
+  acceptHandoff: {
+    id: idSchema,
+    expectedVersion: z.number().int().positive(),
+    acceptedBy: z.string().trim().min(1).max(120),
+    targetRunId: idSchema.optional(),
+    run: createRunRequestSchema.optional()
+  },
+  declineHandoff: {
+    id: idSchema,
+    expectedVersion: z.number().int().positive(),
+    reason: z.string().trim().min(1).max(1000).optional()
+  },
+  versionedHandoff: {
+    id: idSchema,
+    expectedVersion: z.number().int().positive()
+  },
   manifest: { runId: idSchema },
   journalSearch: {
     project: journalSearchQuerySchema.shape.project,
     source: journalSearchQuerySchema.shape.source,
-    status: z.union([runStatusSchema, openLoopStatusSchema]).optional(),
+    status: z.union([runStatusSchema, openLoopStatusSchema, handoffStatusSchema]).optional(),
     category: journalSearchQuerySchema.shape.category,
     tag: journalSearchQuerySchema.shape.tag,
     text: journalSearchQuerySchema.shape.text,

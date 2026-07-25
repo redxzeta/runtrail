@@ -32,6 +32,11 @@ export const runtrailToolNames = [
   "journal_resolve_open_loop",
   "journal_record_decision",
   "journal_create_handoff",
+  "journal_list_pending_handoffs",
+  "journal_accept_handoff",
+  "journal_decline_handoff",
+  "journal_complete_handoff",
+  "journal_expire_handoff",
   "journal_get_run_manifest",
   "journal_get_workflow",
   "journal_search",
@@ -116,6 +121,56 @@ export function createRuntrailMcpServer(
       inputSchema: mcpToolInputSchemas.handoff
     },
     async (args) => mcpText(await callRuntrailTool("journal_create_handoff", args, client))
+  );
+
+  server.registerTool(
+    "journal_list_pending_handoffs",
+    {
+      title: "List pending Runtrail handoffs",
+      description: "List the bounded actionable handoff inbox",
+      inputSchema: mcpToolInputSchemas.pendingHandoffs
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_list_pending_handoffs", args, client))
+  );
+
+  server.registerTool(
+    "journal_accept_handoff",
+    {
+      title: "Accept Runtrail handoff",
+      description: "Accept a pending handoff exactly once and link its receiving run",
+      inputSchema: mcpToolInputSchemas.acceptHandoff
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_accept_handoff", args, client))
+  );
+
+  server.registerTool(
+    "journal_decline_handoff",
+    {
+      title: "Decline Runtrail handoff",
+      description: "Decline a pending handoff",
+      inputSchema: mcpToolInputSchemas.declineHandoff
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_decline_handoff", args, client))
+  );
+
+  server.registerTool(
+    "journal_complete_handoff",
+    {
+      title: "Complete Runtrail handoff",
+      description: "Complete an accepted handoff",
+      inputSchema: mcpToolInputSchemas.versionedHandoff
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_complete_handoff", args, client))
+  );
+
+  server.registerTool(
+    "journal_expire_handoff",
+    {
+      title: "Expire Runtrail handoff",
+      description: "Expire a pending handoff",
+      inputSchema: mcpToolInputSchemas.versionedHandoff
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_expire_handoff", args, client))
   );
 
   server.registerTool(
@@ -221,7 +276,7 @@ export async function callRuntrailTool(
       const query = new URLSearchParams({
         project: requireString(args, "project")
       });
-      appendOptional(query, "limit", args.limit);
+      appendOptional(query, "limit", args.limit ?? 10);
       appendOptional(query, "min_importance", args.min_importance);
       return await client.requestJson(`/agent/context?${query.toString()}`);
     }
@@ -294,6 +349,49 @@ export async function callRuntrailTool(
           context: args.context
         })
       });
+    case "journal_list_pending_handoffs": {
+      const query = new URLSearchParams();
+      appendOptional(query, "project", args.project);
+      appendOptional(query, "toSource", args.toSource);
+      appendOptional(query, "limit", args.limit ?? 10);
+      const suffix = query.toString();
+      return await client.requestJson(`/handoffs${suffix ? `?${suffix}` : ""}`);
+    }
+    case "journal_accept_handoff":
+      return await client.requestJson(
+        `/handoffs/${encodeURIComponent(requireString(args, "id"))}/accept`,
+        {
+          method: "POST",
+          body: compact({
+            expectedVersion: args.expectedVersion,
+            acceptedBy: args.acceptedBy,
+            targetRunId: args.targetRunId,
+            run: args.run
+          })
+        }
+      );
+    case "journal_decline_handoff":
+      return await client.requestJson(
+        `/handoffs/${encodeURIComponent(requireString(args, "id"))}/decline`,
+        {
+          method: "POST",
+          body: compact({
+            expectedVersion: args.expectedVersion,
+            reason: args.reason
+          })
+        }
+      );
+    case "journal_complete_handoff":
+    case "journal_expire_handoff": {
+      const action = name === "journal_complete_handoff" ? "complete" : "expire";
+      return await client.requestJson(
+        `/handoffs/${encodeURIComponent(requireString(args, "id"))}/${action}`,
+        {
+          method: "POST",
+          body: compact({ expectedVersion: args.expectedVersion })
+        }
+      );
+    }
     case "journal_get_run_manifest":
       return await client.requestJson(
         `/runs/${encodeURIComponent(requireString(args, "runId"))}/manifest`

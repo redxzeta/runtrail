@@ -158,7 +158,7 @@ export async function runLifecycleSmoke(hooks: SmokeHooks = {}): Promise<void> {
           201
         )
     );
-    await step(
+    const handoff = await step(
       "record handoff",
       async () =>
         await request(
@@ -178,6 +178,40 @@ export async function runLifecycleSmoke(hooks: SmokeHooks = {}): Promise<void> {
           },
           201
         )
+    );
+    const handoffId = readId(handoff, "handoff");
+    const acceptedHandoff = await step(
+      "accept handoff",
+      async () =>
+        await request(baseUrl, token, `/handoffs/${encodeURIComponent(handoffId)}/accept`, {
+          method: "POST",
+          body: {
+            expectedVersion: 1,
+            acceptedBy: "smoke-recipient",
+            run: {
+              source: "smoke-recipient",
+              project: "runtrail-smoke",
+              task: "Receive smoke handoff"
+            }
+          }
+        })
+    );
+    const receivingRunId = readId(acceptedHandoff, "targetRun");
+    await step(
+      "complete handoff",
+      async () =>
+        await request(baseUrl, token, `/handoffs/${encodeURIComponent(handoffId)}/complete`, {
+          method: "POST",
+          body: { expectedVersion: 2 }
+        })
+    );
+    await step(
+      "finish receiving run",
+      async () =>
+        await request(baseUrl, token, `/runs/${encodeURIComponent(receivingRunId)}/finish`, {
+          method: "POST",
+          body: { status: "completed", summary: "Smoke handoff received" }
+        })
     );
     await step(
       "finish run",

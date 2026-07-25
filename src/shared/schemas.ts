@@ -50,6 +50,13 @@ export const openLoopTypeSchema = z.enum([
 ]);
 
 export const openLoopStatusSchema = z.enum(["open", "resolved", "cancelled"]);
+export const handoffStatusSchema = z.enum([
+  "pending",
+  "accepted",
+  "completed",
+  "declined",
+  "expired"
+]);
 const tagSchema = z.string().trim().min(1).max(80);
 const tagsSchema = z.array(tagSchema).max(20).optional();
 const categorySchema = z.string().trim().min(1).max(80).optional();
@@ -57,6 +64,7 @@ const clientRecordIdSchema = z.string().trim().min(1).max(255).optional();
 const workKeySchema = z.string().trim().min(1).max(500).optional();
 const runRelationshipIdSchema = z.string().trim().min(1).max(255).optional();
 const expectedVersionSchema = z.number().int().positive().optional();
+const requiredExpectedVersionSchema = z.number().int().positive();
 
 export const createRunRequestSchema = z.object({
   source: z.string().trim().min(1).max(80),
@@ -224,7 +232,38 @@ export const createHandoffRequestSchema = z.object({
 export const listHandoffsQuerySchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
   sourceRunId: z.string().trim().min(1).optional(),
+  toSource: z.string().trim().min(1).max(80).optional(),
+  status: z.union([handoffStatusSchema, z.literal("all")]).default("pending"),
   limit: z.coerce.number().int().positive().max(100).default(50)
+});
+
+export const acceptHandoffRequestSchema = z
+  .object({
+    expectedVersion: requiredExpectedVersionSchema,
+    acceptedBy: z.string().trim().min(1).max(120),
+    targetRunId: z.string().trim().min(1).max(255).optional(),
+    run: createRunRequestSchema.optional()
+  })
+  .superRefine((value, context) => {
+    if ((value.targetRunId === undefined) === (value.run === undefined)) {
+      context.addIssue({
+        code: "custom",
+        message: "Exactly one of targetRunId or run is required"
+      });
+    }
+  });
+
+export const declineHandoffRequestSchema = z.object({
+  expectedVersion: requiredExpectedVersionSchema,
+  reason: z.string().trim().min(1).max(1000).optional()
+});
+
+export const completeHandoffRequestSchema = z.object({
+  expectedVersion: requiredExpectedVersionSchema
+});
+
+export const expireHandoffRequestSchema = z.object({
+  expectedVersion: requiredExpectedVersionSchema
 });
 
 export const createArtifactRequestSchema = z.object({
@@ -269,6 +308,7 @@ export type RunStatus = z.infer<typeof runStatusSchema>;
 export type EventType = z.infer<typeof eventTypeSchema>;
 export type OpenLoopType = z.infer<typeof openLoopTypeSchema>;
 export type OpenLoopStatus = z.infer<typeof openLoopStatusSchema>;
+export type HandoffStatus = z.infer<typeof handoffStatusSchema>;
 export type CreateRunRequest = z.infer<typeof createRunRequestSchema>;
 export type CloseStaleRunsRequest = z.infer<typeof closeStaleRunsRequestSchema>;
 export type UpdateRunRequest = z.infer<typeof updateRunRequestSchema>;
@@ -285,6 +325,8 @@ export type CreateDecisionRequest = z.infer<typeof createDecisionRequestSchema>;
 export type ListDecisionsQuery = z.infer<typeof listDecisionsQuerySchema>;
 export type CreateHandoffRequest = z.infer<typeof createHandoffRequestSchema>;
 export type ListHandoffsQuery = z.infer<typeof listHandoffsQuerySchema>;
+export type AcceptHandoffRequest = z.infer<typeof acceptHandoffRequestSchema>;
+export type DeclineHandoffRequest = z.infer<typeof declineHandoffRequestSchema>;
 export type CreateArtifactRequest = z.infer<typeof createArtifactRequestSchema>;
 export type ListArtifactsQuery = z.infer<typeof listArtifactsQuerySchema>;
 export type JournalSearchQuery = z.infer<typeof journalSearchQuerySchema>;
@@ -393,7 +435,15 @@ export type Handoff = {
   category?: string;
   tags?: string[];
   context?: unknown;
+  status: HandoffStatus;
+  acceptedBy?: string;
+  acceptedAt?: string;
+  targetRunId?: string;
+  completedAt?: string;
+  declineReason?: string;
+  version: number;
   createdAt: string;
+  updatedAt: string;
 };
 
 export type HandoffSummary = Omit<Handoff, "context">;
@@ -414,6 +464,7 @@ export type AgentContext = {
   recent_runs: AgentRun[];
   failed_runs: AgentRun[];
   recent_events: Array<Omit<AgentEvent, "data">>;
+  pending_handoffs: HandoffSummary[];
   recent_handoffs: HandoffSummary[];
   open_loops: OpenLoop[];
   decisions: Decision[];

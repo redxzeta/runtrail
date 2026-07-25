@@ -324,6 +324,92 @@ describe("cli", () => {
     );
   });
 
+  it("lists and transitions handoffs through versioned lifecycle endpoints", async () => {
+    const fetchMock = mockFetch({ handoff: { id: "handoff_1" } });
+    captureOutput();
+
+    await runCli([
+      "node",
+      "rt",
+      "handoff",
+      "pending",
+      "--project",
+      "runtrail",
+      "--to-source",
+      "openclaw",
+      "--limit",
+      "5"
+    ]);
+    await runCli([
+      "node",
+      "rt",
+      "handoff",
+      "accept",
+      "handoff_1",
+      "--expected-version",
+      "1",
+      "--accepted-by",
+      "openclaw-agent",
+      "--target-run-id",
+      "run_2"
+    ]);
+    await runCli([
+      "node",
+      "rt",
+      "handoff",
+      "decline",
+      "handoff_2",
+      "--expected-version",
+      "1",
+      "--reason",
+      "Unavailable"
+    ]);
+    await runCli(["node", "rt", "handoff", "complete", "handoff_1", "--expected-version", "2"]);
+    await runCli(["node", "rt", "handoff", "expire", "handoff_3", "--expected-version", "1"]);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      new URL("/handoffs?project=runtrail&toSource=openclaw&limit=5", "http://runtrail.test"),
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      new URL("/handoffs/handoff_1/accept", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          expectedVersion: 1,
+          acceptedBy: "openclaw-agent",
+          targetRunId: "run_2"
+        })
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      new URL("/handoffs/handoff_2/decline", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ expectedVersion: 1, reason: "Unavailable" })
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      new URL("/handoffs/handoff_1/complete", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ expectedVersion: 2 })
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      new URL("/handoffs/handoff_3/expire", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ expectedVersion: 1 })
+      })
+    );
+  });
+
   it("reports stale runs by default and requires --apply to close them", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-09T12:00:00.000Z"));

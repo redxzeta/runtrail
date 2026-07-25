@@ -92,7 +92,15 @@ export type HandoffRow = {
   category: string | null;
   tags_json: string | null;
   context_json: string | null;
+  status: Handoff["status"];
+  accepted_by: string | null;
+  accepted_at: string | null;
+  target_run_id: string | null;
+  completed_at: string | null;
+  decline_reason: string | null;
+  version: number;
   created_at: string;
+  updated_at: string;
 };
 
 export type ArtifactRow = {
@@ -216,7 +224,15 @@ export function mapHandoffRow(row: HandoffRow): Handoff {
     category: row.category ?? undefined,
     tags: parseTags(row.tags_json),
     context: row.context_json ? JSON.parse(row.context_json) : undefined,
-    createdAt: row.created_at
+    status: row.status,
+    acceptedBy: row.accepted_by ?? undefined,
+    acceptedAt: row.accepted_at ?? undefined,
+    targetRunId: row.target_run_id ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    declineReason: row.decline_reason ?? undefined,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
@@ -232,7 +248,15 @@ export function mapHandoffSummaryRow(row: HandoffRow): HandoffSummary {
     nextAction: row.next_action ?? undefined,
     category: row.category ?? undefined,
     tags: parseTags(row.tags_json),
-    createdAt: row.created_at
+    status: row.status,
+    acceptedBy: row.accepted_by ?? undefined,
+    acceptedAt: row.accepted_at ?? undefined,
+    targetRunId: row.target_run_id ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    declineReason: row.decline_reason ?? undefined,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
@@ -322,7 +346,7 @@ export function searchFilters(
   }
 
   if (query.status) {
-    if (table === "agent_runs" || table === "open_loops") {
+    if (table === "agent_runs" || table === "open_loops" || table === "handoffs") {
       filters.push(`${table}.status = @status`);
     } else if (table === "agent_events") {
       filters.push(`${runTable}.status = @status`);

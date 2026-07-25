@@ -143,6 +143,13 @@ describe("database", () => {
         'loop_legacy', 'blocked', 'runtrail', 'legacy loop', 'open',
         '2026-07-01T00:00:00.000Z', '2026-07-01T00:00:00.000Z'
       )
+      ;
+      INSERT INTO handoffs (
+        id, from_source, project, summary, created_at
+      ) VALUES (
+        'handoff_legacy', 'codex', 'runtrail', 'legacy handoff',
+        '2026-07-01T00:00:00.000Z'
+      )
     `);
 
     migrate(db);
@@ -171,6 +178,9 @@ describe("database", () => {
     const loopVersion = db.prepare("SELECT version FROM open_loops LIMIT 1").get() as
       | { version: number }
       | undefined;
+    const migratedHandoff = db
+      .prepare("SELECT status, version, updated_at FROM handoffs LIMIT 1")
+      .get() as { status: string; version: number; updated_at: string } | undefined;
     db.close();
 
     expect(runColumns.map((column) => column.name)).toEqual(
@@ -195,7 +205,19 @@ describe("database", () => {
       ])
     );
     expect(handoffColumns.map((column) => column.name)).toEqual(
-      expect.arrayContaining(["category", "tags_json", "client_record_id"])
+      expect.arrayContaining([
+        "category",
+        "tags_json",
+        "client_record_id",
+        "status",
+        "accepted_by",
+        "accepted_at",
+        "target_run_id",
+        "completed_at",
+        "decline_reason",
+        "version",
+        "updated_at"
+      ])
     );
     expect(loopColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining([
@@ -210,6 +232,11 @@ describe("database", () => {
     );
     expect(runVersion?.version).toBe(1);
     expect(loopVersion?.version).toBe(1);
+    expect(migratedHandoff).toEqual({
+      status: "pending",
+      version: 1,
+      updated_at: "2026-07-01T00:00:00.000Z"
+    });
     expect(decisionColumns.map((column) => column.name)).toContain("client_record_id");
     expect(artifactColumns.map((column) => column.name)).toContain("client_record_id");
     expect(indexes.map((index) => index.name)).toEqual(
@@ -218,6 +245,7 @@ describe("database", () => {
         "idx_open_loops_client_record_id",
         "idx_decisions_client_record_id",
         "idx_handoffs_client_record_id",
+        "idx_handoffs_project_status_updated_at",
         "idx_artifacts_client_record_id"
       ])
     );
