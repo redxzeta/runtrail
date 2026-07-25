@@ -230,6 +230,19 @@ export async function runLifecycleSmoke(hooks: SmokeHooks = {}): Promise<void> {
     assertIncludes(readArray(context, "recent_events"), "type", "command_executed");
     assertIncludes(readArray(context, "decisions"), "title", "Use deterministic smoke lifecycle");
 
+    const prepared = await step(
+      "verify prepare-work",
+      async () =>
+        await request(
+          baseUrl,
+          token,
+          `/agent/prepare-work?project=runtrail-smoke&runId=${encodeURIComponent(runId)}`
+        )
+    );
+    if (readRecord(readRecord(prepared, "selectedRun"), "freshness").state !== "not_applicable") {
+      throw new Error("prepare-work did not classify the completed run as not_applicable");
+    }
+
     const manifest = await step(
       "verify manifest",
       async () => await request(baseUrl, token, `/runs/${encodeURIComponent(runId)}/manifest`)

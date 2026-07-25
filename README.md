@@ -81,6 +81,12 @@ Fetch compact agent context:
 pnpm cli context --project runtrail --limit 5 --min-importance 4
 ```
 
+Prepare a deterministic working set before editing:
+
+```sh
+pnpm cli prepare-work --project runtrail --source codex --work-key github:redxzeta/runtrail#114 --limit 10
+```
+
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before starting work. It documents the
@@ -278,7 +284,7 @@ The MCP adapter is a thin HTTP client. It does not access SQLite directly.
 MCP startup paths must read local environment/config only. Do not SSH, sudo, or
 scrape `/etc/runtrail/runtrail.env` from an MCP startup command.
 
-Agent continuity tools include `journal_get_context`, `journal_search`,
+Agent continuity tools include `journal_prepare_work`, `journal_get_context`, `journal_search`,
 `journal_search_runs`, `journal_get_run_manifest`, `journal_get_workflow`, `journal_create_handoff`,
 `journal_list_pending_handoffs`, `journal_accept_handoff`, `journal_decline_handoff`,
 `journal_complete_handoff`, `journal_expire_handoff`,
@@ -333,6 +339,7 @@ RUNTRAIL_LOG_DIR=./data/logs
 RUNTRAIL_TOKEN=change-me-to-a-long-random-secret
 RUNTRAIL_URL=http://127.0.0.1:8787
 RUNTRAIL_REQUEST_TIMEOUT_MS=15000
+RUNTRAIL_AGENT_STALE_AFTER_SECONDS=3600
 DISCORD_WEBHOOK_URL=
 ```
 
@@ -340,6 +347,9 @@ DISCORD_WEBHOOK_URL=
 services fail promptly, and errors distinguish between timeouts, connection failures,
 authentication, validation, and server responses without exposing tokens or authorization
 headers.
+
+`RUNTRAIL_AGENT_STALE_AFTER_SECONDS` overrides the non-secret server-owned freshness window used by
+prepare-work. Callers cannot supply their own threshold.
 
 Do not commit real tokens or webhook URLs.
 

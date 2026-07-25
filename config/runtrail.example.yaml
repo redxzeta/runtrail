@@ -16,3 +16,4 @@ notifications:
 agentContext:
   defaultLimit: 10
   minImportance: 3
+  staleAfterSeconds: 3600

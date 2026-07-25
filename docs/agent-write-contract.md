@@ -113,16 +113,45 @@ startup sweeper.
 rt runs close-stale --older-than 24h --apply
 ```
 
+## Authoritative Liveness
+
+`lastLivenessAt` is a nullable server-owned timestamp. Runtrail initializes it when a run is
+created and refreshes it only after an explicit heartbeat or successful resume. Events, client
+timestamps, idempotent replay, handoffs, searches, and arbitrary run updates never refresh it.
+Terminal runs have `not_applicable` freshness; migrated legacy runs without a trustworthy signal
+remain `unknown`.
+
+Prepare-work compares this timestamp with the instance-wide
+`agentContext.staleAfterSeconds` setting (default `3600`, environment override
+`RUNTRAIL_AGENT_STALE_AFTER_SECONDS`). A signal exactly on the boundary is still `fresh`; only an
+older signal is a `stale_candidate`. Staleness is advisory and never cancels, resumes, reassigns, or
+accepts work automatically.
+
 ## Continuation Query
 
-Before continuing work, an agent should query in this order:
+Before editing, call `journal_prepare_work` (or `GET /agent/prepare-work` / `rt prepare-work`) with
+the project and any known source, work key, run ID, category, or tags. A run ID targets that run and
+its workflow context. The response uses one server `asOf`, separates lifecycle status from
+freshness, returns bounded sections and current optimistic versions, and omits tasks, record bodies,
+logs, prompts, credentials, environment data, and private paths.
 
-1. `journal_get_context` with the target `project`.
-2. `journal_search` with `project` plus relevant `tag`, `category`, `issue-N`, or `pr-N`.
-3. `journal_get_run_manifest` for the most relevant run.
-4. Open loops and recent handoffs from the context or search results.
+Handle the stable action codes without executing them implicitly:
 
-The goal is to recover the current branch, issue/PR, changed files, tests run, blocked reason, and next action before editing.
+- `inspect_active_conflict`, `inspect_stale_run`, or `inspect_failed_manifest`: reread the referenced run.
+- `resolve_blocker`: inspect the referenced open loop.
+- `accept_handoff`: reread and explicitly accept with the referenced handoff version.
+- `resume_run`: explicitly resume with the referenced run version.
+- `start_new_run`: no conflicting or blocked work was found in the bounded response.
+- `stop_and_reread`: freshness is unknown or another ambiguity makes starting unsafe.
+
+Reason codes are also bounded: `fresh_nonterminal_same_work_key`,
+`run_liveness_exceeds_window`, `run_liveness_unknown`, `blocking_open_loop`,
+`pending_targeted_handoff`, `selected_run_failed`, `selected_run_can_resume`,
+`selected_run_terminal`, and `no_conflicting_or_blocked_work`.
+
+Use `journal_search`, `journal_get_context`, and `journal_get_run_manifest` only when the
+prepare-work recommendation calls for more detail. A recommendation is advisory and never performs
+a mutation.
 
 ## Copyable Snippets
 

@@ -8,7 +8,8 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 - Expose hosted MCP over Streamable HTTP at `/mcp` for remote-capable agents.
 - Use `RUNTRAIL_MCP_URL` and `RUNTRAIL_TOKEN` for stdio bridge processes.
 - Never SSH, sudo, or scrape live env files from MCP startup commands.
-- Default every list-style tool to `limit: 10`; cap caller-provided limits at `50`.
+- Default every list-style tool to `limit: 10`; cap prepare-work at `20` and other caller-provided
+  limits at `50`.
 - Require `project` for project-context and open-loop list tools.
 - Return compact event and handoff shapes by default; fetch full detail only through explicit id-based tools.
 - Keep write tools append-oriented or narrow state transitions. Do not expose raw SQL, bulk deletes, config mutation, or unfiltered journal dumps.
@@ -26,6 +27,7 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 | `journal_get_run_manifest` | Read-only | `GET /runs/:id/manifest` | `{ runId: string }` | Compact run manifest with linked events, changed files, commands, tests, open loops, handoffs, and artifacts |
 | `journal_get_workflow` | Read-only | `GET /workflows/:workflowId/runs` | `{ workflowId: string, project: string, limit?: number }` | Bounded oldest-first related-run summaries with explicit truncation |
 | `journal_get_context` | Read-only | `GET /agent/context` | `{ project: string, limit?: number, min_importance?: number }` | Compact project context with actionable `pending_handoffs` separated from historical `recent_handoffs` |
+| `journal_prepare_work` | Read-only | `GET /agent/prepare-work` | `{ project: string, source?: string, workKey?: string, runId?: string, category?: string, tags?: string[], limit?: number }` | Bounded lifecycle, authoritative freshness, conflicts, targeted handoffs, open loops, manifest counts, stable advisory actions, warnings, and truncation metadata |
 | `journal_search` | Read-only | `GET /search` | `{ project?: string, source?: string, status?: string, category?: string, tag?: string, text?: string, date_from?: string, date_to?: string, limit?: number }` | Compact runs, events, open loops, handoffs, and decisions matching the filters |
 | `journal_create_event` | Write | `POST /events` | `{ runId: string, clientRecordId?: string, type: EventType, message: string, importance?: number, category?: string, tags?: string[], data?: object }` | `{ event: AgentEvent }` |
 | `journal_create_handoff` | Write | `POST /handoffs` | `{ sourceRunId?: string, clientRecordId?: string, fromSource: string, toSource?: string, project: string, summary: string, nextAction?: string, category?: string, tags?: string[], context?: object }` | `{ handoff: Handoff }` |
@@ -55,6 +57,11 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 - Run relationships are immutable and explicit: `parentRunId` means delegation/child lineage,
   `continuedFromRunId` means a new run continuing a previous run, and `workflowId` groups related
   runs without scheduling them.
+- Prepare-work uses the server-owned `lastLivenessAt` signal and configured freshness window.
+  Append timestamps cannot revive a run. `stale_candidate` and every recommendation remain
+  advisory; unknown freshness produces `stop_and_reread`, never automatic new work.
+- Prepare-work summaries omit tasks, summaries, event bodies, handoff context, open-loop prose,
+  logs, prompts, credentials, headers, environment data, and private paths.
 
 ## Guardrails
 

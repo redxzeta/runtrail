@@ -27,6 +27,9 @@ describe("database", () => {
     const workflowMigration = db
       .prepare("SELECT name FROM schema_migrations WHERE id = ?")
       .get(5) as { name: string } | undefined;
+    const livenessMigration = db
+      .prepare("SELECT name FROM schema_migrations WHERE id = ?")
+      .get(7) as { name: string } | undefined;
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as Array<{ name: string }>;
@@ -40,6 +43,7 @@ describe("database", () => {
     expect(idempotencyMigration?.name).toBe("002_append_record_idempotency");
     expect(concurrencyMigration?.name).toBe("004_optimistic_concurrency");
     expect(workflowMigration?.name).toBe("005_workflow_relationships");
+    expect(livenessMigration?.name).toBe("007_authoritative_run_liveness");
     expect(tables.map((table) => table.name)).toEqual([
       "agent_event_tags",
       "agent_events",
@@ -175,6 +179,9 @@ describe("database", () => {
     const runVersion = db.prepare("SELECT version FROM agent_runs LIMIT 1").get() as
       | { version: number }
       | undefined;
+    const legacyLiveness = db.prepare("SELECT last_liveness_at FROM agent_runs LIMIT 1").get() as
+      | { last_liveness_at: string | null }
+      | undefined;
     const loopVersion = db.prepare("SELECT version FROM open_loops LIMIT 1").get() as
       | { version: number }
       | undefined;
@@ -192,7 +199,8 @@ describe("database", () => {
         "workflow_id",
         "parent_run_id",
         "continued_from_run_id",
-        "version"
+        "version",
+        "last_liveness_at"
       ])
     );
     expect(eventColumns.map((column) => column.name)).toEqual(
@@ -231,6 +239,7 @@ describe("database", () => {
       ])
     );
     expect(runVersion?.version).toBe(1);
+    expect(legacyLiveness?.last_liveness_at).toBeNull();
     expect(loopVersion?.version).toBe(1);
     expect(migratedHandoff).toEqual({
       status: "pending",

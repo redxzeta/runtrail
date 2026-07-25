@@ -304,6 +304,16 @@ export const agentContextQuerySchema = z.object({
   min_importance: z.coerce.number().int().min(0).max(10).default(4)
 });
 
+export const prepareWorkQuerySchema = z.object({
+  project: z.string().trim().min(1).max(120),
+  source: z.string().trim().min(1).max(80).optional(),
+  workKey: workKeySchema,
+  runId: z.string().trim().min(1).max(255).optional(),
+  category: categorySchema,
+  tags: z.array(tagSchema).max(10).default([]),
+  limit: z.coerce.number().int().positive().max(20).default(10)
+});
+
 export type RunStatus = z.infer<typeof runStatusSchema>;
 export type EventType = z.infer<typeof eventTypeSchema>;
 export type OpenLoopType = z.infer<typeof openLoopTypeSchema>;
@@ -331,6 +341,7 @@ export type CreateArtifactRequest = z.infer<typeof createArtifactRequestSchema>;
 export type ListArtifactsQuery = z.infer<typeof listArtifactsQuerySchema>;
 export type JournalSearchQuery = z.infer<typeof journalSearchQuerySchema>;
 export type AgentContextQuery = z.infer<typeof agentContextQuerySchema>;
+export type PrepareWorkQuery = z.infer<typeof prepareWorkQuerySchema>;
 
 export type AgentRun = {
   id: string;
@@ -352,6 +363,7 @@ export type AgentRun = {
   category?: string;
   tags?: string[];
   version: number;
+  lastLivenessAt?: string;
   startedAt: string;
   completedAt?: string;
   createdAt: string;
@@ -469,6 +481,129 @@ export type AgentContext = {
   open_loops: OpenLoop[];
   decisions: Decision[];
   next_actions: string[];
+};
+
+export type RunFreshness = {
+  state: "fresh" | "stale_candidate" | "unknown" | "not_applicable";
+  lastLivenessAt?: string;
+  staleAfterSeconds: number;
+  asOf: string;
+  reasonCode:
+    | "authoritative_liveness_within_window"
+    | "run_liveness_exceeds_window"
+    | "no_authoritative_liveness"
+    | "terminal_status";
+};
+
+export type PrepareWorkRunSummary = Pick<
+  AgentRun,
+  | "id"
+  | "source"
+  | "project"
+  | "workKey"
+  | "workflowId"
+  | "parentRunId"
+  | "continuedFromRunId"
+  | "status"
+  | "category"
+  | "tags"
+  | "version"
+  | "startedAt"
+  | "updatedAt"
+> & { freshness: RunFreshness };
+
+export type PrepareWorkConflict = PrepareWorkRunSummary & {
+  conflictCode: "active_work_conflict" | "stale_work_warning" | "work_freshness_unknown";
+};
+
+export type PrepareWorkTargetRef = {
+  type: "run" | "handoff" | "openLoop";
+  id: string;
+  version: number;
+};
+
+export type PrepareWorkRecommendation = {
+  actionCode:
+    | "inspect_active_conflict"
+    | "inspect_stale_run"
+    | "resume_run"
+    | "accept_handoff"
+    | "resolve_blocker"
+    | "inspect_failed_manifest"
+    | "start_new_run"
+    | "stop_and_reread";
+  targetRefs: PrepareWorkTargetRef[];
+  reasonCodes: Array<
+    | "fresh_nonterminal_same_work_key"
+    | "run_liveness_exceeds_window"
+    | "run_liveness_unknown"
+    | "blocking_open_loop"
+    | "pending_targeted_handoff"
+    | "selected_run_failed"
+    | "selected_run_can_resume"
+    | "selected_run_terminal"
+    | "no_conflicting_or_blocked_work"
+  >;
+  requiresReread: boolean;
+};
+
+export type PrepareWorkHandoff = Pick<
+  Handoff,
+  "id" | "sourceRunId" | "fromSource" | "toSource" | "status" | "version" | "updatedAt"
+>;
+
+export type PrepareWorkOpenLoop = Pick<
+  OpenLoop,
+  "id" | "type" | "owner" | "source" | "sourceRunId" | "status" | "version" | "updatedAt"
+>;
+
+export type PrepareWorkManifestSummary = {
+  runId: string;
+  status: RunStatus;
+  eventCount: number;
+  openLoopCount: number;
+  handoffCount: number;
+  artifactCount: number;
+  lastEventAt?: string;
+};
+
+type PrepareWorkSectionMeta = {
+  limit: number;
+  count: number;
+  truncated: boolean;
+};
+
+type PrepareWorkSectionName =
+  | "relevantRuns"
+  | "workflowRuns"
+  | "conflicts"
+  | "pendingHandoffs"
+  | "openLoops"
+  | "recommendations"
+  | "warnings";
+
+export type PrepareWorkResponse = {
+  project: string;
+  asOf: string;
+  staleAfterSeconds: number;
+  selectedRun?: PrepareWorkRunSummary;
+  relevantRuns: PrepareWorkRunSummary[];
+  workflowRuns: PrepareWorkRunSummary[];
+  conflicts: PrepareWorkConflict[];
+  pendingHandoffs: PrepareWorkHandoff[];
+  openLoops: PrepareWorkOpenLoop[];
+  latestManifest?: PrepareWorkManifestSummary;
+  recommendations: PrepareWorkRecommendation[];
+  warnings: Array<{ code: "section_truncated"; section: PrepareWorkSectionName }>;
+  sections: {
+    relevantRuns: PrepareWorkSectionMeta;
+    workflowRuns: PrepareWorkSectionMeta;
+    conflicts: PrepareWorkSectionMeta;
+    pendingHandoffs: PrepareWorkSectionMeta;
+    openLoops: PrepareWorkSectionMeta;
+    recommendations: PrepareWorkSectionMeta;
+    warnings: PrepareWorkSectionMeta;
+  };
 };
 
 export type RecoveryReceipt = {

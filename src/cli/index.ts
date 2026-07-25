@@ -33,6 +33,17 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--limit <limit>", "Maximum items per section", parseInteger)
     .option("--min-importance <importance>", "Minimum event importance", parseInteger)
     .action(context);
+  program
+    .command("prepare-work")
+    .description("Fetch deterministic continuation guidance before editing")
+    .requiredOption("--project <project>", "Project name")
+    .option("--source <source>", "Agent or integration source")
+    .option("--work-key <workKey>", "Canonical external work identifier")
+    .option("--run-id <runId>", "Existing run to continue")
+    .option("--category <category>", "Run category")
+    .option("--tag <tag>", "Required run tag", collectOption, [])
+    .option("--limit <limit>", "Maximum items per section", parseInteger)
+    .action(prepareWork);
 
   const run = program.command("run").description("Wrap a command in a Runtrail run");
   run
@@ -220,6 +231,25 @@ async function context(options: {
   }
 
   printJson(await requestJson(`/agent/context?${query.toString()}`));
+}
+
+async function prepareWork(options: {
+  project: string;
+  source?: string;
+  workKey?: string;
+  runId?: string;
+  category?: string;
+  tag?: string[];
+  limit?: number;
+}): Promise<void> {
+  const query = new URLSearchParams({ project: options.project });
+  appendQuery(query, "source", options.source);
+  appendQuery(query, "workKey", options.workKey);
+  appendQuery(query, "runId", options.runId);
+  appendQuery(query, "category", options.category);
+  for (const tag of options.tag ?? []) query.append("tag", tag);
+  appendQuery(query, "limit", options.limit);
+  printJson(await requestJson(`/agent/prepare-work?${query.toString()}`));
 }
 
 async function createRun(options: {

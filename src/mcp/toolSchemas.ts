@@ -13,6 +13,7 @@ import {
   listRunsQuerySchema,
   openLoopStatusSchema,
   pauseRunRequestSchema,
+  prepareWorkQuerySchema,
   runStatusSchema,
   updateOpenLoopRequestSchema,
   versionedMutationRequestSchema,
@@ -46,6 +47,15 @@ export const mcpToolInputSchemas = {
     project: agentContextQuerySchema.shape.project,
     limit: mcpLimitSchema,
     min_importance: agentContextQuerySchema.shape.min_importance.optional()
+  },
+  prepareWork: {
+    project: prepareWorkQuerySchema.shape.project,
+    source: prepareWorkQuerySchema.shape.source,
+    workKey: prepareWorkQuerySchema.shape.workKey,
+    runId: prepareWorkQuerySchema.shape.runId,
+    category: prepareWorkQuerySchema.shape.category,
+    tags: prepareWorkQuerySchema.shape.tags.optional(),
+    limit: prepareWorkQuerySchema.shape.limit.optional()
   },
   event: {
     runId: createEventRequestSchema.shape.runId,
