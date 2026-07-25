@@ -1,19 +1,23 @@
 #!/usr/bin/env node
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CallToolResultSchema, InitializeRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import {
   fetchWithTimeout,
   formatClientFailure,
   readRequestTimeoutMs,
+  redactSecrets,
   safePath
 } from "../shared/httpClient.js";
 import type { runtrailToolNames } from "./index.js";
 import { mcpToolInputSchemas } from "./toolSchemas.js";
 
 type RemoteRuntrailClient = Pick<Client, "callTool">;
+const BRIDGE_STARTUP_TIMEOUT_MS = 5_000;
 
 export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): McpServer {
   const server = new McpServer({
@@ -258,8 +262,14 @@ async function forwardTool(
 async function start(): Promise<void> {
   const { token, url } = loadBridgeConfig();
   const timeoutMs = readRequestTimeoutMs();
+  let startupPending = true;
   const remoteTransport = new StreamableHTTPClientTransport(new URL(url), {
-    fetch: (input: string | URL, init: RequestInit = {}) => bridgeFetch(input, init, timeoutMs),
+    fetch: (input: string | URL, init: RequestInit = {}) =>
+      bridgeFetch(
+        input,
+        init,
+        startupPending ? Math.min(timeoutMs, BRIDGE_STARTUP_TIMEOUT_MS) : timeoutMs
+      ),
     requestInit: {
       headers: {
         accept: "application/json, text/event-stream",
@@ -272,7 +282,23 @@ async function start(): Promise<void> {
     version: "1.0.0"
   });
 
-  await client.connect(remoteTransport);
+  try {
+    await client.connect(remoteTransport);
+  } catch (error) {
+    startupPending = false;
+    const failureServer = new McpServer({
+      name: "runtrail-mcp-bridge",
+      version: "1.0.0"
+    });
+    const detail = error instanceof Error ? error.message : String(error);
+    const diagnostic = `${redactSecrets(detail, token)}. Check Runtrail service health and RUNTRAIL_MCP_URL.`;
+    failureServer.server.setRequestHandler(InitializeRequestSchema, () => {
+      throw new Error(diagnostic);
+    });
+    await failureServer.connect(new StdioServerTransport());
+    return;
+  }
+  startupPending = false;
   const server = createRuntrailMcpBridgeServer(client);
   await server.connect(new StdioServerTransport());
 }
@@ -314,7 +340,7 @@ function requiredEnv(
   return value;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   start().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
