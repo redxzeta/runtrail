@@ -1,3 +1,10 @@
+import { createServer, type Socket } from "node:net";
+import { fileURLToPath } from "node:url";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import {
+  getDefaultEnvironment,
+  StdioClientTransport
+} from "@modelcontextprotocol/sdk/client/stdio.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRuntrailMcpBridgeServer, loadBridgeConfig } from "../src/mcp/bridge.js";
 import {
@@ -504,10 +511,129 @@ describe("mcp adapter", () => {
       "RUNTRAIL_TOKEN is required"
     );
   });
+
+  it("returns an actionable secret-free diagnostic when bridge initialization cannot reach Runtrail", async () => {
+    const token = "synthetic-bridge-token";
+    const unavailableService = await startRejectingService();
+    const bridgePath = fileURLToPath(new URL("../src/mcp/bridge.ts", import.meta.url));
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: ["--import", "tsx", bridgePath],
+      cwd: process.cwd(),
+      env: {
+        ...getDefaultEnvironment(),
+        RUNTRAIL_MCP_URL: `http://127.0.0.1:${unavailableService.port}/mcp`,
+        RUNTRAIL_TOKEN: token,
+        RUNTRAIL_REQUEST_TIMEOUT_MS: "500"
+      },
+      stderr: "pipe"
+    });
+    const client = new Client({ name: "runtrail-bridge-test", version: "1.0.0" });
+
+    let connectionError: unknown;
+    try {
+      await client.connect(transport);
+    } catch (error) {
+      connectionError = error;
+    } finally {
+      await transport.close();
+      await unavailableService.close();
+    }
+
+    expect(connectionError).toBeInstanceOf(Error);
+    const message = (connectionError as Error).message;
+    expect(message).toContain("Runtrail POST /mcp connection error");
+    expect(message).toContain("Check Runtrail service health and RUNTRAIL_MCP_URL");
+    expect(message).not.toContain(token);
+  });
+
+  it("bounds upstream initialization below the documented Codex startup timeout", async () => {
+    const token = "synthetic-timeout-token";
+    const unavailableService = await startUnresponsiveService();
+    const bridgePath = fileURLToPath(new URL("../src/mcp/bridge.ts", import.meta.url));
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: ["--import", "tsx", bridgePath],
+      cwd: process.cwd(),
+      env: {
+        ...getDefaultEnvironment(),
+        RUNTRAIL_MCP_URL: `http://127.0.0.1:${unavailableService.port}/mcp`,
+        RUNTRAIL_TOKEN: token,
+        RUNTRAIL_REQUEST_TIMEOUT_MS: "15000"
+      },
+      stderr: "pipe"
+    });
+    const client = new Client({ name: "runtrail-bridge-timeout-test", version: "1.0.0" });
+    const startedAt = performance.now();
+
+    let connectionError: unknown;
+    try {
+      await client.connect(transport);
+    } catch (error) {
+      connectionError = error;
+    } finally {
+      await transport.close();
+      await unavailableService.close();
+    }
+
+    const elapsedMs = performance.now() - startedAt;
+    expect(connectionError).toBeInstanceOf(Error);
+    const message = (connectionError as Error).message;
+    expect(message).toContain("Runtrail POST /mcp timeout after 5000ms");
+    expect(message).toContain("Check Runtrail service health and RUNTRAIL_MCP_URL");
+    expect(message).not.toContain(token);
+    expect(elapsedMs).toBeLessThan(10_000);
+  }, 20_000);
 });
 
 function mockClient(result: unknown) {
   return {
     requestJson: vi.fn(async () => result)
+  };
+}
+
+async function startRejectingService(): Promise<{ close(): Promise<void>; port: number }> {
+  const server = createServer((socket) => socket.destroy());
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    server.close();
+    throw new Error("Expected a TCP port");
+  }
+  return {
+    port: address.port,
+    close: async () =>
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      })
+  };
+}
+
+async function startUnresponsiveService(): Promise<{ close(): Promise<void>; port: number }> {
+  const sockets = new Set<Socket>();
+  const server = createServer((socket) => {
+    sockets.add(socket);
+    socket.once("close", () => sockets.delete(socket));
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    server.close();
+    throw new Error("Expected a TCP port");
+  }
+  return {
+    port: address.port,
+    close: async () => {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
   };
 }
