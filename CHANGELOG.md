@@ -1,3 +1,10 @@
+# [1.40.0](https://github.com/redxzeta/runtrail/compare/v1.39.0...v1.40.0) (2026-07-25)
+
+
+### Features
+
+* **workflows:** add versioned review packets ([#157](https://github.com/redxzeta/runtrail/issues/157)) ([4a0913a](https://github.com/redxzeta/runtrail/commit/4a0913a9dc62e674e23961846bab2d2ea50611ff))
+
 # [1.39.0](https://github.com/redxzeta/runtrail/compare/v1.38.0...v1.39.0) (2026-07-25)
 
 
