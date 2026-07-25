@@ -1,3 +1,10 @@
+# [1.37.0](https://github.com/redxzeta/runtrail/compare/v1.36.0...v1.37.0) (2026-07-25)
+
+
+### Features
+
+* **decisions:** resolve effective guidance ([#153](https://github.com/redxzeta/runtrail/issues/153)) ([e515318](https://github.com/redxzeta/runtrail/commit/e515318feaa1dfe3408ff138fd2418ebd9a31207))
+
 # [1.36.0](https://github.com/redxzeta/runtrail/compare/v1.35.0...v1.36.0) (2026-07-25)
 
 
