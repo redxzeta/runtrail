@@ -171,6 +171,24 @@ An invalid, unsupported, or wrong-query cursor returns `invalid_cursor` with
 `action: "retry_without_cursor"`. Restart with a full read rather than guessing or editing the
 cursor.
 
+## Local Outbox and Replay
+
+The CLI queues only failed append creates carrying `clientRunId` or `clientRecordId`. Network
+errors, timeouts, HTTP 408/429, and 5xx responses are retryable; permanent 4xx responses are
+quarantined. Run lifecycle mutations and unkeyed writes are never queued. Each owner-only JSON file
+contains the operation, route, safe payload, idempotency key, creation time, and retry count—never
+the bearer token, authorization headers, environment contents, or verbose logs. Records are capped
+at 64 KiB.
+
+Use `rt outbox list` for bounded metadata and `rt outbox retry` or `rt sync` for explicit replay.
+Successful authoritative responses remove the pending record. Malformed records move to quarantine
+with a bounded reason. Replaying duplicates is safe because the original idempotency key and payload
+are preserved. Delayed event replay never updates `lastLivenessAt`; only explicit heartbeat or
+resume does.
+
+The command wrapper attempts queued telemetry at safe post-command boundaries. A telemetry or sync
+failure is reported as unsynced work but never replaces the wrapped command's exit status.
+
 ## Copyable Snippets
 
 Codex `AGENTS.md` snippet:
