@@ -1,3 +1,10 @@
+# [1.32.0](https://github.com/redxzeta/runtrail/compare/v1.31.0...v1.32.0) (2026-07-25)
+
+
+### Features
+
+* **handoffs:** add acknowledgement state and receiving-run linkage ([#148](https://github.com/redxzeta/runtrail/issues/148)) ([1a1ace0](https://github.com/redxzeta/runtrail/commit/1a1ace03e0e440e012467d530d33c386eaa2001d)), closes [#113](https://github.com/redxzeta/runtrail/issues/113)
+
 # [1.31.0](https://github.com/redxzeta/runtrail/compare/v1.30.0...v1.31.0) (2026-07-25)
 
 
