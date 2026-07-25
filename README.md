@@ -186,6 +186,9 @@ pnpm cli runs close-stale --older-than 24h
 # After reviewing the dry-run candidates:
 pnpm cli runs close-stale --older-than 24h --apply
 pnpm cli event create --run-id run_abc123 --client-record-id event-local-1 --type progress --message "added command tests" --importance 5 --category implementation --tag tests
+pnpm cli verification add --run-id run_abc123 --client-record-id verification-local-1 \
+  --check-id unit --kind test --outcome passed --name "unit tests" \
+  --support-json '{"type":"exit_code","exitCode":0}' --completed-at 2026-07-01T00:00:00Z
 pnpm cli loop add --type blocked --project runtrail --title "choose retention policy" \
   --owner maintainer --source codex --next-action "review options" \
   --blocker-ref "issue-123" --source-run-id run_abc123
@@ -306,7 +309,7 @@ Agent continuity tools include `journal_prepare_work`, `journal_get_context`, `j
 `journal_search_runs`, `journal_get_run_manifest`, `journal_get_workflow`, `journal_create_handoff`,
 `journal_list_pending_handoffs`, `journal_accept_handoff`, `journal_decline_handoff`,
 `journal_complete_handoff`, `journal_expire_handoff`,
-`journal_create_event`, `journal_create_open_loop`,
+`journal_create_event`, `journal_record_verification`, `journal_create_open_loop`,
 `journal_resolve_open_loop`, `journal_record_decision`, and `journal_list_decisions`.
 See [docs/mcp-safe-surface.md](docs/mcp-safe-surface.md) for the proposed safe read/write tool surface and default response limits.
 See [docs/agent-write-contract.md](docs/agent-write-contract.md) for the recommended cross-agent write contract.

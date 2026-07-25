@@ -22,6 +22,7 @@ import {
   createHandoffRequestSchema,
   createOpenLoopRequestSchema,
   createRunRequestSchema,
+  createVerificationRequestSchema,
   declineHandoffRequestSchema,
   expireHandoffRequestSchema,
   finishRunRequestSchema,
@@ -32,6 +33,7 @@ import {
   listHandoffsQuerySchema,
   listOpenLoopsQuerySchema,
   listRunsQuerySchema,
+  listVerificationsQuerySchema,
   type OpenLoop,
   pauseRunRequestSchema,
   prepareWorkQuerySchema,
@@ -447,6 +449,21 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
   route.get("/decisions/:id", (c) => {
     const decision = ledger.getDecision(c.req.param("id"));
     return decision ? c.json({ decision }) : c.json({ error: "Decision not found" }, 404);
+  });
+
+  route.post("/verifications", async (c) => {
+    const parsed = createVerificationRequestSchema.safeParse(await readJson(c.req.raw));
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    const verification = ledger.createVerification(parsed.data);
+    return verification ? c.json({ verification }, 201) : c.json({ error: "Run not found" }, 404);
+  });
+
+  route.get("/verifications", (c) => {
+    const parsed = listVerificationsQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams)
+    );
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    return c.json({ verifications: ledger.listVerifications(parsed.data) });
   });
 
   route.get("/agent/context", (c) => {

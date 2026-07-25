@@ -16,6 +16,7 @@ import type {
   CreateHandoffRequest,
   CreateOpenLoopRequest,
   CreateRunRequest,
+  CreateVerificationRequest,
   Decision,
   DeclineHandoffRequest,
   FinishRunRequest,
@@ -30,6 +31,7 @@ import type {
   ListHandoffsQuery,
   ListOpenLoopsQuery,
   ListRunsQuery,
+  ListVerificationsQuery,
   OpenLoop,
   PauseRunRequest,
   PrepareWorkConflict,
@@ -47,6 +49,7 @@ import type {
   RunManifest,
   UpdateOpenLoopRequest,
   UpdateRunRequest,
+  VerificationEvidence,
   WorkflowRunSummary,
   WorkflowRunsQuery
 } from "../shared/schemas.js";
@@ -64,6 +67,7 @@ import {
   mapHandoffSummaryRow,
   mapOpenLoopRow,
   mapRunRow,
+  mapVerificationRow,
   normalizeTags,
   normalizeTimestamp,
   type OpenLoopRow,
@@ -75,6 +79,7 @@ import {
   tagsToJson,
   toSqlValue,
   uniqueStrings,
+  type VerificationRow,
   whereClause
 } from "./ledgerHelpers.js";
 
@@ -1640,6 +1645,73 @@ export class LedgerRepository {
     return rows.map(mapArtifactRow);
   }
 
+  createVerification(input: CreateVerificationRequest): VerificationEvidence | undefined {
+    if (!this.getRun(input.runId)) return undefined;
+    if (input.clientRecordId) {
+      const existing = this.findVerificationByClientRecordId(input.runId, input.clientRecordId);
+      if (existing) return existing;
+    }
+
+    const verification: VerificationEvidence = {
+      id: createId("ver"),
+      ...input,
+      createdAt: nowIso()
+    };
+    const support = verificationSupportColumns(verification.support);
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO verification_evidence (
+            id, run_id, client_record_id, check_id, kind, outcome, name, summary,
+            command_summary, duration_ms, support_type, support_ref, support_sha256,
+            unavailable_reason, exit_code, completed_at, created_at
+          ) VALUES (
+            @id, @runId, @clientRecordId, @checkId, @kind, @outcome, @name, @summary,
+            @commandSummary, @durationMs, @supportType, @supportRef, @supportSha256,
+            @unavailableReason, @exitCode, @completedAt, @createdAt
+          )`
+        )
+        .run({
+          ...verification,
+          ...support,
+          clientRecordId: toSqlValue(verification.clientRecordId),
+          summary: toSqlValue(verification.summary),
+          commandSummary: toSqlValue(verification.commandSummary),
+          durationMs: toSqlValue(verification.durationMs)
+        });
+    } catch (error) {
+      if (input.clientRecordId && isUniqueConstraint(error)) {
+        const existing = this.findVerificationByClientRecordId(input.runId, input.clientRecordId);
+        if (existing) return existing;
+      }
+      throw error;
+    }
+    return verification;
+  }
+
+  listVerifications(query: ListVerificationsQuery): VerificationEvidence[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT * FROM verification_evidence
+          WHERE run_id = @runId
+          ORDER BY completed_at ASC, id ASC
+          LIMIT @limit`
+        )
+        .all(query) as VerificationRow[]
+    ).map(mapVerificationRow);
+  }
+
+  private findVerificationByClientRecordId(
+    runId: string,
+    clientRecordId: string
+  ): VerificationEvidence | undefined {
+    const row = this.db
+      .prepare("SELECT * FROM verification_evidence WHERE run_id = ? AND client_record_id = ?")
+      .get(runId, clientRecordId) as VerificationRow | undefined;
+    return row ? mapVerificationRow(row) : undefined;
+  }
+
   searchJournal(query: JournalSearchQuery): JournalSearchResults {
     const params = searchParams(query);
     const runFilters = searchFilters(query, "agent_runs", ["task", "summary", "project", "source"]);
@@ -1759,6 +1831,7 @@ export class LedgerRepository {
       open_loops: openLoops.map(mapOpenLoopRow),
       handoffs: this.listHandoffs({ sourceRunId: id, status: "all", limit: 100 }),
       artifacts: this.listArtifacts({ runId: id, limit: 100 }),
+      verifications: this.listVerifications({ runId: id, limit: 100 }),
       recovery_receipts: this.listRecoveryReceipts(id)
     };
   }
@@ -2728,6 +2801,21 @@ function projectCommandEvidence(event: AgentEvent): RunManifest["commands"][numb
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function verificationSupportColumns(support: VerificationEvidence["support"]) {
+  return {
+    supportType: support.type,
+    supportRef:
+      support.type === "receipt"
+        ? support.receiptId
+        : support.type === "artifact_digest"
+          ? toSqlValue(support.artifactId)
+          : null,
+    supportSha256: support.type === "artifact_digest" ? support.sha256 : null,
+    unavailableReason: support.type === "unavailable" ? support.reason : null,
+    exitCode: support.type === "exit_code" ? support.exitCode : null
+  };
 }
 
 function deriveResolvedAt(existing: OpenLoop, input: UpdateOpenLoopRequest): string | undefined {

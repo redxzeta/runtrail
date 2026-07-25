@@ -28,6 +28,7 @@ describe("mcp adapter", () => {
       "journal_get_context",
       "journal_prepare_work",
       "journal_create_event",
+      "journal_record_verification",
       "journal_create_open_loop",
       "journal_resolve_open_loop",
       "journal_record_decision",
@@ -251,6 +252,20 @@ describe("mcp adapter", () => {
       client
     );
     await callRuntrailTool(
+      "journal_record_verification",
+      {
+        runId: "run_1",
+        clientRecordId: "verification-mcp-1",
+        checkId: "unit",
+        kind: "test",
+        outcome: "passed",
+        name: "unit tests",
+        support: { type: "exit_code", exitCode: 0 },
+        completedAt: "2026-07-01T00:00:00.000Z"
+      },
+      client
+    );
+    await callRuntrailTool(
       "journal_resolve_open_loop",
       {
         id: "loop_1",
@@ -323,6 +338,17 @@ describe("mcp adapter", () => {
     });
     expect(client.requestJson).toHaveBeenNthCalledWith(
       3,
+      "/verifications",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.objectContaining({
+          clientRecordId: "verification-mcp-1",
+          support: { type: "exit_code", exitCode: 0 }
+        })
+      })
+    );
+    expect(client.requestJson).toHaveBeenNthCalledWith(
+      4,
       "/open-loops/loop_1",
       expect.objectContaining({
         method: "PATCH",
@@ -334,7 +360,7 @@ describe("mcp adapter", () => {
       })
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(
-      4,
+      5,
       "/decisions",
       expect.objectContaining({
         method: "POST",
@@ -348,7 +374,7 @@ describe("mcp adapter", () => {
       })
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(
-      5,
+      6,
       "/handoffs",
       expect.objectContaining({
         method: "POST",
@@ -366,7 +392,7 @@ describe("mcp adapter", () => {
         }
       })
     );
-    expect(client.requestJson).toHaveBeenNthCalledWith(6, "/runs/run_1/manifest");
+    expect(client.requestJson).toHaveBeenNthCalledWith(7, "/runs/run_1/manifest");
   });
 
   it("maps effective decision reads to the bounded HTTP endpoint", async () => {
@@ -493,7 +519,7 @@ describe("mcp adapter", () => {
     });
 
     expect(server).toBeDefined();
-    expect(runtrailToolNames).toHaveLength(22);
+    expect(runtrailToolNames).toHaveLength(23);
   });
 
   it("fails fast when bridge config is missing", () => {

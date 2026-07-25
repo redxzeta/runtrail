@@ -638,6 +638,122 @@ describe("ledger routes", () => {
     }
   });
 
+  it("records bounded verification outcomes in stable manifest order", async () => {
+    const app = createTestApp();
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+    const cases = [
+      {
+        checkId: "unit",
+        kind: "test",
+        outcome: "passed",
+        support: { type: "exit_code", exitCode: 0 },
+        completedAt: "2026-07-01T00:00:00.000Z"
+      },
+      {
+        checkId: "lint",
+        kind: "lint",
+        outcome: "failed",
+        support: { type: "exit_code", exitCode: 1 },
+        completedAt: "2026-07-01T00:01:00.000Z"
+      },
+      {
+        checkId: "smoke",
+        kind: "smoke",
+        outcome: "not_run",
+        support: { type: "unavailable", reason: "not_supported" },
+        completedAt: "2026-07-01T00:02:00.000Z"
+      },
+      {
+        checkId: "custom",
+        kind: "custom",
+        outcome: "not_applicable",
+        support: { type: "client_reported" },
+        completedAt: "2026-07-01T00:03:00.000Z"
+      }
+    ] as const;
+
+    for (const [index, item] of cases.entries()) {
+      const response = await postJson(app, "/verifications", {
+        runId: run.run.id,
+        clientRecordId: `verification-${index}`,
+        name: item.checkId,
+        ...item
+      });
+      expect(response.status).toBe(201);
+    }
+
+    const replay = (await (
+      await postJson(app, "/verifications", {
+        runId: run.run.id,
+        clientRecordId: "verification-0",
+        checkId: "replacement",
+        kind: "build",
+        outcome: "failed",
+        name: "replacement",
+        support: { type: "receipt", receiptId: "receipt-1" },
+        completedAt: "2026-07-02T00:00:00.000Z"
+      })
+    ).json()) as { verification: { checkId: string } };
+    const listed = (await (
+      await app.request(`/verifications?runId=${run.run.id}`, { headers: authHeaders() })
+    ).json()) as { verifications: Array<{ checkId: string; outcome: string }> };
+    const manifest = (await (
+      await app.request(`/runs/${run.run.id}/manifest`, { headers: authHeaders() })
+    ).json()) as { manifest: { verifications: Array<{ checkId: string }> } };
+
+    expect(replay.verification.checkId).toBe("unit");
+    expect(listed.verifications.map(({ checkId, outcome }) => [checkId, outcome])).toEqual([
+      ["unit", "passed"],
+      ["lint", "failed"],
+      ["smoke", "not_run"],
+      ["custom", "not_applicable"]
+    ]);
+    expect(manifest.manifest.verifications.map(({ checkId }) => checkId)).toEqual([
+      "unit",
+      "lint",
+      "smoke",
+      "custom"
+    ]);
+
+    for (const invalid of [
+      { kind: "unknown" },
+      { outcome: "unknown" },
+      { checkId: "" },
+      { summary: "x".repeat(1001) },
+      { stdout: "raw output" },
+      { outcome: "passed", support: { type: "exit_code", exitCode: 1 } },
+      { outcome: "not_run", support: { type: "artifact_digest", sha256: "a".repeat(64) } }
+    ]) {
+      const response = await postJson(app, "/verifications", {
+        runId: run.run.id,
+        checkId: "invalid",
+        kind: "test",
+        outcome: "passed",
+        name: "invalid",
+        support: { type: "client_reported" },
+        completedAt: "2026-07-01T00:00:00.000Z",
+        ...invalid
+      });
+      expect(response.status).toBe(400);
+    }
+
+    expect(
+      (
+        await postJson(app, "/verifications", {
+          runId: "run_missing",
+          checkId: "unit",
+          kind: "test",
+          outcome: "passed",
+          name: "unit",
+          support: { type: "client_reported" },
+          completedAt: "2026-07-01T00:00:00.000Z"
+        })
+      ).status
+    ).toBe(404);
+  });
+
   it("scopes concurrent-looking keyed retries by record ownership", async () => {
     const app = createTestApp();
     const firstRun = (await (await postJson(app, "/runs", validRunRequest())).json()) as {

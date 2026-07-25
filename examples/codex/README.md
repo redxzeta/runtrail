@@ -62,7 +62,7 @@ configuration, trust, concurrency, and stdin payload contract.
 | `SessionStart` startup/resume/clear/compact | `started`; run reopened if needed | allowlisted start source |
 | `UserPromptSubmit` | `started`; same run reopened for a new turn | no prompt text |
 | `PostToolUse` for `Bash` | `command_executed` | executable plus safe subcommand only |
-| Recognized test command | `test_started`, then `test_passed` or `test_failed` when the result is deterministic | sanitized command summary only |
+| Recognized test command | `test_started`, then `test_passed` or `test_failed`; typed verification only when a numeric exit code is present | sanitized command summary and bounded exit-code evidence |
 | `PostToolUse` for `apply_patch` | `files_changed` | repository-relative paths from local git state |
 | `Stop` | `completed`; run status completed | fixed lifecycle summary only |
 
@@ -94,7 +94,8 @@ curl -fsS -H "authorization: Bearer $RUNTRAIL_TOKEN" \
   "$RUNTRAIL_URL/runs/<run-id>/manifest"
 ```
 
-The manifest should contain non-empty `changed_files`, `commands`, and `tests`, and the run should
+The manifest should contain non-empty `changed_files`, `commands`, `tests`, and `verifications`,
+and the run should
 be `completed`. Resume the same Codex session and confirm the run id is unchanged. Start a separate
 session and confirm it receives a new run id. Local per-session state is stored with mode `0600`
 under `~/.local/state/runtrail/codex` by default.

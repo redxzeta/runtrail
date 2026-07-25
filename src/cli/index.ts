@@ -109,6 +109,23 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--data-json <json>", "Additional event data as JSON")
     .action(createEvent);
 
+  const verification = program.command("verification").description("Manage verification evidence");
+  verification
+    .command("add")
+    .description("Record bounded typed verification evidence")
+    .requiredOption("--run-id <runId>", "Run ID")
+    .requiredOption("--check-id <checkId>", "Stable check identifier")
+    .requiredOption("--kind <kind>", "test, lint, typecheck, build, smoke, or custom")
+    .requiredOption("--outcome <outcome>", "passed, failed, not_run, or not_applicable")
+    .requiredOption("--name <name>", "Human-readable check name")
+    .requiredOption("--support-json <json>", "Bounded evidence support object")
+    .requiredOption("--completed-at <timestamp>", "ISO-8601 completion time")
+    .option("--client-record-id <clientRecordId>", "Stable idempotency key")
+    .option("--summary <summary>", "Bounded result summary")
+    .option("--command-summary <commandSummary>", "Sanitized command summary")
+    .option("--duration-ms <durationMs>", "Duration in milliseconds", parseInteger)
+    .action(addVerification);
+
   const loop = program.command("loop").description("Manage open loops");
   loop
     .command("add")
@@ -501,6 +518,31 @@ async function wrapRun(
       { operation: "create_event", idempotencyKey: `wrapper-${wrapperKey}-command` }
     )
   );
+  const verificationKind = verificationKindForCommand(command);
+  await bestEffortWrapperWrite(() =>
+    requestJson(
+      "/verifications",
+      {
+        method: "POST",
+        body: {
+          runId,
+          clientRecordId: `wrapper-${wrapperKey}-verification`,
+          checkId: "wrapper-command",
+          kind: verificationKind,
+          outcome: exitCode === 0 ? "passed" : "failed",
+          name: verificationKind === "custom" ? "wrapped command" : `${verificationKind} check`,
+          commandSummary: verificationCommandSummary(command),
+          durationMs,
+          support: { type: "exit_code", exitCode },
+          completedAt: new Date().toISOString()
+        }
+      },
+      {
+        operation: "create_verification",
+        idempotencyKey: `wrapper-${wrapperKey}-verification`
+      }
+    )
+  );
   if (changedFiles.length > 0) {
     await bestEffortWrapperWrite(() =>
       requestJson(
@@ -569,6 +611,27 @@ async function bestEffortWrapperWrite(action: () => Promise<unknown>): Promise<v
       error instanceof Error ? error.message : "Runtrail write failed; work may be unsynced"
     );
   }
+}
+
+function verificationKindForCommand(
+  command: string[]
+): "test" | "lint" | "typecheck" | "build" | "smoke" | "custom" {
+  const executable = path.basename(command[0] ?? "").toLowerCase();
+  const subcommand = (command[1] ?? "").toLowerCase();
+  if (["pytest", "vitest", "jest"].includes(executable)) return "test";
+  if (["pnpm", "npm", "yarn", "bun"].includes(executable)) {
+    if (subcommand === "test" || subcommand.startsWith("test:")) return "test";
+    if (["lint", "typecheck", "build", "smoke"].includes(subcommand)) {
+      return subcommand as "lint" | "typecheck" | "build" | "smoke";
+    }
+  }
+  return "custom";
+}
+
+function verificationCommandSummary(command: string[]): string {
+  const executable = path.basename(command[0] ?? "command").replace(/[^A-Za-z0-9._-]/g, "");
+  const subcommand = (command[1] ?? "").replace(/[^A-Za-z0-9:_-]/g, "");
+  return [executable || "command", subcommand].filter(Boolean).join(" ").slice(0, 500);
 }
 
 async function wrapRunFromArgv(args: string[]): Promise<void> {
@@ -698,6 +761,45 @@ async function createEvent(options: {
       },
       options.clientRecordId
         ? { operation: "create_event", idempotencyKey: options.clientRecordId }
+        : undefined
+    )
+  );
+}
+
+async function addVerification(options: {
+  runId: string;
+  clientRecordId?: string;
+  checkId: string;
+  kind: string;
+  outcome: string;
+  name: string;
+  summary?: string;
+  commandSummary?: string;
+  durationMs?: number;
+  supportJson: string;
+  completedAt: string;
+}): Promise<void> {
+  printJson(
+    await requestJson(
+      "/verifications",
+      {
+        method: "POST",
+        body: compact({
+          runId: options.runId,
+          clientRecordId: options.clientRecordId,
+          checkId: options.checkId,
+          kind: options.kind,
+          outcome: options.outcome,
+          name: options.name,
+          summary: options.summary,
+          commandSummary: options.commandSummary,
+          durationMs: options.durationMs,
+          support: parseJsonOption(options.supportJson, "--support-json"),
+          completedAt: options.completedAt
+        })
+      },
+      options.clientRecordId
+        ? { operation: "create_verification", idempotencyKey: options.clientRecordId }
         : undefined
     )
   );

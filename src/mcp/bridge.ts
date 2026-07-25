@@ -70,6 +70,16 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
   );
 
   server.registerTool(
+    "journal_record_verification",
+    {
+      title: "Record Runtrail verification",
+      description: "Record bounded typed verification evidence for an existing run",
+      inputSchema: mcpToolInputSchemas.verification
+    },
+    async (args) => await forwardTool(client, "journal_record_verification", args)
+  );
+
+  server.registerTool(
     "journal_create_open_loop",
     {
       title: "Create Runtrail open loop",

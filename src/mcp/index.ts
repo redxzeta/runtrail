@@ -29,6 +29,7 @@ export const runtrailToolNames = [
   "journal_get_context",
   "journal_prepare_work",
   "journal_create_event",
+  "journal_record_verification",
   "journal_create_open_loop",
   "journal_resolve_open_loop",
   "journal_record_decision",
@@ -83,6 +84,16 @@ export function createRuntrailMcpServer(
       inputSchema: mcpToolInputSchemas.event
     },
     async (args) => mcpText(await callRuntrailTool("journal_create_event", args, client))
+  );
+
+  server.registerTool(
+    "journal_record_verification",
+    {
+      title: "Record Runtrail verification",
+      description: "Record bounded typed verification evidence for an existing run",
+      inputSchema: mcpToolInputSchemas.verification
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_record_verification", args, client))
   );
 
   server.registerTool(
@@ -330,6 +341,23 @@ export async function callRuntrailTool(
           category: args.category,
           tags: args.tags,
           data: args.data
+        })
+      });
+    case "journal_record_verification":
+      return await client.requestJson("/verifications", {
+        method: "POST",
+        body: compact({
+          runId: requireString(args, "runId"),
+          clientRecordId: args.clientRecordId,
+          checkId: requireString(args, "checkId"),
+          kind: requireString(args, "kind"),
+          outcome: requireString(args, "outcome"),
+          name: requireString(args, "name"),
+          summary: args.summary,
+          commandSummary: args.commandSummary,
+          durationMs: args.durationMs,
+          support: args.support,
+          completedAt: requireString(args, "completedAt")
         })
       });
     case "journal_create_open_loop":

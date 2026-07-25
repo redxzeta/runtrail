@@ -16,6 +16,7 @@ type CodexHookInput = {
   toolUseId?: string;
   toolCommand?: string;
   toolSucceeded?: boolean;
+  toolExitCode?: number;
 };
 
 type AdapterConfig = {
@@ -196,6 +197,24 @@ async function recordToolUse(
       importance: input.toolSucceeded ? 5 : 8
     });
   }
+
+  if (input.toolExitCode !== undefined && input.toolUseId) {
+    const identity = createHash("sha256").update(input.toolUseId).digest("hex").slice(0, 32);
+    await requestJson(config, fetchImpl, "/verifications", {
+      method: "POST",
+      body: {
+        runId,
+        clientRecordId: `codex-verification-${identity}`,
+        checkId: `codex:${identity}`,
+        kind: "test",
+        outcome: input.toolExitCode === 0 ? "passed" : "failed",
+        name: command,
+        commandSummary: command,
+        support: { type: "exit_code", exitCode: input.toolExitCode },
+        completedAt: new Date().toISOString()
+      }
+    });
+  }
 }
 
 async function markRunning(
@@ -262,8 +281,20 @@ function parseHookInput(rawInput: unknown): CodexHookInput {
     toolName: readOptionalString(input, "tool_name"),
     toolUseId: readOptionalString(input, "tool_use_id"),
     toolCommand: readOptionalString(toolInput, "command"),
-    toolSucceeded: readToolSucceeded(input.tool_response)
+    toolSucceeded: readToolSucceeded(input.tool_response),
+    toolExitCode: readToolExitCode(input.tool_response)
   };
+}
+
+function readToolExitCode(value: unknown): number | undefined {
+  const response = asRecord(value);
+  const exitCode = response.exit_code ?? response.exitCode;
+  return typeof exitCode === "number" &&
+    Number.isInteger(exitCode) &&
+    exitCode >= 0 &&
+    exitCode <= 255
+    ? exitCode
+    : undefined;
 }
 
 function readToolSucceeded(value: unknown): boolean | undefined {

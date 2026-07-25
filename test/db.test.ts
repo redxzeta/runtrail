@@ -39,6 +39,9 @@ describe("database", () => {
     const effectiveDecisionsMigration = db
       .prepare("SELECT name FROM schema_migrations WHERE id = ?")
       .get(10) as { name: string } | undefined;
+    const verificationEvidenceMigration = db
+      .prepare("SELECT name FROM schema_migrations WHERE id = ?")
+      .get(11) as { name: string } | undefined;
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as Array<{ name: string }>;
@@ -56,6 +59,7 @@ describe("database", () => {
     expect(cursorMigration?.name).toBe("008_incremental_context_cursors");
     expect(provenanceMigration?.name).toBe("009_agent_provenance");
     expect(effectiveDecisionsMigration?.name).toBe("010_effective_decisions");
+    expect(verificationEvidenceMigration?.name).toBe("011_verification_evidence");
     expect(tables.map((table) => table.name)).toEqual([
       "agent_event_tags",
       "agent_events",
@@ -69,7 +73,8 @@ describe("database", () => {
       "open_loops",
       "recovery_receipts",
       "schema_migrations",
-      "sqlite_sequence"
+      "sqlite_sequence",
+      "verification_evidence"
     ]);
     expect(indexes.map((index) => index.name)).toContain(
       "idx_agent_runs_project_status_updated_at"
@@ -83,6 +88,8 @@ describe("database", () => {
     );
     expect(indexes.map((index) => index.name)).toContain("idx_agent_events_client_record_id");
     expect(indexes.map((index) => index.name)).toContain("idx_decisions_supersedes");
+    expect(indexes.map((index) => index.name)).toContain("idx_verification_run_completed");
+    expect(indexes.map((index) => index.name)).toContain("idx_verification_client_record");
   });
 
   it("adds collaboration and metadata columns to existing databases", () => {

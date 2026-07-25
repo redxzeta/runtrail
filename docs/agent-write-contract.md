@@ -28,10 +28,10 @@ transcripts, command output, processes, or private configuration. Idempotent run
 original values without applying retry payload changes.
 
 Append-oriented writes may include a stable, non-secret `clientRecordId`. A retry with the same key
-returns the original event, open loop, decision, handoff, or artifact without changing its payload
+returns the original event, open loop, decision, handoff, artifact, or verification without changing its payload
 or timestamps. The key is scoped by record type and its stable owner:
 
-- Events and artifacts: `runId` plus `clientRecordId`.
+- Events, artifacts, and verifications: `runId` plus `clientRecordId`.
 - Open loops and handoffs: `project` plus `clientRecordId`.
 - Decisions: `project` (or the global decision scope) plus `clientRecordId`.
 
@@ -39,6 +39,21 @@ The same key may be reused in a different record type, run, or project without c
 that omit `clientRecordId` keep the existing append behavior. Keys are bounded identifiers, not
 payload hashes: never derive them from prompts, logs, environment values, credentials, or other
 secret-bearing content.
+
+## Verification Evidence
+
+Use `POST /verifications`, `rt verification add`, or `journal_record_verification` for bounded
+structured checks. Every record has a stable `checkId`, one kind (`test`, `lint`, `typecheck`,
+`build`, `smoke`, or `custom`), and one explicit outcome (`passed`, `failed`, `not_run`, or
+`not_applicable`). The run manifest returns these records oldest-first in `verifications`.
+
+Evidence support is explicit: `client_reported`, an `exit_code`, a bounded receipt reference, an
+artifact SHA-256 digest, or `unavailable` with `not_provided`/`not_supported`. `not_run` and
+`not_applicable` cannot carry execution or artifact proof. These facts remain client assertions;
+Runtrail does not infer success from a command name, summary, event status, or terminal run state.
+Omit unknown evidence rather than scraping logs. Never place stdout, stderr, prompts, transcripts,
+credentials, headers, environment data, private paths, or unbounded arguments in verification
+fields.
 
 ## Effective Decisions
 

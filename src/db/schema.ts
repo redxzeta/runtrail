@@ -181,6 +181,31 @@ export const schemaStatements = [
     ON artifacts (run_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_artifacts_kind_created_at
     ON artifacts (kind, created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS verification_evidence (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    client_record_id TEXT,
+    check_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    name TEXT NOT NULL,
+    summary TEXT,
+    command_summary TEXT,
+    duration_ms INTEGER,
+    support_type TEXT NOT NULL,
+    support_ref TEXT,
+    support_sha256 TEXT,
+    unavailable_reason TEXT,
+    exit_code INTEGER,
+    completed_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES agent_runs (id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_verification_run_completed
+    ON verification_evidence (run_id, completed_at ASC, id ASC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_verification_client_record
+    ON verification_evidence (run_id, client_record_id)
+    WHERE client_record_id IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS ledger_changes (
     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
     record_type TEXT NOT NULL,
