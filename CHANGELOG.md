@@ -1,3 +1,10 @@
+# [1.38.0](https://github.com/redxzeta/runtrail/compare/v1.37.0...v1.38.0) (2026-07-25)
+
+
+### Features
+
+* **evidence:** add typed verification records ([#155](https://github.com/redxzeta/runtrail/issues/155)) ([a87a07b](https://github.com/redxzeta/runtrail/commit/a87a07b9b7f0908a66be6d66378253e3b1949f11)), closes [#139](https://github.com/redxzeta/runtrail/issues/139)
+
 # [1.37.0](https://github.com/redxzeta/runtrail/compare/v1.36.0...v1.37.0) (2026-07-25)
 
 
