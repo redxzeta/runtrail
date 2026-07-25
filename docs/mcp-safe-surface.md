@@ -26,6 +26,7 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 | `journal_finish_run` | Write | `POST /runs/:id/finish` | `{ runId, expectedVersion?, status, summary, completedAt?, gitBranch?, gitCommit? }` | `{ run }` |
 | `journal_get_run_manifest` | Read-only | `GET /runs/:id/manifest` | `{ runId: string }` | Compact run manifest with linked events, changed files, commands, tests, open loops, handoffs, artifacts, verifications, and canonical readiness |
 | `journal_get_workflow` | Read-only | `GET /workflows/:workflowId/runs` | `{ workflowId: string, project: string, limit?: number }` | Bounded oldest-first related-run summaries, explicit truncation, and canonical readiness |
+| `journal_get_workflow_review_packet` | Read-only | `GET /workflows/:workflowId/review-packet` | `{ workflowId: string, project: string, limit?: number }` | Versioned portable workflow facts, provenance, canonical readiness, limitations, and per-section truncation |
 | `journal_get_context` | Read-only | `GET /agent/context` | `{ project: string, limit?: number, min_importance?: number, cursor?: string }` | Compact full context, or bounded changed runs, events, open loops, handoffs, and decisions after an opaque cursor |
 | `journal_prepare_work` | Read-only | `GET /agent/prepare-work` | `{ project: string, source?: string, workKey?: string, runId?: string, category?: string, tags?: string[], limit?: number, cursor?: string }` | Bounded lifecycle, effective decision summaries, authoritative freshness, canonical readiness for a selected run, stable advisory actions, and an optional incremental change envelope |
 | `journal_search` | Read-only | `GET /search` | `{ project?: string, source?: string, status?: string, category?: string, tag?: string, text?: string, date_from?: string, date_to?: string, effectiveOnly?: boolean, limit?: number }` | Compact runs, events, open loops, handoffs, and all or effective-only decisions matching the filters |
@@ -69,6 +70,9 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 - Workflow, prepare-work, manifest, direct MCP, and stdio-bridge reads preserve the same readiness
   status, reason codes, findings, actions, provenance, versions, and `asOf`. Readiness is a bounded
   deterministic projection, not an MCP-side policy decision.
+- Workflow review packets default each section to 20 items and cap it at 50. Direct MCP and the
+  stdio bridge return the HTTP packet unchanged; neither adapter reads SQLite, expands sections,
+  recalculates freshness/readiness, or imports packet data.
 - Context cursors use server-owned change sequences rather than client timestamps. The opaque token
   contains only a version, query fingerprint, and per-section numeric positions; invalid or
   wrong-query cursors fail with `retry_without_cursor`.

@@ -469,6 +469,148 @@ export const workflowReadinessSchema = z.object({
 export const workflowReadinessQuerySchema = z.object({
   project: z.string().trim().min(1).max(120)
 });
+export const workflowReviewPacketQuerySchema = z.object({
+  project: z.string().trim().min(1).max(120),
+  limit: z.coerce.number().int().positive().max(50).default(20)
+});
+
+const packetSourceRefSchema = z.object({
+  type: z.enum(["run", "openLoop", "handoff", "decision", "verification", "artifact"]),
+  id: z.string().trim().min(1).max(255),
+  version: z.number().int().positive().optional()
+});
+const packetRunSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  workKey: z.string().optional(),
+  workflowId: z.string(),
+  parentRunId: z.string().optional(),
+  continuedFromRunId: z.string().optional(),
+  status: runStatusSchema,
+  version: z.number().int().positive(),
+  startedAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  freshness: z.object({
+    state: z.enum(["fresh", "stale_candidate", "unknown", "not_applicable"]),
+    lastLivenessAt: z.string().datetime().optional(),
+    staleAfterSeconds: z.number().int().positive(),
+    asOf: z.string().datetime(),
+    reasonCode: z.enum([
+      "authoritative_liveness_within_window",
+      "run_liveness_exceeds_window",
+      "no_authoritative_liveness",
+      "terminal_status"
+    ])
+  }),
+  declaredAgent: z
+    .object({
+      name: z.string().optional(),
+      model: z.string().optional(),
+      origin: z.literal("client_reported"),
+      assurance: z.literal("asserted")
+    })
+    .optional(),
+  sourceRef: packetSourceRefSchema
+});
+const packetDecisionSchema = z.object({
+  id: z.string(),
+  project: z.string().optional(),
+  title: z.string(),
+  supersedesDecisionId: z.string().optional(),
+  origin: z.literal("deterministic_derivation"),
+  assurance: z.literal("evidence_backed"),
+  sourceRefs: z.array(packetSourceRefSchema).max(2)
+});
+const packetVerificationSchema = z.object({
+  id: z.string(),
+  runId: z.string(),
+  checkId: z.string(),
+  kind: verificationKindSchema,
+  outcome: verificationOutcomeSchema,
+  name: z.string(),
+  support: verificationSupportSchema,
+  completedAt: z.string().datetime(),
+  origin: z.literal("client_reported"),
+  assurance: provenanceAssuranceSchema,
+  sourceRef: packetSourceRefSchema
+});
+const packetArtifactSchema = z.object({
+  id: z.string(),
+  runId: z.string(),
+  kind: z.string(),
+  path: z.string().optional(),
+  sizeBytes: z.number().int().nonnegative().optional(),
+  sha256: z.string().optional(),
+  sourceRef: packetSourceRefSchema
+});
+const packetOpenLoopSchema = z.object({
+  id: z.string(),
+  type: openLoopTypeSchema,
+  sourceRunId: z.string().optional(),
+  status: z.literal("open"),
+  version: z.number().int().positive(),
+  sourceRef: packetSourceRefSchema
+});
+const packetHandoffSchema = z.object({
+  id: z.string(),
+  sourceRunId: z.string().optional(),
+  targetRunId: z.string().optional(),
+  fromSource: z.string(),
+  toSource: z.string().optional(),
+  status: handoffStatusSchema,
+  version: z.number().int().positive(),
+  sourceRef: packetSourceRefSchema
+});
+const packetSectionSchema = z.enum([
+  "runs",
+  "effectiveDecisions",
+  "verifications",
+  "artifacts",
+  "openLoops",
+  "handoffs"
+]);
+const packetSectionMetaSchema = z.object({
+  limit: z.number().int().positive().max(50),
+  count: z.number().int().nonnegative(),
+  hasMore: z.boolean()
+});
+const packetLimitationSchema = z.object({
+  code: z.enum([
+    "agent_identity_client_asserted",
+    "verification_client_asserted",
+    "verification_assurance_mixed",
+    "workflow_relationship_incomplete",
+    "run_freshness_unknown",
+    "legacy_record_incomplete",
+    "section_truncated",
+    "unsafe_artifact_path_omitted"
+  ]),
+  section: packetSectionSchema.optional()
+});
+const packetNextActionSchema = readinessNextActionSchema.extend({
+  reasonCodes: z.array(readinessReasonCodeSchema).max(20)
+});
+export const workflowReviewPacketSchema = z.object({
+  schemaVersion: z.literal("1"),
+  asOf: z.string().datetime(),
+  workflow: z.object({
+    id: z.string(),
+    project: z.string(),
+    workKey: z.string().optional(),
+    rootRunId: z.string(),
+    runIds: z.array(z.string()).max(50)
+  }),
+  runs: z.array(packetRunSchema).max(50),
+  effectiveDecisions: z.array(packetDecisionSchema).max(50),
+  verifications: z.array(packetVerificationSchema).max(50),
+  artifacts: z.array(packetArtifactSchema).max(50),
+  openLoops: z.array(packetOpenLoopSchema).max(50),
+  handoffs: z.array(packetHandoffSchema).max(50),
+  readiness: workflowReadinessSchema,
+  nextActions: z.array(packetNextActionSchema).max(20),
+  limitations: z.array(packetLimitationSchema).max(50),
+  truncation: z.record(packetSectionSchema, packetSectionMetaSchema)
+});
 
 export const journalSearchQuerySchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
@@ -542,6 +684,8 @@ export type ReadinessTargetRef = z.infer<typeof readinessTargetRefSchema>;
 export type ReadinessFinding = z.infer<typeof readinessFindingSchema>;
 export type ReadinessNextAction = z.infer<typeof readinessNextActionSchema>;
 export type WorkflowReadiness = z.infer<typeof workflowReadinessSchema>;
+export type WorkflowReviewPacketQuery = z.infer<typeof workflowReviewPacketQuerySchema>;
+export type WorkflowReviewPacket = z.infer<typeof workflowReviewPacketSchema>;
 export type JournalSearchQuery = z.infer<typeof journalSearchQuerySchema>;
 export type AgentContextQuery = z.infer<typeof agentContextQuerySchema>;
 export type PrepareWorkQuery = z.infer<typeof prepareWorkQuerySchema>;

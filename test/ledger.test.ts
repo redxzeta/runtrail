@@ -5,6 +5,7 @@ import { LedgerRepository } from "../src/db/ledger.js";
 import { migrate } from "../src/db/migrate.js";
 import { createApp } from "../src/index.js";
 import { verifyEventChain } from "../src/shared/receipts.js";
+import { workflowReviewPacketSchema } from "../src/shared/schemas.js";
 
 const databases: Database.Database[] = [];
 
@@ -493,6 +494,86 @@ describe("ledger routes", () => {
       })
     );
     expect(JSON.stringify(direct)).not.toContain("secret transcript");
+  });
+
+  it("returns the canonical bounded workflow review packet", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-25T19:30:00.000Z"));
+    const app = createTestApp();
+    const created = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        workflowId: "workflow-packet",
+        workKey: "github:redxzeta/runtrail#142",
+        agentName: "implementation-agent",
+        agentModel: "gpt-5.6",
+        task: "private prompt"
+      })
+    ).json()) as { run: { id: string; version: number } };
+    await postJson(app, `/runs/${created.run.id}/finish`, {
+      expectedVersion: created.run.version,
+      status: "completed",
+      summary: "private transcript"
+    });
+    await postJson(app, "/verifications", {
+      runId: created.run.id,
+      checkId: "unit",
+      kind: "test",
+      outcome: "passed",
+      name: "Unit tests",
+      summary: "private verification transcript",
+      support: { type: "exit_code", exitCode: 0 },
+      completedAt: "2026-07-25T19:29:00.000Z"
+    });
+    await postJson(app, "/artifacts", {
+      runId: created.run.id,
+      kind: "log",
+      path: "/Users/private/runtrail.log"
+    });
+
+    const response = await app.request(
+      "/workflows/workflow-packet/review-packet?project=ice-council&limit=20",
+      { headers: authHeaders() }
+    );
+    const packet = workflowReviewPacketSchema.parse(await response.json());
+    const serialized = JSON.stringify(packet);
+
+    expect(response.status).toBe(200);
+    expect(packet).toEqual(
+      expect.objectContaining({
+        schemaVersion: "1",
+        asOf: "2026-07-25T19:30:00.000Z",
+        workflow: expect.objectContaining({
+          id: "workflow-packet",
+          rootRunId: created.run.id
+        }),
+        readiness: expect.objectContaining({ status: "ready_for_review" })
+      })
+    );
+    expect(packet.runs[0]).toEqual(
+      expect.objectContaining({
+        version: 2,
+        declaredAgent: {
+          name: "implementation-agent",
+          model: "gpt-5.6",
+          origin: "client_reported",
+          assurance: "asserted"
+        }
+      })
+    );
+    expect(packet.artifacts[0]).not.toHaveProperty("path");
+    expect(packet.limitations).toContainEqual({
+      code: "unsafe_artifact_path_omitted",
+      section: "artifacts"
+    });
+    for (const excluded of [
+      "private prompt",
+      "private transcript",
+      "private verification transcript",
+      "/Users/private"
+    ]) {
+      expect(serialized).not.toContain(excluded);
+    }
   });
 
   it("rejects invalid run relationships without changing existing runs", async () => {

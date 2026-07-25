@@ -243,6 +243,39 @@ current `version`, origin, and assurance. Findings and actions are also capped a
 records, event data, summaries, logs, prompts, transcripts, credentials, headers, environment
 data, or private paths. Older unlinked runs remain readable and return conservative `unknown`.
 
+## Workflow Review Packets
+
+Use `GET /workflows/:workflowId/review-packet?project=<project>`,
+`journal_get_workflow_review_packet`, or
+`rt workflow packet --workflow-id <id> --project <project>` to retrieve the same portable JSON.
+The top-level `schemaVersion` is `"1"`. Consumers should ignore additive fields within version 1;
+removing or changing existing semantics requires a new version.
+
+Each packet uses one `asOf` and contains compact workflow identity, ordered runs, current effective
+decisions, typed verifications, safe artifact metadata, unresolved open loops, linked handoffs, the
+canonical readiness object unchanged, advisory next actions, stable limitations, and per-section
+truncation metadata. The default section limit is 20 and the maximum is 50. Each section reports
+`limit`, returned `count`, and `hasMore`; a truncated section also adds
+`section_truncated` so omission cannot make a packet appear complete.
+
+Run freshness uses the same authoritative classifier as prepare-work. Declared agent/model values
+remain `client_reported` and `asserted`. Effective decisions are deterministically derived and
+reference both current and directly superseded IDs without presenting prior guidance as current.
+Verification support and assurance are preserved. Mutable run, open-loop, and handoff references
+carry current versions.
+
+Limitations use stable codes: `agent_identity_client_asserted`,
+`verification_client_asserted`, `verification_assurance_mixed`,
+`workflow_relationship_incomplete`, `run_freshness_unknown`, `legacy_record_incomplete`,
+`section_truncated`, and `unsafe_artifact_path_omitted`. Absolute, Windows-drive,
+root-relative, and parent-traversing artifact paths are omitted. Packets also exclude tasks,
+summaries, decision bodies, open-loop prose, handoff context/prose, event data, command output,
+logs, prompts, transcripts, credentials, headers, environment data, and host paths.
+
+The CLI prints JSON by default. `--output <path>` writes the same JSON using create-only behavior;
+use `--force` to replace an existing file. Packets are export-only and cannot be imported or
+executed.
+
 ## Incremental Context
 
 `journal_get_context` and `journal_prepare_work` return an opaque versioned `cursor`. Supplying that

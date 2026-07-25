@@ -42,6 +42,7 @@ export const runtrailToolNames = [
   "journal_expire_handoff",
   "journal_get_run_manifest",
   "journal_get_workflow",
+  "journal_get_workflow_review_packet",
   "journal_search",
   "journal_search_runs"
 ] as const;
@@ -224,6 +225,17 @@ export function createRuntrailMcpServer(
       inputSchema: mcpToolInputSchemas.workflow
     },
     async (args) => mcpText(await callRuntrailTool("journal_get_workflow", args, client))
+  );
+
+  server.registerTool(
+    "journal_get_workflow_review_packet",
+    {
+      title: "Get Runtrail workflow review packet",
+      description: "Get one versioned bounded portable review packet for an explicit workflow",
+      inputSchema: mcpToolInputSchemas.workflowPacket
+    },
+    async (args) =>
+      mcpText(await callRuntrailTool("journal_get_workflow_review_packet", args, client))
   );
 
   server.registerTool(
@@ -477,6 +489,13 @@ export async function callRuntrailTool(
       appendOptional(query, "limit", args.limit);
       return await client.requestJson(
         `/workflows/${encodeURIComponent(requireString(args, "workflowId"))}/runs?${query.toString()}`
+      );
+    }
+    case "journal_get_workflow_review_packet": {
+      const query = new URLSearchParams({ project: requireString(args, "project") });
+      appendOptional(query, "limit", args.limit);
+      return await client.requestJson(
+        `/workflows/${encodeURIComponent(requireString(args, "workflowId"))}/review-packet?${query.toString()}`
       );
     }
     case "journal_search": {

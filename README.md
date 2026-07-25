@@ -199,6 +199,7 @@ pnpm cli handoff pending --project runtrail --to-source openclaw
 pnpm cli handoff accept handoff_abc123 --expected-version 1 --accepted-by openclaw --target-run-id run_def456
 pnpm cli handoff complete handoff_abc123 --expected-version 2
 pnpm cli workflow readiness --workflow-id issue-123-workflow --project runtrail
+pnpm cli workflow packet --workflow-id issue-123-workflow --project runtrail --output review.json
 ```
 
 Runs, open loops, and handoffs expose a `version`. Pass the last observed value as `expectedVersion`
@@ -215,6 +216,11 @@ These reads, targeted prepare-work, and manifests include one bounded determinis
 `readiness` projection. The statuses are `in_progress`, `blocked`, `needs_evidence`,
 `ready_for_review`, and `unknown`; provenance distinguishes client reports, server observations,
 and derivations without treating terminal status or command text as verification.
+For a portable versioned review, use
+`GET /workflows/:workflowId/review-packet?project=<project>`,
+`journal_get_workflow_review_packet`, or the CLI packet command. Packet sections default to 20
+items (maximum 50), report `hasMore`, preserve readiness/provenance, and omit raw records and unsafe
+host paths. CLI file output refuses to overwrite unless `--force` is supplied.
 
 Wrap a command and journal its result:
 

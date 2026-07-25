@@ -19,6 +19,7 @@ import {
   runStatusSchema,
   updateOpenLoopRequestSchema,
   versionedMutationRequestSchema,
+  workflowReviewPacketQuerySchema,
   workflowRunsQuerySchema
 } from "../shared/schemas.js";
 
@@ -126,6 +127,11 @@ export const mcpToolInputSchemas = {
   workflow: {
     workflowId: idSchema,
     project: workflowRunsQuerySchema.shape.project,
+    limit: mcpLimitSchema
+  },
+  workflowPacket: {
+    workflowId: idSchema,
+    project: workflowReviewPacketQuerySchema.shape.project,
     limit: mcpLimitSchema
   },
   handoff: {

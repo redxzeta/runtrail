@@ -210,6 +210,16 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
   );
 
   server.registerTool(
+    "journal_get_workflow_review_packet",
+    {
+      title: "Get Runtrail workflow review packet",
+      description: "Get one versioned bounded portable review packet for an explicit workflow",
+      inputSchema: mcpToolInputSchemas.workflowPacket
+    },
+    async (args) => await forwardTool(client, "journal_get_workflow_review_packet", args)
+  );
+
+  server.registerTool(
     "journal_search",
     {
       title: "Search Runtrail journal",

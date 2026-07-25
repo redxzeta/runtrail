@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
+import { classifyRunFreshness } from "../shared/freshness.js";
 import { createId } from "../shared/ids.js";
 import { evaluateWorkflowReadiness } from "../shared/readiness.js";
 import { compareEventsForReceipts, computeEventHash } from "../shared/receipts.js";
@@ -46,16 +47,18 @@ import type {
   PrepareWorkRunSummary,
   RecoveryReceipt,
   RunConflict,
-  RunFreshness,
   RunManifest,
   UpdateOpenLoopRequest,
   UpdateRunRequest,
   VerificationEvidence,
   WorkflowReadiness,
+  WorkflowReviewPacket,
+  WorkflowReviewPacketQuery,
   WorkflowRunSummary,
   WorkflowRunsQuery
 } from "../shared/schemas.js";
 import { nowIso } from "../shared/time.js";
+import { assembleWorkflowReviewPacket } from "../shared/workflowPacket.js";
 import {
   type ArtifactRow,
   type DecisionRow,
@@ -631,6 +634,86 @@ export class LedgerRepository {
     return run.workflowId
       ? this.getWorkflowReadiness(run.workflowId, run.project, staleAfterSeconds, asOf)
       : this.evaluateReadiness([run], undefined, staleAfterSeconds, asOf, false);
+  }
+
+  getWorkflowReviewPacket(
+    workflowId: string,
+    query: WorkflowReviewPacketQuery,
+    staleAfterSeconds: number,
+    asOf = nowIso()
+  ): WorkflowReviewPacket | undefined {
+    const scopeRows = this.db
+      .prepare(
+        `SELECT * FROM agent_runs
+        WHERE project = @project AND workflow_id = @workflowId
+        ORDER BY started_at ASC, id ASC
+        LIMIT @limit`
+      )
+      .all({
+        project: query.project,
+        workflowId,
+        limit: readinessInputLimit + 1
+      }) as RunRow[];
+    if (scopeRows.length === 0) return undefined;
+
+    const scopedRuns = scopeRows.slice(0, readinessInputLimit);
+    const runIds = scopedRuns.map(({ id }) => id);
+    const placeholders = runIds.map(() => "?").join(", ");
+    const openLoopRows = this.db
+      .prepare(
+        `SELECT * FROM open_loops
+        WHERE status = 'open' AND source_run_id IN (${placeholders})
+        ORDER BY updated_at ASC, id ASC
+        LIMIT ?`
+      )
+      .all(...runIds, query.limit + 1) as OpenLoopRow[];
+    const handoffRows = this.db
+      .prepare(
+        `SELECT * FROM handoffs
+        WHERE source_run_id IN (${placeholders}) OR target_run_id IN (${placeholders})
+        ORDER BY updated_at ASC, id ASC
+        LIMIT ?`
+      )
+      .all(...runIds, ...runIds, query.limit + 1) as HandoffRow[];
+    const verificationRows = this.db
+      .prepare(
+        `SELECT * FROM verification_evidence
+        WHERE run_id IN (${placeholders})
+        ORDER BY completed_at ASC, id ASC
+        LIMIT ?`
+      )
+      .all(...runIds, query.limit + 1) as VerificationRow[];
+    const artifactRows = this.db
+      .prepare(
+        `SELECT * FROM artifacts
+        WHERE run_id IN (${placeholders})
+        ORDER BY created_at ASC, id ASC
+        LIMIT ?`
+      )
+      .all(...runIds, query.limit + 1) as ArtifactRow[];
+    const decisions = this.listDecisions({
+      project: query.project,
+      includeGlobal: true,
+      effectiveOnly: true,
+      limit: query.limit + 1
+    });
+    const readiness = this.getWorkflowReadiness(workflowId, query.project, staleAfterSeconds, asOf);
+    if (!readiness) return undefined;
+
+    return assembleWorkflowReviewPacket({
+      workflowId,
+      project: query.project,
+      asOf,
+      limit: query.limit,
+      staleAfterSeconds,
+      runs: boundedSection(scopedRuns.map(mapRunRow), query.limit, scopeRows.length > query.limit),
+      effectiveDecisions: boundedSection(decisions, query.limit),
+      verifications: boundedSection(verificationRows.map(mapVerificationRow), query.limit),
+      artifacts: boundedSection(artifactRows.map(mapArtifactRow), query.limit),
+      openLoops: boundedSection(openLoopRows.map(mapOpenLoopRow), query.limit),
+      handoffs: boundedSection(handoffRows.map(mapHandoffRow), query.limit),
+      readiness
+    });
   }
 
   private evaluateReadiness(
@@ -2519,6 +2602,17 @@ export class LedgerRepository {
   }
 }
 
+function boundedSection<T>(
+  items: T[],
+  limit: number,
+  explicitlyTruncated = false
+): { items: T[]; hasMore: boolean } {
+  return {
+    items: items.slice(0, limit),
+    hasMore: explicitlyTruncated || items.length > limit
+  };
+}
+
 const contextChangeTypes = ["runs", "events", "openLoops", "handoffs", "decisions"] as const;
 type ContextChangeType = (typeof contextChangeTypes)[number];
 type ContextCursorSections = Record<ContextChangeType, number>;
@@ -2663,36 +2757,6 @@ function toPrepareWorkRunSummary(
     startedAt: run.startedAt,
     updatedAt: run.updatedAt,
     freshness: classifyRunFreshness(run, asOf, staleAfterSeconds)
-  };
-}
-
-function classifyRunFreshness(
-  run: AgentRun,
-  asOf: string,
-  staleAfterSeconds: number
-): RunFreshness {
-  const base = { staleAfterSeconds, asOf };
-  if (isTerminal(run.status)) {
-    return { ...base, state: "not_applicable", reasonCode: "terminal_status" };
-  }
-  if (!run.lastLivenessAt) {
-    return { ...base, state: "unknown", reasonCode: "no_authoritative_liveness" };
-  }
-
-  const staleBoundary = Date.parse(asOf) - staleAfterSeconds * 1000;
-  if (Date.parse(run.lastLivenessAt) < staleBoundary) {
-    return {
-      ...base,
-      state: "stale_candidate",
-      lastLivenessAt: run.lastLivenessAt,
-      reasonCode: "run_liveness_exceeds_window"
-    };
-  }
-  return {
-    ...base,
-    state: "fresh",
-    lastLivenessAt: run.lastLivenessAt,
-    reasonCode: "authoritative_liveness_within_window"
   };
 }
 
