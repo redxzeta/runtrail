@@ -18,6 +18,236 @@ RUNTRAIL_URL=http://<runtrail-host>:8787
 RUNTRAIL_TOKEN=<set-outside-source-control>
 ```
 
+## macOS GUI credentials
+
+A macOS application opened from Finder, Spotlight, the Dock, or at login is started by the user's
+GUI `launchd` domain. It does not normally read interactive `zsh` startup files, so a token that is
+available in Terminal may still be absent from a GUI MCP client. The generic pattern below stores
+the token at rest in the login Keychain and uses a per-user LaunchAgent to export it into the GUI
+bootstrap environment at login.
+
+This pattern applies to any GUI client whose MCP configuration names a bearer-token environment
+variable. Codex is only an example. For a Codex configuration that already uses an
+environment-backed bearer token, the relevant shape is:
+
+```toml
+[mcp_servers.runtrail]
+url = "RUNTRAIL_MCP_URL"
+bearer_token_env_var = "TOKEN_ENV_VAR"
+```
+
+Preserve the transport supported by the installed client; do not switch a working stdio setup
+solely to copy this example. Replace every uppercase placeholder consistently:
+
+- `RUNTRAIL_MCP_URL`: the existing MCP endpoint
+- `TOKEN_ENV_VAR`: the variable named by the client configuration
+- `KEYCHAIN_SERVICE` and `KEYCHAIN_ACCOUNT`: generic identifiers for one Keychain item
+- `LAUNCH_AGENT_LABEL`: a unique reverse-DNS-style per-user label
+
+The environment value is available to processes in the same login session after export. Keychain
+protects the credential at rest, but an environment variable is not isolation from other processes
+running as the same user.
+
+### Inspect before changing anything
+
+Confirm the endpoint, variable name, client process, and proposed locations without reading or
+printing the token:
+
+```zsh
+token_env_name="TOKEN_ENV_VAR"
+keychain_service="KEYCHAIN_SERVICE"
+keychain_account="KEYCHAIN_ACCOUNT"
+agent_label="LAUNCH_AGENT_LABEL"
+agent_path="$HOME/Library/LaunchAgents/$agent_label.plist"
+
+if /usr/bin/security find-generic-password \
+  -s "$keychain_service" -a "$keychain_account" >/dev/null 2>&1; then
+  print "Keychain item already exists; do not replace it without confirmation."
+fi
+if [[ -e "$agent_path" ]]; then
+  print "LaunchAgent already exists at the proposed path; inspect it before replacement."
+fi
+```
+
+An existing item or plist may belong to a working setup. Repeated setup should leave matching
+state unchanged and stop for confirmation when it differs.
+
+### Store or rotate the token
+
+After confirming the identifiers and whether an existing item may be updated, read the credential
+interactively so it is not written into shell history:
+
+```zsh
+IFS= read -r -s "new_token?Bearer token: "
+print
+if [[ -n "$new_token" ]]; then
+  /usr/bin/security add-generic-password -U \
+    -s "$keychain_service" \
+    -a "$keychain_account" \
+    -w "$new_token" \
+    -T /usr/bin/security
+else
+  print -u2 "Token was empty; no Keychain change made."
+fi
+unset new_token
+```
+
+`-U` creates the item on first setup or updates that exact service/account pair during an approved
+rotation. The token is neither echoed nor embedded in a persistent command. Do not add it to a
+repository `.env`, YAML, plist, client configuration, transcript, or handoff.
+macOS may request interactive approval for the Keychain change; approve only after verifying the
+service/account identifiers, and treat cancellation as no completed rotation.
+
+### Install the per-user LaunchAgent
+
+Create `$HOME/Library/LaunchAgents/LAUNCH_AGENT_LABEL.plist` with mode `0600` only after checking
+for an existing file. Replace the four placeholder strings; the plist must contain identifiers and
+the lookup command, never the credential:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>LAUNCH_AGENT_LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-c</string>
+    <string>token=$(/usr/bin/security find-generic-password -s 'KEYCHAIN_SERVICE' -a 'KEYCHAIN_ACCOUNT' -w) || exit 1; [[ -n "$token" ]] || exit 1; /bin/launchctl setenv 'TOKEN_ENV_VAR' "$token"; unset token</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
+```
+
+Validate permissions and syntax before loading:
+
+```zsh
+/bin/chmod 600 "$agent_path"
+/usr/bin/plutil -lint "$agent_path"
+```
+
+The absence of stdout/stderr paths is intentional: the lookup result must not be logged.
+
+### Load, reload, and verify
+
+Bootstrap the agent in the current user's GUI domain. The guarded `bootout` makes a repeated load
+safe without hiding a failure from `bootstrap` or `kickstart`:
+
+```zsh
+gui_domain="gui/$(/usr/bin/id -u)"
+if /bin/launchctl print "$gui_domain/$agent_label" >/dev/null 2>&1; then
+  /bin/launchctl bootout "$gui_domain/$agent_label"
+fi
+/bin/launchctl bootstrap "$gui_domain" "$agent_path"
+/bin/launchctl kickstart -k "$gui_domain/$agent_label"
+```
+
+Run each check without displaying the token:
+
+```zsh
+/usr/bin/security find-generic-password \
+  -s "$keychain_service" -a "$keychain_account" >/dev/null
+/usr/bin/plutil -lint "$agent_path"
+/bin/launchctl print "$gui_domain/$agent_label" >/dev/null
+/bin/launchctl print "$gui_domain/$agent_label" |
+  /usr/bin/awk '/state =|last exit code =/'
+/bin/launchctl getenv "$token_env_name" | /usr/bin/grep -q .
+```
+
+Set `runtrail_base_url` to the existing service URL without a trailing slash and verify health:
+
+```zsh
+runtrail_base_url="RUNTRAIL_BASE_URL"
+/usr/bin/curl -fsS "$runtrail_base_url/health" >/dev/null
+```
+
+Fully quit the GUI MCP client—not merely its window—and reopen it after initial setup or rotation.
+Use the reopened client to initialize MCP or perform one bounded authenticated read such as
+`journal_search_runs` with `limit: 1`. Do not enable verbose HTTP logging or print the authorization
+header. Success proves that a newly launched client inherited the variable; it does not prove the
+token value should be displayed.
+
+### Rotation and removal
+
+For rotation, repeat the interactive `security add-generic-password -U` command, kickstart the
+LaunchAgent, confirm the variable is non-empty, then fully quit and reopen the GUI client. Existing
+client processes retain their old environment.
+
+For clean removal, first quit the GUI client and confirm the exact label, plist, service, account,
+and variable. Then unload before deleting:
+
+```zsh
+if /bin/launchctl print "$gui_domain/$agent_label" >/dev/null 2>&1; then
+  /bin/launchctl bootout "$gui_domain/$agent_label"
+fi
+/bin/launchctl unsetenv "$token_env_name"
+/bin/rm -- "$agent_path"
+/usr/bin/security delete-generic-password \
+  -s "$keychain_service" -a "$keychain_account"
+```
+
+Verify `launchctl print` fails for the removed label, `launchctl getenv` returns no value, and the
+exact Keychain lookup fails. Removal takes effect for the GUI client after it is fully restarted.
+
+### Troubleshooting
+
+- If Terminal has the variable but the GUI client does not, confirm the client was fully quit and
+  reopened after `launchctl setenv`.
+- If Keychain lookup fails, confirm the exact service/account pair and that the login Keychain is
+  unlocked. Unlock it interactively in Keychain Access or with `security unlock-keychain` without
+  putting the Keychain password on the command line.
+- If creation, rotation, or retrieval opens a Keychain approval prompt, verify the requesting
+  binary and exact identifiers before approving. Do not bypass or automate the prompt.
+- If `last exit code` is nonzero, run the silent Keychain-presence check as the same user. Do not
+  add shell tracing or echo the lookup result.
+- If `bootstrap` reports an existing service, inspect it with the bounded `launchctl print` pipeline,
+  then use the guarded reload sequence. Do not use `sudo` or install a system LaunchDaemon.
+- If the authenticated read fails, distinguish service health, client restart, endpoint, Keychain
+  access, and MCP compatibility before rotating the token.
+
+### Copyable agent setup prompt
+
+```text
+Configure persistent, environment-backed MCP authentication for my macOS GUI client.
+
+Before changing anything:
+
+1. Inspect the existing MCP client configuration and relevant client process. Determine the
+   endpoint, bearer-token environment-variable name, transport, proposed Keychain service/account,
+   LaunchAgent label, and per-user plist path without reading or printing any secret value.
+2. Use discovered values or explicit placeholders. Do not assume a username, host, token variable,
+   Keychain identifier, application, or installation path.
+3. Check whether the exact Keychain item and LaunchAgent already exist. Explain the proposed
+   identifiers and locations, show only secret-free metadata, and obtain my confirmation before
+   overwriting or deleting either item.
+
+Implement the setup:
+
+4. Prompt for the bearer token with hidden interactive input. Store it in the login Keychain. Never
+   place it in a repository file, YAML, source, .env, plist, shell history, command output, log, or
+   final report.
+5. Create an idempotent per-user LaunchAgent, never a LaunchDaemon, that uses /bin/zsh,
+   /usr/bin/security, and /bin/launchctl setenv to retrieve the item at login. The plist may contain
+   only the Keychain identifiers, environment-variable name, and lookup/export command—not the
+   credential. Leave matching existing state unchanged and stop for confirmation when it differs.
+6. Set the plist to mode 0600, validate it with plutil, and safely bootout/bootstrap/kickstart it in
+   gui/$(id -u). Confirm Keychain presence, plist validity, service status/exit result, and a
+   non-empty launchctl environment value without displaying the value.
+7. Verify the Runtrail health endpoint and one authenticated MCP initialization or bounded read
+   through the fully restarted GUI client. Do not log an authorization header or raw response body.
+8. Exercise repeat setup and, if I approve it, token rotation. Explain and validate clean removal
+   using the exact service/account, label, plist, and environment variable.
+
+Finish by telling me to fully quit and reopen the GUI client after installation or rotation.
+Return a secret-free handoff listing created paths, identifiers (not values), validation outcomes,
+restart requirements, rollback/removal commands, and manual follow-up.
+```
+
 ## Codex
 
 Codex uses a stdio bridge. Build and link the bridge executable from a trusted Runtrail checkout:
