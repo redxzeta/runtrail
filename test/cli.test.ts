@@ -59,6 +59,30 @@ describe("cli", () => {
     });
   });
 
+  it("prints equivalent capability facts as JSON and human-readable text", async () => {
+    const manifest = {
+      schemaVersion: "1",
+      service: { name: "runtrail", version: "1.40.0" },
+      protocol: { name: "runtrail-agent-ledger", version: "1" },
+      features: [{ id: "prepare_work", version: "1" }],
+      mcp: { transports: ["streamable_http", "stdio_bridge"], tools: [] }
+    };
+    const fetchMock = mockFetch(manifest);
+    const output = captureOutput();
+
+    await runCli(["node", "rt", "capabilities", "--json"]);
+    await runCli(["node", "rt", "capabilities"]);
+
+    expect(JSON.parse(output[0] ?? "{}")).toEqual(manifest);
+    expect(output[1]).toContain("runtrail 1.40.0 (protocol 1)");
+    expect(output[1]).toContain("prepare_work@1");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL("/meta/capabilities", "http://runtrail.test"),
+      expect.any(Object)
+    );
+  });
+
   it("fetches project context with query options", async () => {
     const fetchMock = mockFetch({
       project: "runtrail",

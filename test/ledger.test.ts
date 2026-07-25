@@ -4,6 +4,7 @@ import { loadConfig, type RuntrailConfig } from "../src/config.js";
 import { LedgerRepository } from "../src/db/ledger.js";
 import { migrate } from "../src/db/migrate.js";
 import { createApp } from "../src/index.js";
+import { RUNTRAIL_CAPABILITIES } from "../src/shared/capabilities.js";
 import { verifyEventChain } from "../src/shared/receipts.js";
 import { workflowReviewPacketSchema } from "../src/shared/schemas.js";
 
@@ -19,6 +20,16 @@ afterEach(() => {
 });
 
 describe("ledger routes", () => {
+  it("serves capability facts under the existing auth boundary", async () => {
+    const app = createTestApp();
+    const unauthorized = await app.request("/meta/capabilities");
+    const response = await app.request("/meta/capabilities", { headers: authHeaders() });
+
+    expect(unauthorized.status).toBe(401);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(RUNTRAIL_CAPABILITIES);
+  });
+
   it("requires a bearer token when auth is enabled", async () => {
     const app = createTestApp({ authRequired: true, token: "secret-token" });
 

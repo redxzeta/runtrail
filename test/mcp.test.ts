@@ -42,6 +42,7 @@ describe("mcp adapter", () => {
       "journal_get_run_manifest",
       "journal_get_workflow",
       "journal_get_workflow_review_packet",
+      "journal_get_capabilities",
       "journal_search",
       "journal_search_runs"
     ]);
@@ -216,6 +217,7 @@ describe("mcp adapter", () => {
       },
       client
     );
+    const capabilities = await callRuntrailTool("journal_get_capabilities", {}, client);
 
     expect(client.requestJson).toHaveBeenNthCalledWith(
       1,
@@ -239,6 +241,8 @@ describe("mcp adapter", () => {
       "/workflows/workflow-112/review-packet?project=runtrail&limit=10"
     );
     expect(packet).toEqual({ readiness });
+    expect(client.requestJson).toHaveBeenNthCalledWith(6, "/meta/capabilities");
+    expect(capabilities).toEqual({ readiness });
   });
 
   it("maps write tools to existing HTTP API endpoints", async () => {
@@ -542,7 +546,7 @@ describe("mcp adapter", () => {
     });
 
     expect(server).toBeDefined();
-    expect(runtrailToolNames).toHaveLength(24);
+    expect(runtrailToolNames).toHaveLength(25);
   });
 
   it("fails fast when bridge config is missing", () => {

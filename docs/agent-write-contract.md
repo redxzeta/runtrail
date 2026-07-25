@@ -40,6 +40,23 @@ that omit `clientRecordId` keep the existing append behavior. Keys are bounded i
 payload hashes: never derive them from prompts, logs, environment values, credentials, or other
 secret-bearing content.
 
+## Capability Discovery
+
+Before calling optional workflow features, read `GET /meta/capabilities`,
+`rt capabilities --json`, or `journal_get_capabilities`. All surfaces return the same manifest
+under the existing authentication boundary. Human-readable CLI output is available without
+`--json`.
+
+Manifest schema version `1` includes the service/protocol version, workflow-packet schema version,
+stable independently testable feature identifiers, MCP transports and tools, and actual
+default/maximum limits. Unknown feature IDs are additive and safe to ignore. An omitted optional
+feature means `not_supported`; an advertised feature whose contract fails is a conformance error.
+
+Capability claims mean protocol support only. They do not authenticate agent/model declarations or
+upgrade client-supplied verification evidence. The manifest is static and contains no ledger
+records, project/config values, credentials, environment data, database/host paths, or
+authorization decisions.
+
 ## Verification Evidence
 
 Use `POST /verifications`, `rt verification add`, or `journal_record_verification` for bounded

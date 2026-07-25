@@ -8,8 +8,64 @@ export const healthResponseSchema = z.object({
   ok: z.literal(true),
   service: z.literal("runtrail")
 });
+export const capabilityFeatureIdSchema = z.enum([
+  "optimistic_concurrency",
+  "workflow_relationships",
+  "handoff_lifecycle",
+  "prepare_work",
+  "server_authoritative_run_freshness",
+  "incremental_cursors",
+  "durable_local_outbox_replay",
+  "effective_decisions",
+  "typed_verification_evidence",
+  "provenance_aware_readiness",
+  "workflow_review_packet"
+]);
+const capabilityLimitSchema = z.object({
+  default: z.number().int().positive(),
+  maximum: z.number().int().positive()
+});
+export const capabilitiesManifestSchema = z.object({
+  schemaVersion: z.literal("1"),
+  service: z.object({
+    name: z.literal("runtrail"),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/)
+  }),
+  protocol: z.object({
+    name: z.literal("runtrail-agent-ledger"),
+    version: z.literal("1")
+  }),
+  schemas: z.object({
+    capabilities: z.literal("1"),
+    workflowReviewPacket: z.literal("1")
+  }),
+  features: z.array(
+    z.object({
+      id: capabilityFeatureIdSchema,
+      version: z.literal("1")
+    })
+  ),
+  mcp: z.object({
+    transports: z.array(z.enum(["streamable_http", "stdio_bridge"])),
+    tools: z.array(z.string().min(1))
+  }),
+  limits: z.object({
+    runs: capabilityLimitSchema,
+    workflowRuns: capabilityLimitSchema,
+    context: capabilityLimitSchema,
+    prepareWork: capabilityLimitSchema,
+    journalSearch: capabilityLimitSchema,
+    workflowReviewPacket: capabilityLimitSchema
+  }),
+  semantics: z.object({
+    capabilityClaims: z.literal("protocol_support"),
+    verificationEvidence: z.literal("recorded_client_evidence")
+  })
+});
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
+export type CapabilityFeatureId = z.infer<typeof capabilityFeatureIdSchema>;
+export type CapabilitiesManifest = z.infer<typeof capabilitiesManifestSchema>;
 
 export const runStatusSchema = z.enum([
   "running",

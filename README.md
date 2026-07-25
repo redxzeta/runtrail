@@ -75,6 +75,18 @@ curl http://127.0.0.1:8787/health
 pnpm cli health
 ```
 
+Discover optional protocol support before feature-specific calls:
+
+```sh
+curl -H "authorization: Bearer $RUNTRAIL_TOKEN" http://127.0.0.1:8787/meta/capabilities
+pnpm cli capabilities --json
+```
+
+The versioned manifest advertises stable feature identifiers, schema versions, MCP transports and
+tools, and actual default/maximum list limits. Unknown feature identifiers are additive and safe to
+ignore. Capability support describes the protocol contract; it does not claim that a particular
+client-supplied verification record is independently proven.
+
 Fetch compact agent context:
 
 ```sh

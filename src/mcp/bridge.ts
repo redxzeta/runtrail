@@ -220,6 +220,16 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
   );
 
   server.registerTool(
+    "journal_get_capabilities",
+    {
+      title: "Get Runtrail capabilities",
+      description: "Discover versioned protocol, feature, transport, tool, and limit support",
+      inputSchema: mcpToolInputSchemas.capabilities
+    },
+    async (args) => await forwardTool(client, "journal_get_capabilities", args)
+  );
+
+  server.registerTool(
     "journal_search",
     {
       title: "Search Runtrail journal",

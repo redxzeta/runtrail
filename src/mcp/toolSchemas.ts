@@ -27,6 +27,7 @@ const idSchema = z.string().trim().min(1);
 const mcpLimitSchema = z.number().int().positive().max(50).optional();
 
 export const mcpToolInputSchemas = {
+  capabilities: {},
   startRun: {
     source: createRunRequestSchema.shape.source,
     project: createRunRequestSchema.shape.project,

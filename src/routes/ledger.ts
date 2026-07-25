@@ -9,6 +9,7 @@ import {
   RunRelationshipError,
   VersionConflictError
 } from "../db/ledger.js";
+import { RUNTRAIL_CAPABILITIES } from "../shared/capabilities.js";
 import {
   type AgentEvent,
   type AgentRun,
@@ -107,6 +108,7 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
   });
 
   route.get("/", (c) => c.redirect("/today"));
+  route.get("/meta/capabilities", (c) => c.json(RUNTRAIL_CAPABILITIES));
 
   route.get("/today", (c) => {
     const today = new Date().toISOString().slice(0, 10);
