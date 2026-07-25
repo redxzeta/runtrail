@@ -2,6 +2,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig, type RuntrailConfig } from "../config.js";
+import { RUNTRAIL_TOOL_NAMES } from "../shared/capabilities.js";
 import {
   fetchWithTimeout,
   formatClientFailure,
@@ -20,32 +21,7 @@ export type RuntrailHttpClient = {
 
 export type RuntrailHttpClientConfig = Pick<RuntrailConfig, "url" | "security">;
 
-export const runtrailToolNames = [
-  "journal_start_run",
-  "journal_resume_run",
-  "journal_heartbeat_run",
-  "journal_pause_run",
-  "journal_finish_run",
-  "journal_get_context",
-  "journal_prepare_work",
-  "journal_create_event",
-  "journal_record_verification",
-  "journal_create_open_loop",
-  "journal_resolve_open_loop",
-  "journal_record_decision",
-  "journal_list_decisions",
-  "journal_create_handoff",
-  "journal_list_pending_handoffs",
-  "journal_accept_handoff",
-  "journal_decline_handoff",
-  "journal_complete_handoff",
-  "journal_expire_handoff",
-  "journal_get_run_manifest",
-  "journal_get_workflow",
-  "journal_get_workflow_review_packet",
-  "journal_search",
-  "journal_search_runs"
-] as const;
+export const runtrailToolNames = RUNTRAIL_TOOL_NAMES;
 
 export function createRuntrailMcpServer(
   client: RuntrailHttpClient = createHttpClient(loadMcpHttpConfig())
@@ -236,6 +212,16 @@ export function createRuntrailMcpServer(
     },
     async (args) =>
       mcpText(await callRuntrailTool("journal_get_workflow_review_packet", args, client))
+  );
+
+  server.registerTool(
+    "journal_get_capabilities",
+    {
+      title: "Get Runtrail capabilities",
+      description: "Discover versioned protocol, feature, transport, tool, and limit support",
+      inputSchema: mcpToolInputSchemas.capabilities
+    },
+    async () => mcpText(await callRuntrailTool("journal_get_capabilities", {}, client))
   );
 
   server.registerTool(
@@ -498,6 +484,8 @@ export async function callRuntrailTool(
         `/workflows/${encodeURIComponent(requireString(args, "workflowId"))}/review-packet?${query.toString()}`
       );
     }
+    case "journal_get_capabilities":
+      return await client.requestJson("/meta/capabilities");
     case "journal_search": {
       const query = new URLSearchParams();
       appendOptional(query, "project", args.project);

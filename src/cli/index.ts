@@ -35,6 +35,11 @@ export async function runCli(argv = process.argv): Promise<void> {
   program.name("rt").description("Runtrail CLI").showHelpAfterError().exitOverride();
 
   program.command("health").description("Check Runtrail service health").action(health);
+  program
+    .command("capabilities")
+    .description("Discover supported Runtrail protocol capabilities")
+    .option("--json", "Print machine-readable JSON", false)
+    .action(capabilities);
   const outbox = program.command("outbox").description("Inspect and replay queued writes");
   outbox.command("list").description("List bounded safe outbox metadata").action(showOutbox);
   outbox
@@ -283,6 +288,24 @@ export async function runCli(argv = process.argv): Promise<void> {
 async function health(): Promise<void> {
   const parsed = healthResponseSchema.parse(await requestJson("/health"));
   printJson(parsed);
+}
+
+async function capabilities(options: { json: boolean }): Promise<void> {
+  const manifest = (await requestJson("/meta/capabilities")) as {
+    service: { name: string; version: string };
+    protocol: { version: string };
+    features: Array<{ id: string; version: string }>;
+    mcp: { transports: string[] };
+  };
+  if (options.json) return printJson(manifest);
+  console.log(
+    [
+      `${manifest.service.name} ${manifest.service.version} (protocol ${manifest.protocol.version})`,
+      `MCP transports: ${manifest.mcp.transports.join(", ")}`,
+      "Capabilities:",
+      ...manifest.features.map((feature) => `- ${feature.id}@${feature.version}`)
+    ].join("\n")
+  );
 }
 
 async function showOutbox(): Promise<void> {
