@@ -100,6 +100,16 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
   );
 
   server.registerTool(
+    "journal_list_decisions",
+    {
+      title: "List Runtrail decisions",
+      description: "List bounded decision history or only currently effective guidance",
+      inputSchema: mcpToolInputSchemas.decisionList
+    },
+    async (args) => await forwardTool(client, "journal_list_decisions", args)
+  );
+
+  server.registerTool(
     "journal_search_runs",
     {
       title: "Search Runtrail runs",

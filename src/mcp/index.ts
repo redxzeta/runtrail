@@ -32,6 +32,7 @@ export const runtrailToolNames = [
   "journal_create_open_loop",
   "journal_resolve_open_loop",
   "journal_record_decision",
+  "journal_list_decisions",
   "journal_create_handoff",
   "journal_list_pending_handoffs",
   "journal_accept_handoff",
@@ -112,6 +113,16 @@ export function createRuntrailMcpServer(
       inputSchema: mcpToolInputSchemas.decision
     },
     async (args) => mcpText(await callRuntrailTool("journal_record_decision", args, client))
+  );
+
+  server.registerTool(
+    "journal_list_decisions",
+    {
+      title: "List Runtrail decisions",
+      description: "List bounded decision history or only currently effective guidance",
+      inputSchema: mcpToolInputSchemas.decisionList
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_list_decisions", args, client))
   );
 
   server.registerTool(
@@ -355,11 +366,21 @@ export async function callRuntrailTool(
         body: compact({
           project: args.project,
           clientRecordId: args.clientRecordId,
+          supersedesDecisionId: args.supersedesDecisionId,
           title: requireString(args, "title"),
           decision: requireString(args, "decision"),
           rationale: args.rationale
         })
       });
+    case "journal_list_decisions": {
+      const query = new URLSearchParams();
+      appendOptional(query, "project", args.project);
+      appendOptional(query, "includeGlobal", args.includeGlobal);
+      appendOptional(query, "effectiveOnly", args.effectiveOnly);
+      appendOptional(query, "limit", args.limit);
+      const suffix = query.toString();
+      return await client.requestJson(`/decisions${suffix ? `?${suffix}` : ""}`);
+    }
     case "journal_create_handoff":
       return await client.requestJson("/handoffs", {
         method: "POST",
@@ -440,6 +461,7 @@ export async function callRuntrailTool(
       appendOptional(query, "text", args.text);
       appendOptional(query, "date_from", args.date_from);
       appendOptional(query, "date_to", args.date_to);
+      appendOptional(query, "effectiveOnly", args.effectiveOnly);
       appendOptional(query, "limit", args.limit);
       const suffix = query.toString();
       return await client.requestJson(`/search${suffix ? `?${suffix}` : ""}`);

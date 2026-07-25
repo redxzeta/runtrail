@@ -36,6 +36,9 @@ describe("database", () => {
     const provenanceMigration = db
       .prepare("SELECT name FROM schema_migrations WHERE id = ?")
       .get(9) as { name: string } | undefined;
+    const effectiveDecisionsMigration = db
+      .prepare("SELECT name FROM schema_migrations WHERE id = ?")
+      .get(10) as { name: string } | undefined;
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as Array<{ name: string }>;
@@ -52,6 +55,7 @@ describe("database", () => {
     expect(livenessMigration?.name).toBe("007_authoritative_run_liveness");
     expect(cursorMigration?.name).toBe("008_incremental_context_cursors");
     expect(provenanceMigration?.name).toBe("009_agent_provenance");
+    expect(effectiveDecisionsMigration?.name).toBe("010_effective_decisions");
     expect(tables.map((table) => table.name)).toEqual([
       "agent_event_tags",
       "agent_events",
@@ -78,6 +82,7 @@ describe("database", () => {
       "idx_agent_runs_project_workflow_started_at"
     );
     expect(indexes.map((index) => index.name)).toContain("idx_agent_events_client_record_id");
+    expect(indexes.map((index) => index.name)).toContain("idx_decisions_supersedes");
   });
 
   it("adds collaboration and metadata columns to existing databases", () => {
@@ -258,13 +263,16 @@ describe("database", () => {
       version: 1,
       updated_at: "2026-07-01T00:00:00.000Z"
     });
-    expect(decisionColumns.map((column) => column.name)).toContain("client_record_id");
+    expect(decisionColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining(["client_record_id", "supersedes_decision_id"])
+    );
     expect(artifactColumns.map((column) => column.name)).toContain("client_record_id");
     expect(indexes.map((index) => index.name)).toEqual(
       expect.arrayContaining([
         "idx_agent_events_client_record_id",
         "idx_open_loops_client_record_id",
         "idx_decisions_client_record_id",
+        "idx_decisions_supersedes",
         "idx_handoffs_client_record_id",
         "idx_handoffs_project_status_updated_at",
         "idx_artifacts_client_record_id"

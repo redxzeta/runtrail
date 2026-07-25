@@ -119,10 +119,12 @@ export const schemaStatements = [
     id TEXT PRIMARY KEY,
     project TEXT,
     client_record_id TEXT,
+    supersedes_decision_id TEXT,
     title TEXT NOT NULL,
     decision TEXT NOT NULL,
     rationale TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (supersedes_decision_id) REFERENCES decisions (id)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_decisions_project_created_at
     ON decisions (project, created_at DESC)`,

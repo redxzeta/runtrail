@@ -167,6 +167,17 @@ curl -X POST http://127.0.0.1:8787/decisions \
   -d '{"project":"runtrail","title":"SQLite remains source of truth","decision":"Markdown is export-only"}'
 ```
 
+Replace prior guidance without editing its history:
+
+```sh
+pnpm cli decision add --project runtrail --supersedes-decision-id dec_abc123 \
+  --title "Use explicit projections" --decision "Current guidance replaces the prior decision"
+pnpm cli decision list --project runtrail --effective-only
+```
+
+Decision history remains the default for `GET /decisions` and search. Add `effectiveOnly=true` for
+current guidance; superseded records remain available through `GET /decisions/:id`.
+
 CLI equivalents:
 
 ```sh
@@ -296,7 +307,7 @@ Agent continuity tools include `journal_prepare_work`, `journal_get_context`, `j
 `journal_list_pending_handoffs`, `journal_accept_handoff`, `journal_decline_handoff`,
 `journal_complete_handoff`, `journal_expire_handoff`,
 `journal_create_event`, `journal_create_open_loop`,
-`journal_resolve_open_loop`, and `journal_record_decision`.
+`journal_resolve_open_loop`, `journal_record_decision`, and `journal_list_decisions`.
 See [docs/mcp-safe-surface.md](docs/mcp-safe-surface.md) for the proposed safe read/write tool surface and default response limits.
 See [docs/agent-write-contract.md](docs/agent-write-contract.md) for the recommended cross-agent write contract.
 See [docs/mcp-client-setup-runbook.md](docs/mcp-client-setup-runbook.md) for repeatable Codex, OpenClaw, Claude Code, and opencode setup and verification.

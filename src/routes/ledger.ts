@@ -4,6 +4,7 @@ import { type Context, Hono } from "hono";
 import type { RuntrailConfig } from "../config.js";
 import {
   ContextCursorError,
+  DecisionSupersessionError,
   LedgerRepository,
   RunRelationshipError,
   VersionConflictError
@@ -407,7 +408,22 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json(formatValidationError(parsed.error), 400);
     }
 
-    return c.json({ decision: ledger.createDecision(parsed.data) }, 201);
+    try {
+      return c.json({ decision: ledger.createDecision(parsed.data) }, 201);
+    } catch (error) {
+      if (error instanceof DecisionSupersessionError) {
+        return c.json(
+          {
+            error: "Invalid decision supersession",
+            code: error.code,
+            referenceId: error.referenceId,
+            replacingDecisionId: error.replacingDecisionId
+          },
+          400
+        );
+      }
+      throw error;
+    }
   });
 
   route.get("/decisions", (c) => {
@@ -426,6 +442,11 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     }
 
     return c.json({ decisions });
+  });
+
+  route.get("/decisions/:id", (c) => {
+    const decision = ledger.getDecision(c.req.param("id"));
+    return decision ? c.json({ decision }) : c.json({ error: "Decision not found" }, 404);
   });
 
   route.get("/agent/context", (c) => {
@@ -584,7 +605,12 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     const project = c.req.param("project");
     const runs = ledger.listRuns({ project, limit: 25 });
     const openLoops = ledger.listOpenLoops({ project, status: "open", limit: 25 });
-    const decisions = ledger.listDecisions({ project, includeGlobal: true, limit: 25 });
+    const decisions = ledger.listDecisions({
+      project,
+      includeGlobal: true,
+      effectiveOnly: false,
+      limit: 25
+    });
     const context = ledger.getAgentContext({ project, limit: 25, min_importance: 4 });
 
     return c.html(

@@ -31,6 +31,7 @@ describe("mcp adapter", () => {
       "journal_create_open_loop",
       "journal_resolve_open_loop",
       "journal_record_decision",
+      "journal_list_decisions",
       "journal_create_handoff",
       "journal_list_pending_handoffs",
       "journal_accept_handoff",
@@ -171,6 +172,7 @@ describe("mcp adapter", () => {
         text: "handoff",
         date_from: "2026-07-01T00:00:00.000Z",
         date_to: "2026-07-02T00:00:00.000Z",
+        effectiveOnly: true,
         limit: 10
       },
       client
@@ -203,7 +205,7 @@ describe("mcp adapter", () => {
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(
       2,
-      "/search?project=runtrail&source=codex&status=failed&category=implementation&tag=mcp&text=handoff&date_from=2026-07-01T00%3A00%3A00.000Z&date_to=2026-07-02T00%3A00%3A00.000Z&limit=10"
+      "/search?project=runtrail&source=codex&status=failed&category=implementation&tag=mcp&text=handoff&date_from=2026-07-01T00%3A00%3A00.000Z&date_to=2026-07-02T00%3A00%3A00.000Z&effectiveOnly=true&limit=10"
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(
       3,
@@ -262,6 +264,7 @@ describe("mcp adapter", () => {
       {
         project: "runtrail",
         clientRecordId: "decision-mcp-1",
+        supersedesDecisionId: "dec_previous",
         title: "Use HTTP adapter",
         decision: "MCP calls the API"
       },
@@ -338,6 +341,7 @@ describe("mcp adapter", () => {
         body: {
           project: "runtrail",
           clientRecordId: "decision-mcp-1",
+          supersedesDecisionId: "dec_previous",
           title: "Use HTTP adapter",
           decision: "MCP calls the API"
         }
@@ -363,6 +367,20 @@ describe("mcp adapter", () => {
       })
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(6, "/runs/run_1/manifest");
+  });
+
+  it("maps effective decision reads to the bounded HTTP endpoint", async () => {
+    const client = mockClient({ decisions: [] });
+
+    await callRuntrailTool(
+      "journal_list_decisions",
+      { project: "runtrail", includeGlobal: false, effectiveOnly: true, limit: 5 },
+      client
+    );
+
+    expect(client.requestJson).toHaveBeenCalledWith(
+      "/decisions?project=runtrail&includeGlobal=false&effectiveOnly=true&limit=5"
+    );
   });
 
   it("builds the HTTP client from URL and token without loading YAML", async () => {
@@ -475,7 +493,7 @@ describe("mcp adapter", () => {
     });
 
     expect(server).toBeDefined();
-    expect(runtrailToolNames).toHaveLength(21);
+    expect(runtrailToolNames).toHaveLength(22);
   });
 
   it("fails fast when bridge config is missing", () => {

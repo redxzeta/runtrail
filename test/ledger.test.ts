@@ -1372,7 +1372,7 @@ describe("ledger routes", () => {
     });
   });
 
-  it("records and lists project and global decisions", async () => {
+  it("preserves decision history while resolving bounded effective guidance", async () => {
     const app = createTestApp();
     const globalResponse = await postJson(app, "/decisions", {
       title: "Store Markdown as exports only",
@@ -1384,6 +1384,7 @@ describe("ledger routes", () => {
       project: "runtrail",
       title: "Use Hono route modules",
       decision: "Keep ledger routes in the existing API module",
+      clientRecordId: "decision-route-original",
       createdAt: "2026-06-26T10:05:00.000Z"
     });
 
@@ -1394,13 +1395,52 @@ describe("ledger routes", () => {
       decision: { id: string; project?: string; title: string };
     };
     const project = (await projectResponse.json()) as {
-      decision: { id: string; project: string; title: string };
+      decision: { id: string; project: string; title: string; state: string };
     };
+    const replacementResponse = await postJson(app, "/decisions", {
+      project: "runtrail",
+      clientRecordId: "decision-route-replacement",
+      supersedesDecisionId: project.decision.id,
+      title: "Use explicit route registry",
+      decision: "Keep route registration explicit and centralized",
+      createdAt: "2026-06-26T10:10:00.000Z"
+    });
+    const replacement = (await replacementResponse.json()) as {
+      decision: {
+        id: string;
+        supersedesDecisionId: string;
+        state: string;
+        title: string;
+      };
+    };
+    const replay = (await (
+      await postJson(app, "/decisions", {
+        project: "runtrail",
+        clientRecordId: "decision-route-replacement",
+        supersedesDecisionId: global.decision.id,
+        title: "Replacement retry",
+        decision: "Must not replace original payload"
+      })
+    ).json()) as { decision: { id: string; supersedesDecisionId: string; title: string } };
 
     expect(global.decision.id).toMatch(/^dec_/);
     expect(global.decision.project).toBeUndefined();
     expect(project.decision.id).toMatch(/^dec_/);
     expect(project.decision.project).toBe("runtrail");
+    expect(replacementResponse.status).toBe(201);
+    expect(replacement.decision).toEqual(
+      expect.objectContaining({
+        supersedesDecisionId: project.decision.id,
+        state: "current"
+      })
+    );
+    expect(replay.decision).toEqual(
+      expect.objectContaining({
+        id: replacement.decision.id,
+        supersedesDecisionId: project.decision.id,
+        title: "Use explicit route registry"
+      })
+    );
 
     const withGlobalResponse = await app.request("/decisions?project=runtrail", {
       headers: authHeaders()
@@ -1410,8 +1450,18 @@ describe("ledger routes", () => {
     };
 
     expect(withGlobal.decisions.map((decision) => decision.id)).toEqual([
+      replacement.decision.id,
       project.decision.id,
       global.decision.id
+    ]);
+    const effective = (await (
+      await app.request("/decisions?project=runtrail&effectiveOnly=true", {
+        headers: authHeaders()
+      })
+    ).json()) as { decisions: Array<{ id: string; state: string }> };
+    expect(effective.decisions).toEqual([
+      expect.objectContaining({ id: replacement.decision.id, state: "current" }),
+      expect.objectContaining({ id: global.decision.id, state: "current" })
     ]);
 
     const projectOnlyResponse = await app.request(
@@ -1426,9 +1476,109 @@ describe("ledger routes", () => {
 
     expect(projectOnly.decisions).toEqual([
       expect.objectContaining({
+        id: replacement.decision.id
+      }),
+      expect.objectContaining({
         id: project.decision.id
       })
     ]);
+
+    const originalRead = (await (
+      await app.request(`/decisions/${project.decision.id}`, { headers: authHeaders() })
+    ).json()) as {
+      decision: { state: string; replacingDecisionId: string };
+    };
+    expect(originalRead.decision).toEqual(
+      expect.objectContaining({
+        state: "superseded",
+        replacingDecisionId: replacement.decision.id
+      })
+    );
+    const search = (await (
+      await app.request("/search?project=runtrail&text=route&effectiveOnly=true", {
+        headers: authHeaders()
+      })
+    ).json()) as { results: { decisions: Array<{ id: string }> } };
+    expect(search.results.decisions).toEqual([
+      expect.objectContaining({ id: replacement.decision.id })
+    ]);
+    const context = (await (
+      await app.request("/agent/context?project=runtrail", { headers: authHeaders() })
+    ).json()) as { decisions: Array<{ id: string }> };
+    expect(context.decisions.map(({ id }) => id)).toEqual([
+      replacement.decision.id,
+      global.decision.id
+    ]);
+    const prepared = (await (
+      await app.request("/agent/prepare-work?project=runtrail", { headers: authHeaders() })
+    ).json()) as {
+      effectiveDecisions: Array<{ id: string; state: string }>;
+      sections: { effectiveDecisions: { count: number; truncated: boolean } };
+    };
+    expect(prepared.effectiveDecisions).toEqual([
+      expect.objectContaining({ id: replacement.decision.id, state: "current" }),
+      expect.objectContaining({ id: global.decision.id, state: "current" })
+    ]);
+    expect(prepared.sections.effectiveDecisions).toEqual({ count: 2, limit: 10, truncated: false });
+
+    const missing = await postJson(app, "/decisions", {
+      project: "runtrail",
+      supersedesDecisionId: "dec_missing",
+      title: "Missing reference",
+      decision: "Invalid"
+    });
+    expect(await missing.json()).toEqual({
+      error: "Invalid decision supersession",
+      code: "missing_reference",
+      referenceId: "dec_missing"
+    });
+    const wrongScope = await postJson(app, "/decisions", {
+      supersedesDecisionId: project.decision.id,
+      title: "Wrong scope",
+      decision: "Invalid"
+    });
+    expect(await wrongScope.json()).toEqual({
+      error: "Invalid decision supersession",
+      code: "scope_mismatch",
+      referenceId: project.decision.id
+    });
+    const duplicate = await postJson(app, "/decisions", {
+      project: "runtrail",
+      supersedesDecisionId: project.decision.id,
+      title: "Second replacement",
+      decision: "Invalid"
+    });
+    expect(await duplicate.json()).toEqual({
+      error: "Invalid decision supersession",
+      code: "already_superseded",
+      referenceId: project.decision.id,
+      replacingDecisionId: replacement.decision.id
+    });
+  });
+
+  it("rejects an obvious cycle in existing decision links", () => {
+    const db = new Database(":memory:");
+    databases.push(db);
+    migrate(db);
+    db.pragma("foreign_keys = OFF");
+    db.exec(`
+      INSERT INTO decisions (
+        id, project, supersedes_decision_id, title, decision, created_at
+      ) VALUES
+        ('dec_cycle_a', 'runtrail', 'dec_cycle_b', 'Cycle A', 'Invalid legacy link',
+         '2026-07-01T00:00:00.000Z'),
+        ('dec_cycle_b', 'runtrail', 'dec_cycle_a', 'Cycle B', 'Invalid legacy link',
+         '2026-07-01T00:01:00.000Z')
+    `);
+
+    expect(() =>
+      new LedgerRepository(db).createDecision({
+        project: "runtrail",
+        supersedesDecisionId: "dec_cycle_a",
+        title: "Cycle continuation",
+        decision: "Must be rejected"
+      })
+    ).toThrow("Invalid supersedesDecisionId: cycle");
   });
 
   it("creates, lists, and fetches handoffs", async () => {

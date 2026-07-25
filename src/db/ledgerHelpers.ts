@@ -77,9 +77,12 @@ export type DecisionRow = {
   id: string;
   project: string | null;
   client_record_id: string | null;
+  supersedes_decision_id: string | null;
   title: string;
   decision: string;
   rationale: string | null;
+  state?: Decision["state"];
+  replacing_decision_id?: string | null;
   created_at: string;
 };
 
@@ -210,9 +213,12 @@ export function mapDecisionRow(row: DecisionRow): Decision {
     id: row.id,
     project: row.project ?? undefined,
     clientRecordId: row.client_record_id ?? undefined,
+    supersedesDecisionId: row.supersedes_decision_id ?? undefined,
     title: row.title,
     decision: row.decision,
     rationale: row.rationale ?? undefined,
+    state: row.state ?? "current",
+    replacingDecisionId: row.replacing_decision_id ?? undefined,
     createdAt: row.created_at
   };
 }

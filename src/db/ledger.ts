@@ -33,6 +33,7 @@ import type {
   OpenLoop,
   PauseRunRequest,
   PrepareWorkConflict,
+  PrepareWorkDecision,
   PrepareWorkHandoff,
   PrepareWorkManifestSummary,
   PrepareWorkOpenLoop,
@@ -79,6 +80,17 @@ import {
 
 const exceptionalEventTypes = ["blocked", "failed", "needs_review", "decision_required"];
 const exceptionalEventParams = exceptionalEventTypes.map((_, index) => `@exceptional${index}`);
+const decisionProjection = `decisions.*,
+  CASE WHEN EXISTS (
+    SELECT 1 FROM decisions replacement
+    WHERE replacement.supersedes_decision_id = decisions.id
+  ) THEN 'superseded' ELSE 'current' END AS state,
+  (
+    SELECT replacement.id FROM decisions replacement
+    WHERE replacement.supersedes_decision_id = decisions.id
+    ORDER BY replacement.created_at DESC, replacement.id DESC
+    LIMIT 1
+  ) AS replacing_decision_id`;
 
 function isUniqueConstraint(error: unknown): boolean {
   return (
@@ -129,6 +141,22 @@ export class ContextCursorError extends Error {
   constructor(message = "Cursor is invalid, unsupported, or belongs to a different query") {
     super(message);
     this.name = "ContextCursorError";
+  }
+}
+
+export class DecisionSupersessionError extends Error {
+  constructor(
+    readonly code:
+      | "missing_reference"
+      | "scope_mismatch"
+      | "self_reference"
+      | "cycle"
+      | "already_superseded",
+    readonly referenceId: string,
+    readonly replacingDecisionId?: string
+  ) {
+    super(`Invalid supersedesDecisionId: ${code}`);
+    this.name = "DecisionSupersessionError";
   }
 }
 
@@ -1110,73 +1138,163 @@ export class LedgerRepository {
   }
 
   createDecision(input: CreateDecisionRequest): Decision {
+    const replay = input.clientRecordId
+      ? this.findDecisionByClientRecordId(input.project, input.clientRecordId)
+      : undefined;
+    if (replay) return replay;
+
     const decision: Decision = {
       id: createId("dec"),
       project: input.project,
       clientRecordId: input.clientRecordId,
+      supersedesDecisionId: input.supersedesDecisionId,
       title: input.title,
       decision: input.decision,
       rationale: input.rationale,
+      state: "current",
       createdAt: input.createdAt ?? nowIso()
     };
+    if (input.supersedesDecisionId) {
+      this.validateDecisionSupersession(decision);
+    }
 
     try {
       this.db
         .prepare(
           `INSERT INTO decisions (
-            id, project, client_record_id, title, decision, rationale, created_at
+            id, project, client_record_id, supersedes_decision_id,
+            title, decision, rationale, created_at
           ) VALUES (
-            @id, @project, @clientRecordId, @title, @decision, @rationale, @createdAt
+            @id, @project, @clientRecordId, @supersedesDecisionId,
+            @title, @decision, @rationale, @createdAt
           )`
         )
         .run({
           ...decision,
           project: toSqlValue(decision.project),
           clientRecordId: toSqlValue(decision.clientRecordId),
+          supersedesDecisionId: toSqlValue(decision.supersedesDecisionId),
           rationale: toSqlValue(decision.rationale)
         });
     } catch (error) {
-      if (!input.clientRecordId || !isUniqueConstraint(error)) {
-        throw error;
+      if (isUniqueConstraint(error)) {
+        const existing = input.clientRecordId
+          ? this.findDecisionByClientRecordId(input.project, input.clientRecordId)
+          : undefined;
+        if (existing) return existing;
+        if (input.supersedesDecisionId) {
+          const replacement = this.findDecisionReplacement(input.supersedesDecisionId);
+          if (replacement) {
+            throw new DecisionSupersessionError(
+              "already_superseded",
+              input.supersedesDecisionId,
+              replacement.id
+            );
+          }
+        }
       }
-
-      const existing = this.db
-        .prepare("SELECT * FROM decisions WHERE project IS ? AND client_record_id = ?")
-        .get(input.project ?? null, input.clientRecordId) as DecisionRow | undefined;
-      if (!existing) throw error;
-      return mapDecisionRow(existing);
+      throw error;
     }
 
     return decision;
+  }
+
+  getDecision(id: string): Decision | undefined {
+    const row = this.db
+      .prepare(`SELECT ${decisionProjection} FROM decisions WHERE decisions.id = ?`)
+      .get(id) as DecisionRow | undefined;
+    return row ? mapDecisionRow(row) : undefined;
   }
 
   listDecisions(query: ListDecisionsQuery): Decision[] {
     const params: Record<string, string | number> = {
       limit: query.limit
     };
-    let whereClause = "";
+    const filters: string[] = [];
 
     if (query.project && query.includeGlobal) {
-      whereClause = "WHERE project = @project OR project IS NULL";
+      filters.push("(decisions.project = @project OR decisions.project IS NULL)");
       params.project = query.project;
     } else if (query.project) {
-      whereClause = "WHERE project = @project";
+      filters.push("decisions.project = @project");
       params.project = query.project;
     } else if (!query.includeGlobal) {
-      whereClause = "WHERE project IS NOT NULL";
+      filters.push("decisions.project IS NOT NULL");
+    }
+    if (query.effectiveOnly) {
+      filters.push(
+        "NOT EXISTS (SELECT 1 FROM decisions replacement WHERE replacement.supersedes_decision_id = decisions.id)"
+      );
     }
 
     const rows = this.db
       .prepare(
-        `SELECT *
+        `SELECT ${decisionProjection}
         FROM decisions
-        ${whereClause}
-        ORDER BY created_at DESC
+        ${whereClause(filters)}
+        ORDER BY decisions.created_at DESC, decisions.id DESC
         LIMIT @limit`
       )
       .all(params) as DecisionRow[];
 
     return rows.map(mapDecisionRow);
+  }
+
+  private findDecisionByClientRecordId(
+    project: string | undefined,
+    clientRecordId: string
+  ): Decision | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT ${decisionProjection}
+        FROM decisions
+        WHERE decisions.project IS ? AND decisions.client_record_id = ?`
+      )
+      .get(project ?? null, clientRecordId) as DecisionRow | undefined;
+    return row ? mapDecisionRow(row) : undefined;
+  }
+
+  private findDecisionReplacement(id: string): Decision | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT ${decisionProjection}
+        FROM decisions
+        WHERE decisions.supersedes_decision_id = ?
+        ORDER BY decisions.created_at DESC, decisions.id DESC
+        LIMIT 1`
+      )
+      .get(id) as DecisionRow | undefined;
+    return row ? mapDecisionRow(row) : undefined;
+  }
+
+  private validateDecisionSupersession(decision: Decision): void {
+    const referenceId = decision.supersedesDecisionId as string;
+    if (referenceId === decision.id) {
+      throw new DecisionSupersessionError("self_reference", referenceId);
+    }
+    const referenced = this.getDecision(referenceId);
+    if (!referenced) {
+      throw new DecisionSupersessionError("missing_reference", referenceId);
+    }
+    if ((referenced.project ?? null) !== (decision.project ?? null)) {
+      throw new DecisionSupersessionError("scope_mismatch", referenceId);
+    }
+    const seen = new Set([decision.id]);
+    let current: Decision | undefined = referenced;
+    while (current) {
+      if (seen.has(current.id)) {
+        throw new DecisionSupersessionError("cycle", referenceId);
+      }
+      seen.add(current.id);
+      current = current.supersedesDecisionId
+        ? this.getDecision(current.supersedesDecisionId)
+        : undefined;
+    }
+
+    const replacement = this.findDecisionReplacement(referenceId);
+    if (replacement) {
+      throw new DecisionSupersessionError("already_superseded", referenceId, replacement.id);
+    }
   }
 
   createHandoff(input: CreateHandoffRequest): Handoff | undefined {
@@ -1548,6 +1666,11 @@ export class LedgerRepository {
       "rationale",
       "project"
     ]);
+    if (query.effectiveOnly) {
+      decisionFilters.push(
+        "NOT EXISTS (SELECT 1 FROM decisions replacement WHERE replacement.supersedes_decision_id = decisions.id)"
+      );
+    }
 
     const runs = this.db
       .prepare(
@@ -1588,10 +1711,10 @@ export class LedgerRepository {
       .all(params) as HandoffRow[];
     const decisions = this.db
       .prepare(
-        `SELECT *
+        `SELECT ${decisionProjection}
         FROM decisions
         ${whereClause(decisionFilters)}
-        ORDER BY created_at DESC
+        ORDER BY decisions.created_at DESC, decisions.id DESC
         LIMIT @limit`
       )
       .all(params) as DecisionRow[];
@@ -1840,6 +1963,16 @@ export class LedgerRepository {
       query.limit
     );
     const openLoops = loopResult.items.map(toPrepareWorkOpenLoop);
+    const effectiveDecisionResult = takeBounded(
+      this.listDecisions({
+        project: query.project,
+        includeGlobal: true,
+        effectiveOnly: true,
+        limit: query.limit + 1
+      }),
+      query.limit
+    );
+    const effectiveDecisions = effectiveDecisionResult.items.map(toPrepareWorkDecision);
 
     const recommendationsResult = takeBounded(
       prepareWorkRecommendations(selectedSummary, conflicts, pendingHandoffs, openLoops),
@@ -1851,6 +1984,7 @@ export class LedgerRepository {
       ["conflicts", conflictResult.truncated],
       ["pendingHandoffs", handoffResult.truncated],
       ["openLoops", loopResult.truncated],
+      ["effectiveDecisions", effectiveDecisionResult.truncated],
       ["recommendations", recommendationsResult.truncated]
     ] as const;
     const warningLimit = Math.min(query.limit, 6);
@@ -1873,6 +2007,7 @@ export class LedgerRepository {
       conflicts,
       pendingHandoffs,
       openLoops,
+      effectiveDecisions,
       latestManifest: manifestRun ? this.getPrepareWorkManifestSummary(manifestRun) : undefined,
       recommendations: recommendationsResult.items,
       warnings: warningResult.items,
@@ -1882,6 +2017,11 @@ export class LedgerRepository {
         conflicts: sectionMeta(query.limit, conflicts.length, conflictResult.truncated),
         pendingHandoffs: sectionMeta(query.limit, pendingHandoffs.length, handoffResult.truncated),
         openLoops: sectionMeta(query.limit, openLoops.length, loopResult.truncated),
+        effectiveDecisions: sectionMeta(
+          query.limit,
+          effectiveDecisions.length,
+          effectiveDecisionResult.truncated
+        ),
         recommendations: sectionMeta(
           query.limit,
           recommendationsResult.items.length,
@@ -1988,7 +2128,14 @@ export class LedgerRepository {
           .map(toIncrementalHandoff),
         decisions: this.rowsByIds<DecisionRow>("decisions", idsByType.decisions)
           .map(mapDecisionRow)
-          .map(({ id, project, createdAt }) => ({ id, project, createdAt })),
+          .map(({ id, project, supersedesDecisionId, state, replacingDecisionId, createdAt }) => ({
+            id,
+            project,
+            supersedesDecisionId,
+            state,
+            replacingDecisionId,
+            createdAt
+          })),
         sections
       }
     };
@@ -2170,10 +2317,14 @@ export class LedgerRepository {
 
     const decisions = this.db
       .prepare(
-        `SELECT *
+        `SELECT ${decisionProjection}
         FROM decisions
-        WHERE project = @project OR project IS NULL
-        ORDER BY created_at DESC
+        WHERE (decisions.project = @project OR decisions.project IS NULL)
+          AND NOT EXISTS (
+            SELECT 1 FROM decisions replacement
+            WHERE replacement.supersedes_decision_id = decisions.id
+          )
+        ORDER BY decisions.created_at DESC, decisions.id DESC
         LIMIT @limit`
       )
       .all(params) as DecisionRow[];
@@ -2393,6 +2544,11 @@ function toPrepareWorkOpenLoop(openLoop: OpenLoop): PrepareWorkOpenLoop {
     version: openLoop.version,
     updatedAt: openLoop.updatedAt
   };
+}
+
+function toPrepareWorkDecision(decision: Decision): PrepareWorkDecision {
+  const { id, project, supersedesDecisionId, title, state, createdAt } = decision;
+  return { id, project, supersedesDecisionId, title, state, createdAt };
 }
 
 function prepareWorkRecommendations(

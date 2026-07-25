@@ -40,6 +40,16 @@ that omit `clientRecordId` keep the existing append behavior. Keys are bounded i
 payload hashes: never derive them from prompts, logs, environment values, credentials, or other
 secret-bearing content.
 
+## Effective Decisions
+
+A new decision may set `supersedesDecisionId` to one existing decision in the same project or the
+same global scope. The prior row remains immutable and readable with `state: "superseded"` plus its
+`replacingDecisionId`; the replacement is `current`. Runtrail never infers this relationship from
+titles or text. History reads and search include both states by default, while `effectiveOnly=true`
+returns current guidance ordered by `createdAt` descending and then ID descending. Compact context
+and prepare-work expose only current project and global decisions. Use `rt decision list
+--effective-only` or `journal_list_decisions` before acting on guidance.
+
 ## Mutable Record Versions
 
 Runs, open loops, and handoffs include a positive integer `version`, initialized to `1`. Clients
