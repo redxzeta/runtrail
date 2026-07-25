@@ -463,3 +463,6 @@ podman compose up --build
 The Compose example mounts the named volume `runtrail-data` at `/app/data`. SQLite is stored at `/app/data/runtrail.sqlite`, and verbose log files are written under `/app/data/logs`, so both survive container restarts.
 
 Container config still uses `config/runtrail.example.yaml` only for non-secret defaults. Secrets must come from environment variables or an ignored local env file.
+
+To prove structured state survives both restart and recreation without touching an existing
+volume, follow the [disposable Docker Compose persistence check](docs/container-persistence.md).

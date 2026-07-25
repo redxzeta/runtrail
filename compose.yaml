@@ -12,7 +12,7 @@ services:
       RUNTRAIL_TOKEN: "${RUNTRAIL_TOKEN:?set RUNTRAIL_TOKEN in the environment or an ignored .env file}"
       DISCORD_WEBHOOK_URL: "${DISCORD_WEBHOOK_URL:-}"
     ports:
-      - "8787:8787"
+      - "${RUNTRAIL_HOST_PORT:-8787}:8787"
     volumes:
       - runtrail-data:/app/data
 

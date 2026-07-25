@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.13.1-bookworm-slim AS build
+FROM node:22.21.1-bookworm-slim AS build
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY . .
 RUN pnpm build \
   && pnpm prune --prod
 
-FROM node:22.13.1-bookworm-slim AS runtime
+FROM node:22.21.1-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
   RUNTRAIL_CONFIG=/app/config/runtrail.example.yaml \
