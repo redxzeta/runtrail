@@ -1,3 +1,10 @@
+## [1.41.2](https://github.com/redxzeta/runtrail/compare/v1.41.1...v1.41.2) (2026-07-25)
+
+
+### Bug Fixes
+
+* **mcp:** preserve bridge startup diagnostics ([a547f74](https://github.com/redxzeta/runtrail/commit/a547f747ed7d5c33a824d8b6fce5624bfff65374)), closes [#133](https://github.com/redxzeta/runtrail/issues/133)
+
 ## [1.41.1](https://github.com/redxzeta/runtrail/compare/v1.41.0...v1.41.1) (2026-07-25)
 
 
