@@ -6,14 +6,18 @@ import { LedgerRepository, RunRelationshipError, VersionConflictError } from "..
 import {
   type AgentEvent,
   type AgentRun,
+  acceptHandoffRequestSchema,
   agentContextQuerySchema,
   closeStaleRunsRequestSchema,
+  completeHandoffRequestSchema,
   createArtifactRequestSchema,
   createDecisionRequestSchema,
   createEventRequestSchema,
   createHandoffRequestSchema,
   createOpenLoopRequestSchema,
   createRunRequestSchema,
+  declineHandoffRequestSchema,
+  expireHandoffRequestSchema,
   finishRunRequestSchema,
   journalSearchQuerySchema,
   listArtifactsQuerySchema,
@@ -487,6 +491,34 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     return c.json({ handoff });
   });
 
+  route.post("/handoffs/:id/accept", async (c) => {
+    const parsed = acceptHandoffRequestSchema.safeParse(await readJson(c.req.raw));
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    return handoffLifecycleResponse(c, () => ledger.acceptHandoff(c.req.param("id"), parsed.data));
+  });
+
+  route.post("/handoffs/:id/decline", async (c) => {
+    const parsed = declineHandoffRequestSchema.safeParse(await readJson(c.req.raw));
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    return handoffLifecycleResponse(c, () => ledger.declineHandoff(c.req.param("id"), parsed.data));
+  });
+
+  route.post("/handoffs/:id/complete", async (c) => {
+    const parsed = completeHandoffRequestSchema.safeParse(await readJson(c.req.raw));
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    return handoffLifecycleResponse(c, () =>
+      ledger.completeHandoff(c.req.param("id"), parsed.data.expectedVersion)
+    );
+  });
+
+  route.post("/handoffs/:id/expire", async (c) => {
+    const parsed = expireHandoffRequestSchema.safeParse(await readJson(c.req.raw));
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    return handoffLifecycleResponse(c, () =>
+      ledger.expireHandoff(c.req.param("id"), parsed.data.expectedVersion)
+    );
+  });
+
   route.post("/artifacts", async (c) => {
     const body = await readJson(c.req.raw);
     const parsed = createArtifactRequestSchema.safeParse(body);
@@ -652,6 +684,39 @@ function lifecycleResponse(c: Context, action: () => { run?: AgentRun; error?: s
       result.error === "Run not found" ? 404 : 409
     );
   } catch (error) {
+    return mutationErrorResponse(c, error);
+  }
+}
+
+function handoffLifecycleResponse(
+  c: Context,
+  action: () => {
+    handoff?: import("../shared/schemas.js").Handoff;
+    targetRun?: AgentRun;
+    error?: string;
+  }
+): Response {
+  try {
+    const result = action();
+    if (result.handoff) {
+      return c.json({ handoff: result.handoff, targetRun: result.targetRun });
+    }
+    return c.json(
+      { error: result.error ?? "Invalid handoff lifecycle transition" },
+      result.error?.includes("not found") ? 404 : 409
+    );
+  } catch (error) {
+    if (error instanceof RunRelationshipError) {
+      return c.json(
+        {
+          error: "Invalid run relationship",
+          code: error.code,
+          field: error.field,
+          referenceId: error.referenceId
+        },
+        400
+      );
+    }
     return mutationErrorResponse(c, error);
   }
 }

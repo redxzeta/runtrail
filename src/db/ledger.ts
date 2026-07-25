@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 import { createId } from "../shared/ids.js";
 import { compareEventsForReceipts, computeEventHash } from "../shared/receipts.js";
 import type {
+  AcceptHandoffRequest,
   AgentContext,
   AgentContextQuery,
   AgentEvent,
@@ -15,8 +16,10 @@ import type {
   CreateOpenLoopRequest,
   CreateRunRequest,
   Decision,
+  DeclineHandoffRequest,
   FinishRunRequest,
   Handoff,
+  HandoffStatus,
   JournalSearchQuery,
   JournalSearchResults,
   ListArtifactsQuery,
@@ -74,13 +77,13 @@ function isUniqueConstraint(error: unknown): boolean {
   );
 }
 
-type VersionedRecord = AgentRun | OpenLoop;
+type VersionedRecord = AgentRun | OpenLoop | Handoff;
 
 export class VersionConflictError extends Error {
   readonly current: Pick<VersionedRecord, "id" | "status" | "updatedAt" | "version">;
 
   constructor(
-    readonly recordType: "run" | "openLoop",
+    readonly recordType: "run" | "openLoop" | "handoff",
     readonly expectedVersion: number,
     current: VersionedRecord
   ) {
@@ -873,7 +876,7 @@ export class LedgerRepository {
       return undefined;
     }
 
-    const timestamp = input.createdAt ?? nowIso();
+    const timestamp = nowIso();
     const openLoop: OpenLoop = {
       id: createId("loop"),
       type: input.type,
@@ -888,7 +891,7 @@ export class LedgerRepository {
       sourceRunId: input.sourceRunId,
       status: "open",
       version: 1,
-      createdAt: timestamp,
+      createdAt: input.createdAt ?? timestamp,
       updatedAt: timestamp
     };
 
@@ -1139,6 +1142,7 @@ export class LedgerRepository {
     }
 
     const tags = normalizeTags(input.tags);
+    const timestamp = input.createdAt ?? nowIso();
     const handoff: Handoff = {
       id: createId("handoff"),
       sourceRunId: input.sourceRunId,
@@ -1151,7 +1155,10 @@ export class LedgerRepository {
       category: input.category,
       tags,
       context: input.context,
-      createdAt: input.createdAt ?? nowIso()
+      status: "pending",
+      version: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp
     };
 
     const transaction = this.db.transaction(() => {
@@ -1169,7 +1176,10 @@ export class LedgerRepository {
             category,
             tags_json,
             context_json,
-            created_at
+            status,
+            version,
+            created_at,
+            updated_at
           ) VALUES (
             @id,
             @sourceRunId,
@@ -1182,7 +1192,10 @@ export class LedgerRepository {
             @category,
             @tagsJson,
             @contextJson,
-            @createdAt
+            @status,
+            @version,
+            @createdAt,
+            @updatedAt
           )`
         )
         .run({
@@ -1231,13 +1244,23 @@ export class LedgerRepository {
       params.sourceRunId = query.sourceRunId;
     }
 
+    if (query.toSource) {
+      filters.push("to_source = @toSource");
+      params.toSource = query.toSource;
+    }
+
+    if (query.status !== "all") {
+      filters.push("status = @status");
+      params.status = query.status;
+    }
+
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
     const rows = this.db
       .prepare(
         `SELECT *
         FROM handoffs
         ${whereClause}
-        ORDER BY created_at DESC
+        ORDER BY updated_at DESC, id DESC
         LIMIT @limit`
       )
       .all(params) as HandoffRow[];
@@ -1250,6 +1273,134 @@ export class LedgerRepository {
       | HandoffRow
       | undefined;
     return row ? mapHandoffRow(row) : undefined;
+  }
+
+  acceptHandoff(id: string, input: AcceptHandoffRequest): HandoffLifecycleResult {
+    return this.db.transaction(() => {
+      const handoff = this.getHandoff(id);
+      if (!handoff) return { error: "Handoff not found" };
+      assertExpectedVersion("handoff", handoff, input.expectedVersion);
+      if (handoff.status !== "pending") {
+        return { error: `Cannot accept ${handoff.status} handoff` };
+      }
+
+      let targetRun: AgentRun | undefined;
+      if (input.targetRunId) {
+        targetRun = this.getRun(input.targetRunId);
+        if (!targetRun) return { error: "Target run not found" };
+        if (targetRun.project !== handoff.project) {
+          return { error: "Target run must belong to the handoff project" };
+        }
+      } else if (input.run) {
+        if (input.run.project !== handoff.project) {
+          return { error: "Receiving run must belong to the handoff project" };
+        }
+        if (
+          handoff.sourceRunId &&
+          input.run.continuedFromRunId &&
+          input.run.continuedFromRunId !== handoff.sourceRunId
+        ) {
+          return { error: "Receiving run must continue from the handoff source run" };
+        }
+
+        targetRun = this.createRun({
+          ...input.run,
+          continuedFromRunId: input.run.continuedFromRunId ?? handoff.sourceRunId
+        }).run;
+      }
+
+      if (!targetRun) return { error: "Receiving run is required" };
+      const timestamp = nowIso();
+      const result = this.db
+        .prepare(
+          `UPDATE handoffs
+          SET status = 'accepted',
+              accepted_by = @acceptedBy,
+              accepted_at = @acceptedAt,
+              target_run_id = @targetRunId,
+              updated_at = @updatedAt,
+              version = version + 1
+          WHERE id = @id
+            AND status = 'pending'
+            AND version = @expectedVersion`
+        )
+        .run({
+          id,
+          acceptedBy: input.acceptedBy,
+          acceptedAt: timestamp,
+          targetRunId: targetRun.id,
+          updatedAt: timestamp,
+          expectedVersion: input.expectedVersion
+        });
+
+      if (result.changes === 0) {
+        const current = this.getHandoff(id);
+        if (current) throw new VersionConflictError("handoff", input.expectedVersion, current);
+        return { error: "Handoff not found" };
+      }
+
+      return { handoff: this.getHandoff(id) as Handoff, targetRun };
+    })();
+  }
+
+  declineHandoff(id: string, input: DeclineHandoffRequest): HandoffLifecycleResult {
+    return this.transitionHandoff(id, "pending", "declined", input.expectedVersion, {
+      declineReason: input.reason
+    });
+  }
+
+  completeHandoff(id: string, expectedVersion: number): HandoffLifecycleResult {
+    return this.transitionHandoff(id, "accepted", "completed", expectedVersion);
+  }
+
+  expireHandoff(id: string, expectedVersion: number): HandoffLifecycleResult {
+    return this.transitionHandoff(id, "pending", "expired", expectedVersion);
+  }
+
+  private transitionHandoff(
+    id: string,
+    fromStatus: HandoffStatus,
+    toStatus: HandoffStatus,
+    expectedVersion: number,
+    options: { declineReason?: string } = {}
+  ): HandoffLifecycleResult {
+    const handoff = this.getHandoff(id);
+    if (!handoff) return { error: "Handoff not found" };
+    assertExpectedVersion("handoff", handoff, expectedVersion);
+    if (handoff.status !== fromStatus) {
+      return { error: `Cannot mark ${handoff.status} handoff as ${toStatus}` };
+    }
+
+    const timestamp = nowIso();
+    const result = this.db
+      .prepare(
+        `UPDATE handoffs
+        SET status = @toStatus,
+            completed_at = @completedAt,
+            decline_reason = @declineReason,
+            updated_at = @updatedAt,
+            version = version + 1
+        WHERE id = @id
+          AND status = @fromStatus
+          AND version = @expectedVersion`
+      )
+      .run({
+        id,
+        fromStatus,
+        toStatus,
+        completedAt: toStatus === "completed" ? timestamp : null,
+        declineReason: toSqlValue(options.declineReason),
+        updatedAt: timestamp,
+        expectedVersion
+      });
+
+    if (result.changes === 0) {
+      const current = this.getHandoff(id);
+      if (current) throw new VersionConflictError("handoff", expectedVersion, current);
+      return { error: "Handoff not found" };
+    }
+
+    return { handoff: this.getHandoff(id) as Handoff };
   }
 
   createArtifact(input: CreateArtifactRequest): Artifact | undefined {
@@ -1440,7 +1591,7 @@ export class LedgerRepository {
         .filter((event) => event.type.startsWith("test_"))
         .map(({ id, type, message, createdAt }) => ({ id, type, message, createdAt })),
       open_loops: openLoops.map(mapOpenLoopRow),
-      handoffs: this.listHandoffs({ sourceRunId: id, limit: 100 }),
+      handoffs: this.listHandoffs({ sourceRunId: id, status: "all", limit: 100 }),
       artifacts: this.listArtifacts({ runId: id, limit: 100 }),
       recovery_receipts: this.listRecoveryReceipts(id)
     };
@@ -1517,6 +1668,7 @@ export class LedgerRepository {
         `SELECT
           id,
           source_run_id,
+          client_record_id,
           from_source,
           to_source,
           project,
@@ -1525,10 +1677,29 @@ export class LedgerRepository {
           category,
           tags_json,
           NULL AS context_json,
-          created_at
+          status,
+          accepted_by,
+          accepted_at,
+          target_run_id,
+          completed_at,
+          decline_reason,
+          version,
+          created_at,
+          updated_at
         FROM handoffs
         WHERE project = @project
-        ORDER BY created_at DESC
+        ORDER BY updated_at DESC
+        LIMIT @limit`
+      )
+      .all(params) as HandoffRow[];
+
+    const pendingHandoffs = this.db
+      .prepare(
+        `SELECT *
+        FROM handoffs
+        WHERE project = @project
+          AND status = 'pending'
+        ORDER BY updated_at DESC
         LIMIT @limit`
       )
       .all(params) as HandoffRow[];
@@ -1548,6 +1719,7 @@ export class LedgerRepository {
       recent_runs: recentRuns.map(mapRunRow),
       failed_runs: failedRuns.map(mapRunRow),
       recent_events: recentEvents.map(mapEventContextRow),
+      pending_handoffs: pendingHandoffs.map(mapHandoffSummaryRow),
       recent_handoffs: handoffs.map(mapHandoffSummaryRow),
       open_loops: openLoops.map(mapOpenLoopRow),
       decisions: decisions.map(mapDecisionRow),
@@ -1568,6 +1740,9 @@ type RecoveryReceiptRow = {
 };
 
 type LifecycleResult = { run: AgentRun; error?: never } | { run?: never; error: string };
+type HandoffLifecycleResult =
+  | { handoff: Handoff; targetRun?: AgentRun; error?: never }
+  | { handoff?: never; targetRun?: never; error: string };
 
 function isTerminal(status: AgentRun["status"]): boolean {
   return ["completed", "failed", "cancelled"].includes(status);
@@ -1590,7 +1765,7 @@ function toWorkflowRunSummary(run: AgentRun): WorkflowRunSummary {
 }
 
 function assertExpectedVersion(
-  recordType: "run" | "openLoop",
+  recordType: "run" | "openLoop" | "handoff",
   current: VersionedRecord,
   expectedVersion: number | undefined
 ): void {

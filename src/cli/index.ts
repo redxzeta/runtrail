@@ -124,6 +124,40 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--tag <tag>", "Handoff tag", collectOption, [])
     .option("--context-json <json>", "Additional handoff context as JSON")
     .action(createHandoff);
+  handoff
+    .command("pending")
+    .description("List pending handoffs")
+    .option("--project <project>", "Project name")
+    .option("--to-source <toSource>", "Target source")
+    .option("--limit <limit>", "Maximum handoffs", parseInteger)
+    .action(listPendingHandoffs);
+  handoff
+    .command("accept")
+    .description("Accept a handoff and link its receiving run")
+    .argument("<id>", "Handoff ID")
+    .requiredOption("--expected-version <version>", "Observed handoff version", parseInteger)
+    .requiredOption("--accepted-by <acceptedBy>", "Accepting agent or source")
+    .requiredOption("--target-run-id <targetRunId>", "Receiving run ID")
+    .action(acceptHandoff);
+  handoff
+    .command("decline")
+    .description("Decline a pending handoff")
+    .argument("<id>", "Handoff ID")
+    .requiredOption("--expected-version <version>", "Observed handoff version", parseInteger)
+    .option("--reason <reason>", "Decline reason")
+    .action(declineHandoff);
+  handoff
+    .command("complete")
+    .description("Complete an accepted handoff")
+    .argument("<id>", "Handoff ID")
+    .requiredOption("--expected-version <version>", "Observed handoff version", parseInteger)
+    .action(completeHandoff);
+  handoff
+    .command("expire")
+    .description("Expire a pending handoff")
+    .argument("<id>", "Handoff ID")
+    .requiredOption("--expected-version <version>", "Observed handoff version", parseInteger)
+    .action(expireHandoff);
 
   const exportCommand = program.command("export").description("Export Markdown summaries");
   exportCommand
@@ -581,6 +615,68 @@ async function createHandoff(options: {
   );
 }
 
+async function listPendingHandoffs(options: {
+  project?: string;
+  toSource?: string;
+  limit?: number;
+}): Promise<void> {
+  const query = new URLSearchParams();
+  appendQuery(query, "project", options.project);
+  appendQuery(query, "toSource", options.toSource);
+  appendQuery(query, "limit", options.limit);
+  const suffix = query.toString();
+  printJson(await requestJson(`/handoffs${suffix ? `?${suffix}` : ""}`));
+}
+
+async function acceptHandoff(
+  id: string,
+  options: { expectedVersion: number; acceptedBy: string; targetRunId: string }
+): Promise<void> {
+  printJson(
+    await requestJson(`/handoffs/${encodeURIComponent(id)}/accept`, {
+      method: "POST",
+      body: {
+        expectedVersion: options.expectedVersion,
+        acceptedBy: options.acceptedBy,
+        targetRunId: options.targetRunId
+      }
+    })
+  );
+}
+
+async function declineHandoff(
+  id: string,
+  options: { expectedVersion: number; reason?: string }
+): Promise<void> {
+  printJson(
+    await requestJson(`/handoffs/${encodeURIComponent(id)}/decline`, {
+      method: "POST",
+      body: compact({ expectedVersion: options.expectedVersion, reason: options.reason })
+    })
+  );
+}
+
+async function completeHandoff(id: string, options: { expectedVersion: number }): Promise<void> {
+  await versionedHandoffAction(id, "complete", options.expectedVersion);
+}
+
+async function expireHandoff(id: string, options: { expectedVersion: number }): Promise<void> {
+  await versionedHandoffAction(id, "expire", options.expectedVersion);
+}
+
+async function versionedHandoffAction(
+  id: string,
+  action: "complete" | "expire",
+  expectedVersion: number
+): Promise<void> {
+  printJson(
+    await requestJson(`/handoffs/${encodeURIComponent(id)}/${action}`, {
+      method: "POST",
+      body: { expectedVersion }
+    })
+  );
+}
+
 async function exportDaily(options: {
   project: string;
   date: string;
@@ -900,9 +996,13 @@ function readNumberField(source: Record<string, unknown>, key: string): number {
   return value;
 }
 
-function appendQuery(query: URLSearchParams, key: string, value: string | undefined): void {
-  if (value) {
-    query.set(key, value);
+function appendQuery(
+  query: URLSearchParams,
+  key: string,
+  value: string | number | undefined
+): void {
+  if (value !== undefined) {
+    query.set(key, String(value));
   }
 }
 

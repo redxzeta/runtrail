@@ -137,8 +137,17 @@ export const schemaStatements = [
     category TEXT,
     tags_json TEXT,
     context_json TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    accepted_by TEXT,
+    accepted_at TEXT,
+    target_run_id TEXT,
+    completed_at TEXT,
+    decline_reason TEXT,
+    version INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
-    FOREIGN KEY (source_run_id) REFERENCES agent_runs (id) ON DELETE SET NULL
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (source_run_id) REFERENCES agent_runs (id) ON DELETE SET NULL,
+    FOREIGN KEY (target_run_id) REFERENCES agent_runs (id) ON DELETE SET NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_handoffs_project_created_at
     ON handoffs (project, created_at DESC)`,

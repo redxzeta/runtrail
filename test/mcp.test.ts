@@ -31,6 +31,11 @@ describe("mcp adapter", () => {
       "journal_resolve_open_loop",
       "journal_record_decision",
       "journal_create_handoff",
+      "journal_list_pending_handoffs",
+      "journal_accept_handoff",
+      "journal_decline_handoff",
+      "journal_complete_handoff",
+      "journal_expire_handoff",
       "journal_get_run_manifest",
       "journal_get_workflow",
       "journal_search",
@@ -355,6 +360,66 @@ describe("mcp adapter", () => {
     expect(init.headers.get("authorization")).toBe("Bearer secret-token");
   });
 
+  it("maps handoff lifecycle tools to versioned HTTP endpoints", async () => {
+    const client = mockClient({ handoff: { id: "handoff_1" } });
+
+    await callRuntrailTool(
+      "journal_list_pending_handoffs",
+      { project: "runtrail", toSource: "openclaw", limit: 5 },
+      client
+    );
+    await callRuntrailTool(
+      "journal_accept_handoff",
+      {
+        id: "handoff_1",
+        expectedVersion: 1,
+        acceptedBy: "openclaw-agent",
+        targetRunId: "run_2"
+      },
+      client
+    );
+    await callRuntrailTool(
+      "journal_decline_handoff",
+      { id: "handoff_2", expectedVersion: 1, reason: "Unavailable" },
+      client
+    );
+    await callRuntrailTool(
+      "journal_complete_handoff",
+      { id: "handoff_1", expectedVersion: 2 },
+      client
+    );
+    await callRuntrailTool(
+      "journal_expire_handoff",
+      { id: "handoff_3", expectedVersion: 1 },
+      client
+    );
+
+    expect(client.requestJson).toHaveBeenNthCalledWith(
+      1,
+      "/handoffs?project=runtrail&toSource=openclaw&limit=5"
+    );
+    expect(client.requestJson).toHaveBeenNthCalledWith(2, "/handoffs/handoff_1/accept", {
+      method: "POST",
+      body: {
+        expectedVersion: 1,
+        acceptedBy: "openclaw-agent",
+        targetRunId: "run_2"
+      }
+    });
+    expect(client.requestJson).toHaveBeenNthCalledWith(3, "/handoffs/handoff_2/decline", {
+      method: "POST",
+      body: { expectedVersion: 1, reason: "Unavailable" }
+    });
+    expect(client.requestJson).toHaveBeenNthCalledWith(4, "/handoffs/handoff_1/complete", {
+      method: "POST",
+      body: { expectedVersion: 2 }
+    });
+    expect(client.requestJson).toHaveBeenNthCalledWith(5, "/handoffs/handoff_3/expire", {
+      method: "POST",
+      body: { expectedVersion: 1 }
+    });
+  });
+
   it("preserves bounded API diagnostics without exposing authorization secrets", async () => {
     vi.stubGlobal(
       "fetch",
@@ -385,7 +450,7 @@ describe("mcp adapter", () => {
     });
 
     expect(server).toBeDefined();
-    expect(runtrailToolNames).toHaveLength(15);
+    expect(runtrailToolNames).toHaveLength(20);
   });
 
   it("fails fast when bridge config is missing", () => {

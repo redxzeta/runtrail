@@ -110,6 +110,56 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
   );
 
   server.registerTool(
+    "journal_list_pending_handoffs",
+    {
+      title: "List pending Runtrail handoffs",
+      description: "List the bounded actionable handoff inbox",
+      inputSchema: mcpToolInputSchemas.pendingHandoffs
+    },
+    async (args) => await forwardTool(client, "journal_list_pending_handoffs", args)
+  );
+
+  server.registerTool(
+    "journal_accept_handoff",
+    {
+      title: "Accept Runtrail handoff",
+      description: "Accept a pending handoff exactly once and link its receiving run",
+      inputSchema: mcpToolInputSchemas.acceptHandoff
+    },
+    async (args) => await forwardTool(client, "journal_accept_handoff", args)
+  );
+
+  server.registerTool(
+    "journal_decline_handoff",
+    {
+      title: "Decline Runtrail handoff",
+      description: "Decline a pending handoff",
+      inputSchema: mcpToolInputSchemas.declineHandoff
+    },
+    async (args) => await forwardTool(client, "journal_decline_handoff", args)
+  );
+
+  server.registerTool(
+    "journal_complete_handoff",
+    {
+      title: "Complete Runtrail handoff",
+      description: "Complete an accepted handoff",
+      inputSchema: mcpToolInputSchemas.versionedHandoff
+    },
+    async (args) => await forwardTool(client, "journal_complete_handoff", args)
+  );
+
+  server.registerTool(
+    "journal_expire_handoff",
+    {
+      title: "Expire Runtrail handoff",
+      description: "Expire a pending handoff",
+      inputSchema: mcpToolInputSchemas.versionedHandoff
+    },
+    async (args) => await forwardTool(client, "journal_expire_handoff", args)
+  );
+
+  server.registerTool(
     "journal_get_run_manifest",
     {
       title: "Get Runtrail run manifest",

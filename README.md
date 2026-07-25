@@ -168,12 +168,16 @@ pnpm cli loop add --type blocked --project runtrail --title "choose retention po
 pnpm cli loop resolve loop_abc123 --expected-version 1 --resolution "keep structured data in SQLite"
 pnpm cli decision add --project runtrail --title "SQLite remains source of truth" --decision "Markdown is export-only"
 pnpm cli handoff create --source-run-id run_abc123 --from-source codex --to-source openclaw --project runtrail --summary "metadata is ready" --next-action "continue with MCP tools" --category implementation --tag codex --tag issue-123
+pnpm cli handoff pending --project runtrail --to-source openclaw
+pnpm cli handoff accept handoff_abc123 --expected-version 1 --accepted-by openclaw --target-run-id run_def456
+pnpm cli handoff complete handoff_abc123 --expected-version 2
 ```
 
-Runs and open loops expose a `version`. Pass the last observed value as `expectedVersion` on mutable
-HTTP requests or `--expected-version` for CLI loop resolution. A stale write returns `409 Conflict`
-with compact current metadata and must be followed by a reread. The precondition is optional for
-compatibility with existing clients, but new callers should provide it.
+Runs, open loops, and handoffs expose a `version`. Pass the last observed value as `expectedVersion`
+on mutable HTTP requests or `--expected-version` for CLI lifecycle commands. A stale write returns
+`409 Conflict` with compact current metadata and must be followed by a reread. Run and open-loop
+preconditions remain optional for compatibility with existing clients; handoff lifecycle
+transitions require one.
 
 Related runs can share a `workflowId`; child runs use `parentRunId`, while a new session continuing
 an earlier run uses `continuedFromRunId`. These links are immutable coordination facts, not
@@ -276,6 +280,8 @@ scrape `/etc/runtrail/runtrail.env` from an MCP startup command.
 
 Agent continuity tools include `journal_get_context`, `journal_search`,
 `journal_search_runs`, `journal_get_run_manifest`, `journal_get_workflow`, `journal_create_handoff`,
+`journal_list_pending_handoffs`, `journal_accept_handoff`, `journal_decline_handoff`,
+`journal_complete_handoff`, `journal_expire_handoff`,
 `journal_create_event`, `journal_create_open_loop`,
 `journal_resolve_open_loop`, and `journal_record_decision`.
 See [docs/mcp-safe-surface.md](docs/mcp-safe-surface.md) for the proposed safe read/write tool surface and default response limits.
