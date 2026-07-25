@@ -69,6 +69,8 @@ const requiredExpectedVersionSchema = z.number().int().positive();
 export const createRunRequestSchema = z.object({
   source: z.string().trim().min(1).max(80),
   project: z.string().trim().min(1).max(120),
+  agentName: z.string().trim().min(1).max(120).optional(),
+  agentModel: z.string().trim().min(1).max(255).optional(),
   clientRunId: z.string().trim().min(1).max(255).optional(),
   workKey: workKeySchema,
   workflowId: runRelationshipIdSchema,
@@ -349,6 +351,8 @@ export type AgentRun = {
   id: string;
   source: string;
   project: string;
+  agentName?: string;
+  agentModel?: string;
   clientRunId?: string;
   workKey?: string;
   workflowId?: string;

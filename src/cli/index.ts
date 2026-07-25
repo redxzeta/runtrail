@@ -73,6 +73,8 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--source <source>", "Run source")
     .requiredOption("--project <project>", "Project name")
     .requiredOption("--task <task>", "Task summary")
+    .option("--agent-name <agentName>", "Client-declared logical agent name")
+    .option("--agent-model <agentModel>", "Client-declared active model identifier")
     .option("--client-run-id <clientRunId>", "Stable client session identifier")
     .option("--work-key <workKey>", "Canonical external work identifier")
     .option("--workflow-id <workflowId>", "Stable workflow identifier")
@@ -328,6 +330,8 @@ async function createRun(options: {
   source: string;
   project: string;
   task: string;
+  agentName?: string;
+  agentModel?: string;
   clientRunId?: string;
   workKey?: string;
   workflowId?: string;
@@ -346,6 +350,8 @@ async function createRun(options: {
         body: compact({
           source: options.source,
           project: options.project,
+          agentName: options.agentName,
+          agentModel: options.agentModel,
           clientRunId: options.clientRunId,
           workKey: options.workKey,
           workflowId: options.workflowId,
@@ -391,6 +397,8 @@ async function wrapRun(
     source: string;
     project: string;
     task: string;
+    agentName?: string;
+    agentModel?: string;
     workflowId?: string;
     parentRunId?: string;
     continuedFromRunId?: string;
@@ -422,6 +430,8 @@ async function wrapRun(
       body: compact({
         source: options.source,
         project: options.project,
+        agentName: options.agentName,
+        agentModel: options.agentModel,
         clientRunId: `wrapper-${wrapperKey}`,
         task: options.task,
         workflowId: options.workflowId,
@@ -555,6 +565,8 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
     project?: string;
     tag?: string[];
     task?: string;
+    agentName?: string;
+    agentModel?: string;
     workflowId?: string;
     parentRunId?: string;
     continuedFromRunId?: string;
@@ -579,6 +591,8 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
       value === "--source" ||
       value === "--project" ||
       value === "--task" ||
+      value === "--agent-name" ||
+      value === "--agent-model" ||
       value === "--category" ||
       value === "--workflow-id" ||
       value === "--parent-run-id" ||
@@ -596,6 +610,10 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
         options.project = next;
       } else if (value === "--task") {
         options.task = next;
+      } else if (value === "--agent-name") {
+        options.agentName = next;
+      } else if (value === "--agent-model") {
+        options.agentModel = next;
       } else if (value === "--workflow-id") {
         options.workflowId = next;
       } else if (value === "--parent-run-id") {
@@ -629,6 +647,8 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
     source: options.source ?? "",
     project: options.project ?? "",
     task: options.task ?? "",
+    agentName: options.agentName,
+    agentModel: options.agentModel,
     category: options.category,
     workflowId: options.workflowId,
     parentRunId: options.parentRunId,
