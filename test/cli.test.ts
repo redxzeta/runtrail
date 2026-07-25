@@ -234,7 +234,9 @@ describe("cli", () => {
       "--decision",
       "Expose HTTP API through rt",
       "--client-record-id",
-      "decision-cli-1"
+      "decision-cli-1",
+      "--supersedes-decision-id",
+      "dec_previous"
     ]);
     await runCli([
       "node",
@@ -341,6 +343,7 @@ describe("cli", () => {
         body: JSON.stringify({
           project: "runtrail",
           clientRecordId: "decision-cli-1",
+          supersedesDecisionId: "dec_previous",
           title: "Use CLI",
           decision: "Expose HTTP API through rt"
         })
@@ -364,6 +367,35 @@ describe("cli", () => {
           context: { changedFiles: ["src/cli/index.ts"] }
         })
       })
+    );
+  });
+
+  it("lists effective decisions and reads one decision through the API", async () => {
+    const fetchMock = mockFetch({ decisions: [] });
+    captureOutput();
+
+    await runCli([
+      "node",
+      "rt",
+      "decision",
+      "list",
+      "--project",
+      "runtrail",
+      "--effective-only",
+      "--limit",
+      "5"
+    ]);
+    await runCli(["node", "rt", "decision", "get", "dec_1"]);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      new URL("/decisions?project=runtrail&effectiveOnly=true&limit=5", "http://runtrail.test"),
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      new URL("/decisions/dec_1", "http://runtrail.test"),
+      expect.any(Object)
     );
   });
 

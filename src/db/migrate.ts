@@ -11,6 +11,7 @@ const handoffLifecycleMigrationName = "006_handoff_lifecycle";
 const prepareWorkMigrationName = "007_authoritative_run_liveness";
 const contextCursorMigrationName = "008_incremental_context_cursors";
 const agentProvenanceMigrationName = "009_agent_provenance";
+const effectiveDecisionsMigrationName = "010_effective_decisions";
 
 export function migrate(db: Database.Database): void {
   const transaction = db.transaction(() => {
@@ -42,6 +43,12 @@ export function migrate(db: Database.Database): void {
     addColumnIfMissing(db, "open_loops", "client_record_id", "client_record_id TEXT");
     addColumnIfMissing(db, "open_loops", "version", "version INTEGER NOT NULL DEFAULT 1");
     addColumnIfMissing(db, "decisions", "client_record_id", "client_record_id TEXT");
+    addColumnIfMissing(
+      db,
+      "decisions",
+      "supersedes_decision_id",
+      "supersedes_decision_id TEXT REFERENCES decisions(id)"
+    );
     addColumnIfMissing(db, "handoffs", "category", "category TEXT");
     addColumnIfMissing(db, "handoffs", "tags_json", "tags_json TEXT");
     addColumnIfMissing(db, "handoffs", "client_record_id", "client_record_id TEXT");
@@ -96,6 +103,11 @@ export function migrate(db: Database.Database): void {
       WHERE client_record_id IS NOT NULL`
     );
     db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_decisions_supersedes
+      ON decisions (supersedes_decision_id)
+      WHERE supersedes_decision_id IS NOT NULL`
+    );
+    db.exec(
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_handoffs_client_record_id
       ON handoffs (project, client_record_id)
       WHERE client_record_id IS NOT NULL`
@@ -133,6 +145,9 @@ export function migrate(db: Database.Database): void {
     db.prepare(
       "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
     ).run(9, agentProvenanceMigrationName, nowIso());
+    db.prepare(
+      "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
+    ).run(10, effectiveDecisionsMigrationName, nowIso());
   });
 
   transaction();

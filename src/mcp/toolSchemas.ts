@@ -9,6 +9,7 @@ import {
   finishRunRequestSchema,
   handoffStatusSchema,
   journalSearchQuerySchema,
+  listDecisionsQuerySchema,
   listHandoffsQuerySchema,
   listRunsQuerySchema,
   openLoopStatusSchema,
@@ -89,9 +90,16 @@ export const mcpToolInputSchemas = {
   decision: {
     project: createDecisionRequestSchema.shape.project,
     clientRecordId: createDecisionRequestSchema.shape.clientRecordId,
+    supersedesDecisionId: createDecisionRequestSchema.shape.supersedesDecisionId,
     title: createDecisionRequestSchema.shape.title,
     decision: createDecisionRequestSchema.shape.decision,
     rationale: createDecisionRequestSchema.shape.rationale
+  },
+  decisionList: {
+    project: listDecisionsQuerySchema.shape.project,
+    includeGlobal: listDecisionsQuerySchema.shape.includeGlobal.optional(),
+    effectiveOnly: listDecisionsQuerySchema.shape.effectiveOnly.optional(),
+    limit: mcpLimitSchema
   },
   runSearch: {
     project: listRunsQuerySchema.shape.project,
@@ -149,6 +157,7 @@ export const mcpToolInputSchemas = {
     text: journalSearchQuerySchema.shape.text,
     date_from: journalSearchQuerySchema.shape.date_from,
     date_to: journalSearchQuerySchema.shape.date_to,
+    effectiveOnly: journalSearchQuerySchema.shape.effectiveOnly.optional(),
     limit: mcpLimitSchema
   }
 } as const;

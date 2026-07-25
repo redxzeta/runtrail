@@ -205,6 +205,7 @@ export const listOpenLoopsQuerySchema = z.object({
 export const createDecisionRequestSchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
   clientRecordId: clientRecordIdSchema,
+  supersedesDecisionId: z.string().trim().min(1).max(255).optional(),
   title: z.string().trim().min(1).max(240),
   decision: z.string().trim().min(1).max(4000),
   rationale: z.string().trim().min(1).max(4000).optional(),
@@ -214,6 +215,7 @@ export const createDecisionRequestSchema = z.object({
 export const listDecisionsQuerySchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
   includeGlobal: queryBooleanSchema.default(true),
+  effectiveOnly: queryBooleanSchema.default(false),
   limit: z.coerce.number().int().positive().max(100).default(50)
 });
 
@@ -297,6 +299,7 @@ export const journalSearchQuerySchema = z.object({
   text: z.string().trim().min(1).max(200).optional(),
   date_from: z.string().datetime().optional(),
   date_to: z.string().datetime().optional(),
+  effectiveOnly: queryBooleanSchema.default(false),
   limit: z.coerce.number().int().positive().max(50).default(20)
 });
 
@@ -435,9 +438,12 @@ export type Decision = {
   id: string;
   project?: string;
   clientRecordId?: string;
+  supersedesDecisionId?: string;
   title: string;
   decision: string;
   rationale?: string;
+  state: "current" | "superseded";
+  replacingDecisionId?: string;
   createdAt: string;
 };
 
@@ -542,7 +548,12 @@ export type IncrementalContextChanges = {
       | "updatedAt"
     >
   >;
-  decisions: Array<Pick<Decision, "id" | "project" | "createdAt">>;
+  decisions: Array<
+    Pick<
+      Decision,
+      "id" | "project" | "supersedesDecisionId" | "state" | "replacingDecisionId" | "createdAt"
+    >
+  >;
   sections: Record<
     "runs" | "events" | "openLoops" | "handoffs" | "decisions",
     { limit: number; count: number; truncated: boolean }
@@ -623,6 +634,11 @@ export type PrepareWorkOpenLoop = Pick<
   "id" | "type" | "owner" | "source" | "sourceRunId" | "status" | "version" | "updatedAt"
 >;
 
+export type PrepareWorkDecision = Pick<
+  Decision,
+  "id" | "project" | "supersedesDecisionId" | "title" | "state" | "createdAt"
+>;
+
 export type PrepareWorkManifestSummary = {
   runId: string;
   status: RunStatus;
@@ -645,6 +661,7 @@ type PrepareWorkSectionName =
   | "conflicts"
   | "pendingHandoffs"
   | "openLoops"
+  | "effectiveDecisions"
   | "recommendations"
   | "warnings";
 
@@ -661,6 +678,7 @@ export type PrepareWorkResponse = {
   conflicts: PrepareWorkConflict[];
   pendingHandoffs: PrepareWorkHandoff[];
   openLoops: PrepareWorkOpenLoop[];
+  effectiveDecisions: PrepareWorkDecision[];
   latestManifest?: PrepareWorkManifestSummary;
   recommendations: PrepareWorkRecommendation[];
   warnings: Array<{ code: "section_truncated"; section: PrepareWorkSectionName }>;
@@ -670,6 +688,7 @@ export type PrepareWorkResponse = {
     conflicts: PrepareWorkSectionMeta;
     pendingHandoffs: PrepareWorkSectionMeta;
     openLoops: PrepareWorkSectionMeta;
+    effectiveDecisions: PrepareWorkSectionMeta;
     recommendations: PrepareWorkSectionMeta;
     warnings: PrepareWorkSectionMeta;
   };

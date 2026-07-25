@@ -140,8 +140,21 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--decision <decision>", "Decision text")
     .option("--client-record-id <clientRecordId>", "Stable idempotency key")
     .option("--project <project>", "Project name")
+    .option("--supersedes-decision-id <supersedesDecisionId>", "Decision replaced by this one")
     .option("--rationale <rationale>", "Decision rationale")
     .action(addDecision);
+  decision
+    .command("list")
+    .description("List bounded decision history or effective guidance")
+    .option("--project <project>", "Project name")
+    .option("--effective-only", "Return only current decisions", false)
+    .option("--limit <limit>", "Maximum decisions", parseInteger)
+    .action(listDecisions);
+  decision
+    .command("get")
+    .description("Read one decision by ID")
+    .argument("<id>", "Decision ID")
+    .action(getDecision);
 
   const handoff = program.command("handoff").description("Manage handoffs");
   handoff
@@ -748,6 +761,7 @@ async function addDecision(options: {
   decision: string;
   project?: string;
   clientRecordId?: string;
+  supersedesDecisionId?: string;
   rationale?: string;
 }): Promise<void> {
   printJson(
@@ -758,6 +772,7 @@ async function addDecision(options: {
         body: compact({
           project: options.project,
           clientRecordId: options.clientRecordId,
+          supersedesDecisionId: options.supersedesDecisionId,
           title: options.title,
           decision: options.decision,
           rationale: options.rationale
@@ -768,6 +783,23 @@ async function addDecision(options: {
         : undefined
     )
   );
+}
+
+async function listDecisions(options: {
+  project?: string;
+  effectiveOnly: boolean;
+  limit?: number;
+}): Promise<void> {
+  const query = new URLSearchParams();
+  appendQuery(query, "project", options.project);
+  appendQuery(query, "effectiveOnly", options.effectiveOnly ? "true" : undefined);
+  appendQuery(query, "limit", options.limit);
+  const suffix = query.toString();
+  printJson(await requestJson(`/decisions${suffix ? `?${suffix}` : ""}`));
+}
+
+async function getDecision(id: string): Promise<void> {
+  printJson(await requestJson(`/decisions/${encodeURIComponent(id)}`));
 }
 
 async function createHandoff(options: {
