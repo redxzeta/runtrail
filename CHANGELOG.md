@@ -1,3 +1,10 @@
+# [1.33.0](https://github.com/redxzeta/runtrail/compare/v1.32.0...v1.33.0) (2026-07-25)
+
+
+### Features
+
+* **context:** add deterministic prepare-work guidance ([#149](https://github.com/redxzeta/runtrail/issues/149)) ([2ce8e9d](https://github.com/redxzeta/runtrail/commit/2ce8e9ddbf0ad230d0954344607423dabfacf03a)), closes [#114](https://github.com/redxzeta/runtrail/issues/114)
+
 # [1.32.0](https://github.com/redxzeta/runtrail/compare/v1.31.0...v1.32.0) (2026-07-25)
 
 
