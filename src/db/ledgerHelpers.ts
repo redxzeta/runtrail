@@ -13,6 +13,8 @@ export type RunRow = {
   id: string;
   source: string;
   project: string;
+  agent_name: string | null;
+  agent_model: string | null;
   client_run_id: string | null;
   work_key: string | null;
   workflow_id: string | null;
@@ -124,6 +126,8 @@ export function mapRunRow(row: RunRow): AgentRun {
     id: row.id,
     source: row.source,
     project: row.project,
+    agentName: row.agent_name ?? undefined,
+    agentModel: row.agent_model ?? undefined,
     clientRunId: row.client_run_id ?? undefined,
     workKey: row.work_key ?? undefined,
     workflowId: row.workflow_id ?? undefined,

@@ -174,16 +174,20 @@ describe("ledger routes", () => {
     );
   });
 
-  it("replays client run creation without mutating the original record", async () => {
+  it("persists bounded agent provenance in reads and manifests without mutating replay", async () => {
     const app = createTestApp();
     const firstResponse = await postJson(app, "/runs", {
       ...validRunRequest(),
       clientRunId: "session-82",
+      agentName: "implementation-agent",
+      agentModel: "gpt-5.6-codex",
       summary: "original summary"
     });
     const replayResponse = await postJson(app, "/runs", {
       ...validRunRequest(),
       clientRunId: "session-82",
+      agentName: "replacement-agent",
+      agentModel: "replacement-model",
       task: "replacement task",
       status: "failed",
       summary: "replacement summary",
@@ -191,20 +195,51 @@ describe("ledger routes", () => {
     });
     const first = (await firstResponse.json()) as { run: { id: string } };
     const replay = (await replayResponse.json()) as {
-      run: { id: string; task: string; status: string; summary: string; gitCommit: string };
+      run: {
+        id: string;
+        agentName: string;
+        agentModel: string;
+        task: string;
+        status: string;
+        summary: string;
+        gitCommit: string;
+      };
     };
+    const manifest = (await (
+      await app.request(`/runs/${first.run.id}/manifest`, { headers: authHeaders() })
+    ).json()) as {
+      manifest: { run: { agentName: string; agentModel: string } };
+    };
+    const emptyName = await postJson(app, "/runs", {
+      ...validRunRequest(),
+      agentName: " "
+    });
+    const longModel = await postJson(app, "/runs", {
+      ...validRunRequest(),
+      agentModel: "m".repeat(256)
+    });
 
     expect(firstResponse.status).toBe(201);
     expect(replayResponse.status).toBe(200);
     expect(replay.run).toEqual(
       expect.objectContaining({
         id: first.run.id,
+        agentName: "implementation-agent",
+        agentModel: "gpt-5.6-codex",
         task: "Implement the ledger API",
         status: "running",
         summary: "original summary",
         gitCommit: "abc123"
       })
     );
+    expect(manifest.manifest.run).toEqual(
+      expect.objectContaining({
+        agentName: "implementation-agent",
+        agentModel: "gpt-5.6-codex"
+      })
+    );
+    expect(emptyName.status).toBe(400);
+    expect(longModel.status).toBe(400);
   });
 
   it("returns advisory conflicts for active runs sharing a canonical work key", async () => {

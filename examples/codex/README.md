@@ -11,6 +11,12 @@ Runtrail records the resulting recovery decision in the run manifest and exposes
 `recovery_outcome` for the session, so concurrent or replayed hooks do not multiply authoritative
 context.
 
+Codex adapters may send the structured hook input `model` as the run's `agentModel`. A root
+`agentName` must come from explicit adapter configuration or remain absent; a subagent
+`agent_type` must never overwrite the root run's attribution. Other integrations should likewise
+use only documented structured fields or explicit local configuration and omit unavailable
+attribution rather than infer it. These values are client-declared context, not verified identity.
+
 ## Install
 
 Build Runtrail and link its executable from a trusted checkout:

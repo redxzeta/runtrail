@@ -33,6 +33,9 @@ describe("database", () => {
     const cursorMigration = db.prepare("SELECT name FROM schema_migrations WHERE id = ?").get(8) as
       | { name: string }
       | undefined;
+    const provenanceMigration = db
+      .prepare("SELECT name FROM schema_migrations WHERE id = ?")
+      .get(9) as { name: string } | undefined;
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as Array<{ name: string }>;
@@ -48,6 +51,7 @@ describe("database", () => {
     expect(workflowMigration?.name).toBe("005_workflow_relationships");
     expect(livenessMigration?.name).toBe("007_authoritative_run_liveness");
     expect(cursorMigration?.name).toBe("008_incremental_context_cursors");
+    expect(provenanceMigration?.name).toBe("009_agent_provenance");
     expect(tables.map((table) => table.name)).toEqual([
       "agent_event_tags",
       "agent_events",
@@ -200,6 +204,8 @@ describe("database", () => {
       expect.arrayContaining([
         "category",
         "tags_json",
+        "agent_name",
+        "agent_model",
         "client_run_id",
         "work_key",
         "workflow_id",

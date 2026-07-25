@@ -18,6 +18,15 @@ session. Runtrail scopes this identifier by `source` and `project`. The first `P
 task, status, git metadata, or timestamps. Continue that run through events and `PATCH /runs/:id`.
 Clients that omit `clientRunId` keep the non-idempotent create behavior.
 
+Runs may optionally declare `agentName` and `agentModel`. `source` continues to identify the
+integration or client. `agentName` is a client-declared logical role or configured display identity
+(maximum 120 characters), while `agentModel` is the client-declared active model identifier
+(maximum 255 characters). Both are informational assertions, not authenticated identities.
+Integrations may populate them only from a documented structured field or explicit local
+configuration; when either value is unavailable, omit it rather than infer it from prompts,
+transcripts, command output, processes, or private configuration. Idempotent run replay returns the
+original values without applying retry payload changes.
+
 Append-oriented writes may include a stable, non-secret `clientRecordId`. A retry with the same key
 returns the original event, open loop, decision, handoff, or artifact without changing its payload
 or timestamps. The key is scoped by record type and its stable owner:

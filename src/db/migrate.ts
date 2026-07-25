@@ -10,6 +10,7 @@ const workflowRelationshipsMigrationName = "005_workflow_relationships";
 const handoffLifecycleMigrationName = "006_handoff_lifecycle";
 const prepareWorkMigrationName = "007_authoritative_run_liveness";
 const contextCursorMigrationName = "008_incremental_context_cursors";
+const agentProvenanceMigrationName = "009_agent_provenance";
 
 export function migrate(db: Database.Database): void {
   const transaction = db.transaction(() => {
@@ -24,6 +25,8 @@ export function migrate(db: Database.Database): void {
     addColumnIfMissing(db, "open_loops", "source_run_id", "source_run_id TEXT");
     addColumnIfMissing(db, "agent_runs", "category", "category TEXT");
     addColumnIfMissing(db, "agent_runs", "tags_json", "tags_json TEXT");
+    addColumnIfMissing(db, "agent_runs", "agent_name", "agent_name TEXT");
+    addColumnIfMissing(db, "agent_runs", "agent_model", "agent_model TEXT");
     addColumnIfMissing(db, "agent_runs", "client_run_id", "client_run_id TEXT");
     addColumnIfMissing(db, "agent_runs", "work_key", "work_key TEXT");
     addColumnIfMissing(db, "agent_runs", "workflow_id", "workflow_id TEXT");
@@ -127,6 +130,9 @@ export function migrate(db: Database.Database): void {
     db.prepare(
       "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
     ).run(8, contextCursorMigrationName, nowIso());
+    db.prepare(
+      "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
+    ).run(9, agentProvenanceMigrationName, nowIso());
   });
 
   transaction();
