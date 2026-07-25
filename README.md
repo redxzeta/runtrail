@@ -352,7 +352,7 @@ Agent continuity tools include `journal_prepare_work`, `journal_get_context`, `j
 `journal_resolve_open_loop`, `journal_record_decision`, and `journal_list_decisions`.
 See [docs/mcp-safe-surface.md](docs/mcp-safe-surface.md) for the proposed safe read/write tool surface and default response limits.
 See [docs/agent-write-contract.md](docs/agent-write-contract.md) for the recommended cross-agent write contract.
-See [docs/mcp-client-setup-runbook.md](docs/mcp-client-setup-runbook.md) for repeatable Codex, OpenClaw, Claude Code, and opencode setup and verification.
+See [docs/mcp-client-setup-runbook.md](docs/mcp-client-setup-runbook.md) for repeatable Codex, OpenClaw, Claude Code, and opencode setup and verification, including [optional persistent macOS GUI credentials](docs/mcp-client-setup-runbook.md#macos-gui-credentials).
 
 ## Markdown Exports
 
