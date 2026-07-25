@@ -6,7 +6,8 @@ import type {
   Handoff,
   HandoffSummary,
   JournalSearchQuery,
-  OpenLoop
+  OpenLoop,
+  VerificationEvidence
 } from "../shared/schemas.js";
 
 export type RunRow = {
@@ -117,6 +118,26 @@ export type ArtifactRow = {
   path: string;
   size_bytes: number | null;
   sha256: string | null;
+  created_at: string;
+};
+
+export type VerificationRow = {
+  id: string;
+  run_id: string;
+  client_record_id: string | null;
+  check_id: string;
+  kind: VerificationEvidence["kind"];
+  outcome: VerificationEvidence["outcome"];
+  name: string;
+  summary: string | null;
+  command_summary: string | null;
+  duration_ms: number | null;
+  support_type: VerificationEvidence["support"]["type"];
+  support_ref: string | null;
+  support_sha256: string | null;
+  unavailable_reason: string | null;
+  exit_code: number | null;
+  completed_at: string;
   created_at: string;
 };
 
@@ -281,6 +302,41 @@ export function mapArtifactRow(row: ArtifactRow): Artifact {
     path: row.path,
     sizeBytes: row.size_bytes ?? undefined,
     sha256: row.sha256 ?? undefined,
+    createdAt: row.created_at
+  };
+}
+
+export function mapVerificationRow(row: VerificationRow): VerificationEvidence {
+  const support =
+    row.support_type === "exit_code"
+      ? { type: "exit_code" as const, exitCode: row.exit_code as number }
+      : row.support_type === "receipt"
+        ? { type: "receipt" as const, receiptId: row.support_ref as string }
+        : row.support_type === "artifact_digest"
+          ? {
+              type: "artifact_digest" as const,
+              artifactId: row.support_ref ?? undefined,
+              sha256: row.support_sha256 as string
+            }
+          : row.support_type === "unavailable"
+            ? {
+                type: "unavailable" as const,
+                reason: row.unavailable_reason as "not_provided" | "not_supported"
+              }
+            : { type: "client_reported" as const };
+  return {
+    id: row.id,
+    runId: row.run_id,
+    clientRecordId: row.client_record_id ?? undefined,
+    checkId: row.check_id,
+    kind: row.kind,
+    outcome: row.outcome,
+    name: row.name,
+    summary: row.summary ?? undefined,
+    commandSummary: row.command_summary ?? undefined,
+    durationMs: row.duration_ms ?? undefined,
+    support,
+    completedAt: row.completed_at,
     createdAt: row.created_at
   };
 }

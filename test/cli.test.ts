@@ -129,7 +129,7 @@ describe("cli", () => {
     );
   });
 
-  it("creates runs, events, loops, decisions, and handoffs through the API", async () => {
+  it("creates runs, events, verification, loops, decisions, and handoffs through the API", async () => {
     const fetchMock = mockFetch({ ok: true });
     captureOutput();
 
@@ -184,6 +184,28 @@ describe("cli", () => {
       "cli",
       "--data-json",
       '{"files":["src/cli/index.ts"]}'
+    ]);
+    await runCli([
+      "node",
+      "rt",
+      "verification",
+      "add",
+      "--run-id",
+      "run_1",
+      "--check-id",
+      "unit",
+      "--kind",
+      "test",
+      "--outcome",
+      "passed",
+      "--name",
+      "unit tests",
+      "--client-record-id",
+      "verification-cli-1",
+      "--support-json",
+      '{"type":"exit_code","exitCode":0}',
+      "--completed-at",
+      "2026-07-01T00:00:00.000Z"
     ]);
     await runCli([
       "node",
@@ -306,6 +328,23 @@ describe("cli", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
+      new URL("/verifications", "http://runtrail.test"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          runId: "run_1",
+          clientRecordId: "verification-cli-1",
+          checkId: "unit",
+          kind: "test",
+          outcome: "passed",
+          name: "unit tests",
+          support: { type: "exit_code", exitCode: 0 },
+          completedAt: "2026-07-01T00:00:00.000Z"
+        })
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
       new URL("/open-loops", "http://runtrail.test"),
       expect.objectContaining({
         method: "POST",
@@ -324,7 +363,7 @@ describe("cli", () => {
       })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      5,
       new URL("/open-loops/loop_1", "http://runtrail.test"),
       expect.objectContaining({
         method: "PATCH",
@@ -336,7 +375,7 @@ describe("cli", () => {
       })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      5,
+      6,
       new URL("/decisions", "http://runtrail.test"),
       expect.objectContaining({
         method: "POST",
@@ -350,7 +389,7 @@ describe("cli", () => {
       })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      6,
+      7,
       new URL("/handoffs", "http://runtrail.test"),
       expect.objectContaining({
         method: "POST",
@@ -759,6 +798,22 @@ describe("cli", () => {
     );
     expect(JSON.stringify(commandEventBody)).not.toContain("super-secret");
     expect(JSON.stringify(commandEventBody)).not.toContain("also-secret");
+    const verificationBody = JSON.parse(
+      String(
+        fetchMock.mock.calls.find(([url]) => (url as URL).pathname === "/verifications")?.[1]?.body
+      )
+    ) as Record<string, unknown>;
+    expect(verificationBody).toEqual(
+      expect.objectContaining({
+        runId: "run_wrap",
+        checkId: "wrapper-command",
+        kind: "custom",
+        outcome: "passed",
+        support: { type: "exit_code", exitCode: 0 }
+      })
+    );
+    expect(JSON.stringify(verificationBody)).not.toContain("super-secret");
+    expect(JSON.stringify(verificationBody)).not.toContain("also-secret");
     expect(fetchMock).toHaveBeenCalledWith(
       new URL("/runs/run_wrap", "http://runtrail.test"),
       expect.objectContaining({

@@ -12,6 +12,7 @@ const prepareWorkMigrationName = "007_authoritative_run_liveness";
 const contextCursorMigrationName = "008_incremental_context_cursors";
 const agentProvenanceMigrationName = "009_agent_provenance";
 const effectiveDecisionsMigrationName = "010_effective_decisions";
+const verificationEvidenceMigrationName = "011_verification_evidence";
 
 export function migrate(db: Database.Database): void {
   const transaction = db.transaction(() => {
@@ -148,6 +149,9 @@ export function migrate(db: Database.Database): void {
     db.prepare(
       "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
     ).run(10, effectiveDecisionsMigrationName, nowIso());
+    db.prepare(
+      "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
+    ).run(11, verificationEvidenceMigrationName, nowIso());
   });
 
   transaction();

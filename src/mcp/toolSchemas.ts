@@ -6,6 +6,7 @@ import {
   createHandoffRequestSchema,
   createOpenLoopRequestSchema,
   createRunRequestSchema,
+  createVerificationRequestSchema,
   finishRunRequestSchema,
   handoffStatusSchema,
   journalSearchQuerySchema,
@@ -69,6 +70,19 @@ export const mcpToolInputSchemas = {
     category: createEventRequestSchema.shape.category,
     tags: createEventRequestSchema.shape.tags,
     data: z.record(z.string(), z.unknown()).optional()
+  },
+  verification: {
+    runId: createVerificationRequestSchema.shape.runId,
+    clientRecordId: createVerificationRequestSchema.shape.clientRecordId,
+    checkId: createVerificationRequestSchema.shape.checkId,
+    kind: createVerificationRequestSchema.shape.kind,
+    outcome: createVerificationRequestSchema.shape.outcome,
+    name: createVerificationRequestSchema.shape.name,
+    summary: createVerificationRequestSchema.shape.summary,
+    commandSummary: createVerificationRequestSchema.shape.commandSummary,
+    durationMs: createVerificationRequestSchema.shape.durationMs,
+    support: createVerificationRequestSchema.shape.support,
+    completedAt: createVerificationRequestSchema.shape.completedAt
   },
   openLoop: {
     type: createOpenLoopRequestSchema.shape.type,

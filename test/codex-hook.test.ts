@@ -174,6 +174,17 @@ describe("Codex hook adapter", () => {
       { ...base, hook_event_name: "SessionStart", source: "startup" },
       { env, fetch: fetchApp }
     );
+    await handleCodexHook(
+      {
+        ...base,
+        hook_event_name: "PostToolUse",
+        tool_name: "Bash",
+        tool_use_id: "test-without-exit-code",
+        tool_input: { command: "pnpm test" },
+        tool_response: { status: "success" }
+      },
+      { env, fetch: fetchApp }
+    );
     writeFileSync(path.join(repo, "src.ts"), "export const manifest = true;\n");
     await handleCodexHook(
       {
@@ -214,15 +225,27 @@ describe("Codex hook adapter", () => {
         changed_files: string[];
         commands: Array<{ message: string }>;
         tests: Array<{ type: string; message: string }>;
+        verifications: Array<{ outcome: string; support: { type: string; exitCode: number } }>;
       };
     };
 
     expect(listed.runs[0]).toEqual(expect.objectContaining({ status: "completed" }));
     expect(body.manifest.changed_files).toEqual(["src.ts"]);
-    expect(body.manifest.commands).toEqual([expect.objectContaining({ message: "pnpm test" })]);
+    expect(body.manifest.commands).toEqual([
+      expect.objectContaining({ message: "pnpm test" }),
+      expect.objectContaining({ message: "pnpm test" })
+    ]);
     expect(body.manifest.tests).toEqual([
       expect.objectContaining({ type: "test_started", message: "pnpm test started" }),
+      expect.objectContaining({ type: "test_passed", message: "pnpm test passed" }),
+      expect.objectContaining({ type: "test_started", message: "pnpm test started" }),
       expect.objectContaining({ type: "test_passed", message: "pnpm test passed" })
+    ]);
+    expect(body.manifest.verifications).toEqual([
+      expect.objectContaining({
+        outcome: "passed",
+        support: { type: "exit_code", exitCode: 0 }
+      })
     ]);
   });
 

@@ -147,7 +147,9 @@ function assertSafeRecord(record: OutboxRecord): void {
             ? { path: "/decisions", key: "clientRecordId" }
             : record.operation === "create_handoff"
               ? { path: "/handoffs", key: "clientRecordId" }
-              : undefined;
+              : record.operation === "create_verification"
+                ? { path: "/verifications", key: "clientRecordId" }
+                : undefined;
   if (
     !specification ||
     record.path !== specification.path ||

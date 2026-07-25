@@ -290,6 +290,95 @@ export const listArtifactsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(50)
 });
 
+export const verificationKindSchema = z.enum([
+  "test",
+  "lint",
+  "typecheck",
+  "build",
+  "smoke",
+  "custom"
+]);
+export const verificationOutcomeSchema = z.enum(["passed", "failed", "not_run", "not_applicable"]);
+export const verificationSupportSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("client_reported") }).strict(),
+  z
+    .object({
+      type: z.literal("exit_code"),
+      exitCode: z.number().int().min(0).max(255)
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("receipt"),
+      receiptId: z.string().trim().min(1).max(255)
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("artifact_digest"),
+      artifactId: z.string().trim().min(1).max(255).optional(),
+      sha256: z
+        .string()
+        .trim()
+        .regex(/^[a-fA-F0-9]{64}$/)
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("unavailable"),
+      reason: z.enum(["not_provided", "not_supported"])
+    })
+    .strict()
+]);
+export const createVerificationRequestSchema = z
+  .object({
+    runId: z.string().trim().min(1).max(255),
+    clientRecordId: clientRecordIdSchema,
+    checkId: z.string().trim().min(1).max(120),
+    kind: verificationKindSchema,
+    outcome: verificationOutcomeSchema,
+    name: z.string().trim().min(1).max(240),
+    summary: z.string().trim().min(1).max(1000).optional(),
+    commandSummary: z.string().trim().min(1).max(500).optional(),
+    durationMs: z.number().int().nonnegative().max(604_800_000).optional(),
+    support: verificationSupportSchema,
+    completedAt: z.string().datetime()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      ["not_run", "not_applicable"].includes(value.outcome) &&
+      !["client_reported", "unavailable"].includes(value.support.type)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["support"],
+        message: "Not-run dispositions cannot carry execution or artifact support"
+      });
+    }
+    if (value.support.type === "exit_code") {
+      if (value.outcome === "passed" && value.support.exitCode !== 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["support", "exitCode"],
+          message: "Passed exit-code evidence requires exit code 0"
+        });
+      }
+      if (value.outcome === "failed" && value.support.exitCode === 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["support", "exitCode"],
+          message: "Failed exit-code evidence requires a nonzero exit code"
+        });
+      }
+    }
+  });
+
+export const listVerificationsQuerySchema = z.object({
+  runId: z.string().trim().min(1).max(255),
+  limit: z.coerce.number().int().positive().max(100).default(50)
+});
+
 export const journalSearchQuerySchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
   source: z.string().trim().min(1).max(80).optional(),
@@ -346,6 +435,11 @@ export type AcceptHandoffRequest = z.infer<typeof acceptHandoffRequestSchema>;
 export type DeclineHandoffRequest = z.infer<typeof declineHandoffRequestSchema>;
 export type CreateArtifactRequest = z.infer<typeof createArtifactRequestSchema>;
 export type ListArtifactsQuery = z.infer<typeof listArtifactsQuerySchema>;
+export type VerificationKind = z.infer<typeof verificationKindSchema>;
+export type VerificationOutcome = z.infer<typeof verificationOutcomeSchema>;
+export type VerificationSupport = z.infer<typeof verificationSupportSchema>;
+export type CreateVerificationRequest = z.infer<typeof createVerificationRequestSchema>;
+export type ListVerificationsQuery = z.infer<typeof listVerificationsQuerySchema>;
 export type JournalSearchQuery = z.infer<typeof journalSearchQuerySchema>;
 export type AgentContextQuery = z.infer<typeof agentContextQuerySchema>;
 export type PrepareWorkQuery = z.infer<typeof prepareWorkQuerySchema>;
@@ -480,6 +574,22 @@ export type Artifact = {
   path: string;
   sizeBytes?: number;
   sha256?: string;
+  createdAt: string;
+};
+
+export type VerificationEvidence = {
+  id: string;
+  runId: string;
+  clientRecordId?: string;
+  checkId: string;
+  kind: VerificationKind;
+  outcome: VerificationOutcome;
+  name: string;
+  summary?: string;
+  commandSummary?: string;
+  durationMs?: number;
+  support: VerificationSupport;
+  completedAt: string;
   createdAt: string;
 };
 
@@ -724,6 +834,7 @@ export type RunManifest = {
   open_loops: OpenLoop[];
   handoffs: Handoff[];
   artifacts: Artifact[];
+  verifications: VerificationEvidence[];
   recovery_receipts: RecoveryReceipt[];
 };
 
