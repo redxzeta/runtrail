@@ -19,17 +19,17 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 | --- | --- | --- | --- | --- |
 | `journal_search_runs` | Read-only | `GET /runs` | `{ project?: string, workKey?: string, status?: string, category?: string, tag?: string, limit?: number }` | `{ runs: AgentRun[] }` capped and ordered by recent update |
 | `journal_start_run` | Write | `POST /runs` | Bounded run identity and task fields, including optional `workKey` | `{ run, recovery?, conflicts }` |
-| `journal_resume_run` | Write | `POST /runs/:id/resume` | `{ runId }` | `{ run }` |
-| `journal_heartbeat_run` | Write | `POST /runs/:id/heartbeat` | `{ runId }` | `{ run }` without a new event |
-| `journal_pause_run` | Write | `POST /runs/:id/pause` | `{ runId, status, summary? }` | `{ run }` |
-| `journal_finish_run` | Write | `POST /runs/:id/finish` | `{ runId, status, summary, completedAt?, gitBranch?, gitCommit? }` | `{ run }` |
+| `journal_resume_run` | Write | `POST /runs/:id/resume` | `{ runId, expectedVersion? }` | `{ run }` |
+| `journal_heartbeat_run` | Write | `POST /runs/:id/heartbeat` | `{ runId, expectedVersion? }` | `{ run }` without a new event |
+| `journal_pause_run` | Write | `POST /runs/:id/pause` | `{ runId, expectedVersion?, status, summary? }` | `{ run }` |
+| `journal_finish_run` | Write | `POST /runs/:id/finish` | `{ runId, expectedVersion?, status, summary, completedAt?, gitBranch?, gitCommit? }` | `{ run }` |
 | `journal_get_run_manifest` | Read-only | `GET /runs/:id/manifest` | `{ runId: string }` | Compact run manifest with linked events, changed files, commands, tests, open loops, handoffs, and artifacts |
 | `journal_get_context` | Read-only | `GET /agent/context` | `{ project: string, limit?: number, min_importance?: number }` | Compact project context with recent runs, failed runs, compact events, compact handoffs, open loops, decisions, and next actions |
 | `journal_search` | Read-only | `GET /search` | `{ project?: string, source?: string, status?: string, category?: string, tag?: string, text?: string, date_from?: string, date_to?: string, limit?: number }` | Compact runs, events, open loops, handoffs, and decisions matching the filters |
 | `journal_create_event` | Write | `POST /events` | `{ runId: string, clientRecordId?: string, type: EventType, message: string, importance?: number, category?: string, tags?: string[], data?: object }` | `{ event: AgentEvent }` |
 | `journal_create_handoff` | Write | `POST /handoffs` | `{ sourceRunId?: string, clientRecordId?: string, fromSource: string, toSource?: string, project: string, summary: string, nextAction?: string, category?: string, tags?: string[], context?: object }` | `{ handoff: Handoff }` |
 | `journal_create_open_loop` | Write | `POST /open-loops` | `{ type: OpenLoopType, project: string, clientRecordId?: string, title: string, description?: string, owner?: string, source?: string, nextAction?: string, blockerRef?: string, sourceRunId?: string }` | `{ openLoop: OpenLoop }` |
-| `journal_resolve_open_loop` | Write | `PATCH /open-loops/:id` | `{ id: string, resolution?: string }` | `{ openLoop: OpenLoop }` with status set to `resolved` |
+| `journal_resolve_open_loop` | Write | `PATCH /open-loops/:id` | `{ id: string, expectedVersion?: number, resolution?: string }` | `{ openLoop: OpenLoop }` with status set to `resolved` |
 | `journal_record_decision` | Write | `POST /decisions` | `{ project?: string, clientRecordId?: string, title: string, decision: string, rationale?: string }` | `{ decision: Decision }` |
 
 ## Schema Notes
@@ -44,6 +44,8 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
   require a specific external issue system.
 - Start-run conflicts are advisory, limited to ten recently updated nonterminal runs in the same
   project with the same work key, and never include the authoritative run returned by a replay.
+- Mutable run and open-loop tools should send the last observed `version` as `expectedVersion`.
+  Stale writes return the HTTP conflict unchanged through MCP so the agent can reread safely.
 
 ## Guardrails
 

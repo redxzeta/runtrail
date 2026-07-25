@@ -193,11 +193,13 @@ export async function callRuntrailTool(
     case "journal_start_run":
       return await client.requestJson("/runs", { method: "POST", body: compact(args) });
     case "journal_resume_run":
-    case "journal_heartbeat_run":
+    case "journal_heartbeat_run": {
+      const body = compact({ expectedVersion: args.expectedVersion });
       return await client.requestJson(
         `/runs/${encodeURIComponent(requireString(args, "runId"))}/${name === "journal_resume_run" ? "resume" : "heartbeat"}`,
-        { method: "POST" }
+        Object.keys(body).length > 0 ? { method: "POST", body } : { method: "POST" }
       );
+    }
     case "journal_pause_run":
     case "journal_finish_run":
       return await client.requestJson(
@@ -249,7 +251,8 @@ export async function callRuntrailTool(
           method: "PATCH",
           body: compact({
             status: "resolved",
-            resolution: args.resolution
+            resolution: args.resolution,
+            expectedVersion: args.expectedVersion
           })
         }
       );

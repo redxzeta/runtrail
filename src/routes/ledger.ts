@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type Database from "better-sqlite3";
 import { type Context, Hono } from "hono";
 import type { RuntrailConfig } from "../config.js";
-import { LedgerRepository } from "../db/ledger.js";
+import { LedgerRepository, VersionConflictError } from "../db/ledger.js";
 import {
   type AgentEvent,
   type AgentRun,
@@ -22,9 +22,11 @@ import {
   listHandoffsQuerySchema,
   listOpenLoopsQuerySchema,
   listRunsQuerySchema,
+  type OpenLoop,
   pauseRunRequestSchema,
   updateOpenLoopRequestSchema,
-  updateRunRequestSchema
+  updateRunRequestSchema,
+  versionedMutationRequestSchema
 } from "../shared/schemas.js";
 import {
   dashboardSummary,
@@ -161,19 +163,29 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     });
   });
 
-  route.post("/runs/:id/heartbeat", (c) =>
-    lifecycleResponse(c, ledger.heartbeatRun(c.req.param("id")))
-  );
-  route.post("/runs/:id/resume", (c) => lifecycleResponse(c, ledger.resumeRun(c.req.param("id"))));
+  route.post("/runs/:id/heartbeat", async (c) => {
+    const parsed = versionedMutationRequestSchema.safeParse((await readJson(c.req.raw)) ?? {});
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    return lifecycleResponse(c, () =>
+      ledger.heartbeatRun(c.req.param("id"), parsed.data.expectedVersion)
+    );
+  });
+  route.post("/runs/:id/resume", async (c) => {
+    const parsed = versionedMutationRequestSchema.safeParse((await readJson(c.req.raw)) ?? {});
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    return lifecycleResponse(c, () =>
+      ledger.resumeRun(c.req.param("id"), parsed.data.expectedVersion)
+    );
+  });
   route.post("/runs/:id/pause", async (c) => {
     const parsed = pauseRunRequestSchema.safeParse(await readJson(c.req.raw));
     if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
-    return lifecycleResponse(c, ledger.pauseRun(c.req.param("id"), parsed.data));
+    return lifecycleResponse(c, () => ledger.pauseRun(c.req.param("id"), parsed.data));
   });
   route.post("/runs/:id/finish", async (c) => {
     const parsed = finishRunRequestSchema.safeParse(await readJson(c.req.raw));
     if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
-    return lifecycleResponse(c, ledger.finishRun(c.req.param("id"), parsed.data));
+    return lifecycleResponse(c, () => ledger.finishRun(c.req.param("id"), parsed.data));
   });
 
   route.patch("/runs/:id", async (c) => {
@@ -184,7 +196,12 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json(formatValidationError(parsed.error), 400);
     }
 
-    const run = ledger.updateRun(c.req.param("id"), parsed.data);
+    let run: AgentRun | undefined;
+    try {
+      run = ledger.updateRun(c.req.param("id"), parsed.data);
+    } catch (error) {
+      return mutationErrorResponse(c, error);
+    }
 
     if (!run) {
       return c.json({ error: "Run not found" }, 404);
@@ -312,7 +329,12 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json(formatValidationError(parsed.error), 400);
     }
 
-    const openLoop = ledger.updateOpenLoop(c.req.param("id"), parsed.data);
+    let openLoop: OpenLoop | undefined;
+    try {
+      openLoop = ledger.updateOpenLoop(c.req.param("id"), parsed.data);
+    } catch (error) {
+      return mutationErrorResponse(c, error);
+    }
 
     if (!openLoop) {
       return c.json({ error: "Open loop not found" }, 404);
@@ -590,12 +612,34 @@ function isNotifiable(type: AgentEvent["type"]): boolean {
   return ["failed", "completed", "blocked", "needs_review", "decision_required"].includes(type);
 }
 
-function lifecycleResponse(c: Context, result: { run?: AgentRun; error?: string }): Response {
-  if (result.run) return c.json({ run: result.run });
-  return c.json(
-    { error: result.error ?? "Invalid lifecycle transition" },
-    result.error === "Run not found" ? 404 : 409
-  );
+function lifecycleResponse(c: Context, action: () => { run?: AgentRun; error?: string }): Response {
+  try {
+    const result = action();
+    if (result.run) return c.json({ run: result.run });
+    return c.json(
+      { error: result.error ?? "Invalid lifecycle transition" },
+      result.error === "Run not found" ? 404 : 409
+    );
+  } catch (error) {
+    return mutationErrorResponse(c, error);
+  }
+}
+
+function mutationErrorResponse(c: Context, error: unknown): Response {
+  if (error instanceof VersionConflictError) {
+    return c.json(
+      {
+        error: "Version conflict",
+        recordType: error.recordType,
+        expectedVersion: error.expectedVersion,
+        current: error.current,
+        action: "reread"
+      },
+      409
+    );
+  }
+
+  throw error;
 }
 
 function readChangedFiles(data: unknown): string[] {

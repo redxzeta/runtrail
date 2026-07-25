@@ -123,6 +123,57 @@ describe("ledger routes", () => {
     expect(fetched.events).toEqual([]);
   });
 
+  it("rejects stale run updates and succeeds after rereading the current version", async () => {
+    const app = createTestApp();
+    const created = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string; version: number };
+    };
+
+    expect(created.run.version).toBe(1);
+    const first = await app.request(`/runs/${created.run.id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ expectedVersion: 1, summary: "First writer" })
+    });
+    const firstBody = (await first.json()) as {
+      run: { version: number; summary: string; status: string };
+    };
+    expect(firstBody.run).toEqual(
+      expect.objectContaining({ version: 2, summary: "First writer", status: "running" })
+    );
+
+    const stale = await app.request(`/runs/${created.run.id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ expectedVersion: 1, status: "failed", summary: "Stale writer" })
+    });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toEqual({
+      error: "Version conflict",
+      recordType: "run",
+      expectedVersion: 1,
+      current: {
+        id: created.run.id,
+        status: "running",
+        version: 2,
+        updatedAt: expect.any(String)
+      },
+      action: "reread"
+    });
+
+    const retry = await app.request(`/runs/${created.run.id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ expectedVersion: 2, status: "completed", summary: "Retried safely" })
+    });
+    const retryBody = (await retry.json()) as {
+      run: { version: number; status: string; summary: string };
+    };
+    expect(retryBody.run).toEqual(
+      expect.objectContaining({ version: 3, status: "completed", summary: "Retried safely" })
+    );
+  });
+
   it("replays client run creation without mutating the original record", async () => {
     const app = createTestApp();
     const firstResponse = await postJson(app, "/runs", {
@@ -446,6 +497,40 @@ describe("ledger routes", () => {
     ).toBe(409);
   });
 
+  it("applies optimistic versions to lifecycle transitions", async () => {
+    const app = createTestApp();
+    const created = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string; version: number };
+    };
+    const id = created.run.id;
+    const paused = await postJson(app, `/runs/${id}/pause`, {
+      expectedVersion: 1,
+      status: "paused"
+    });
+    expect(await paused.json()).toEqual({
+      run: expect.objectContaining({ status: "paused", version: 2 })
+    });
+
+    const staleResume = await postJson(app, `/runs/${id}/resume`, { expectedVersion: 1 });
+    expect(staleResume.status).toBe(409);
+    expect(await staleResume.json()).toEqual(
+      expect.objectContaining({
+        error: "Version conflict",
+        current: expect.objectContaining({ id, status: "paused", version: 2 }),
+        action: "reread"
+      })
+    );
+
+    const resumed = await postJson(app, `/runs/${id}/resume`, { expectedVersion: 2 });
+    expect(await resumed.json()).toEqual({
+      run: expect.objectContaining({ status: "running", version: 3 })
+    });
+    const heartbeat = await postJson(app, `/runs/${id}/heartbeat`, { expectedVersion: 3 });
+    expect(await heartbeat.json()).toEqual({
+      run: expect.objectContaining({ status: "running", version: 4 })
+    });
+  });
+
   it("records recovery decisions without duplicating authoritative context", async () => {
     const app = createTestApp();
     const payload = {
@@ -731,11 +816,12 @@ describe("ledger routes", () => {
       headers: authHeaders()
     });
     const fetched = (await fetchedResponse.json()) as {
-      run: { updatedAt: string };
+      run: { updatedAt: string; version: number };
       events: Array<{ id: string; message: string; category?: string; tags?: string[] }>;
     };
 
     expect(fetched.run.updatedAt).toBe("2026-06-26T09:30:00.000Z");
+    expect(fetched.run.version).toBe(1);
     expect(fetched.events).toEqual([
       expect.objectContaining({
         id: created.event.id,
@@ -981,6 +1067,64 @@ describe("ledger routes", () => {
         id: cancelled.openLoop.id
       })
     ]);
+  });
+
+  it("rejects stale open-loop reassignment and resolution", async () => {
+    const app = createTestApp();
+    const created = (await (
+      await postJson(app, "/open-loops", {
+        type: "blocked",
+        project: "runtrail",
+        title: "Needs an owner",
+        owner: "agent-a"
+      })
+    ).json()) as { openLoop: { id: string; version: number } };
+
+    const reassigned = await app.request(`/open-loops/${created.openLoop.id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ expectedVersion: 1, owner: "agent-b" })
+    });
+    expect(await reassigned.json()).toEqual({
+      openLoop: expect.objectContaining({ owner: "agent-b", status: "open", version: 2 })
+    });
+
+    const staleResolution = await app.request(`/open-loops/${created.openLoop.id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        expectedVersion: 1,
+        status: "resolved",
+        resolution: "Stale resolution"
+      })
+    });
+    expect(staleResolution.status).toBe(409);
+    expect(await staleResolution.json()).toEqual(
+      expect.objectContaining({
+        recordType: "openLoop",
+        expectedVersion: 1,
+        current: expect.objectContaining({ status: "open", version: 2 }),
+        action: "reread"
+      })
+    );
+
+    const resolved = await app.request(`/open-loops/${created.openLoop.id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        expectedVersion: 2,
+        status: "resolved",
+        resolution: "Confirmed resolution"
+      })
+    });
+    expect(await resolved.json()).toEqual({
+      openLoop: expect.objectContaining({
+        owner: "agent-b",
+        status: "resolved",
+        resolution: "Confirmed resolution",
+        version: 3
+      })
+    });
   });
 
   it("records and lists project and global decisions", async () => {

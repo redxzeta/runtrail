@@ -92,6 +92,7 @@ export async function runCli(argv = process.argv): Promise<void> {
     .description("Resolve an open loop")
     .argument("<id>", "Open loop ID")
     .option("--resolution <resolution>", "Resolution notes")
+    .option("--expected-version <version>", "Version observed before resolving", parseInteger)
     .action(resolveLoop);
 
   const decision = program.command("decision").description("Manage decisions");
@@ -275,6 +276,7 @@ async function wrapRun(
     })
   });
   const runId = readResponseId(created, "run");
+  const expectedVersion = readResponseVersion(created, "run");
   const logPath = path.join(config.storage.logDir, `${runId}.log`);
 
   mkdirSync(config.storage.logDir, { recursive: true });
@@ -335,6 +337,7 @@ async function wrapRun(
     method: "PATCH",
     body: compact({
       status,
+      expectedVersion,
       summary: exitCode === 0 ? "Command completed" : `Command failed with exit code ${exitCode}`,
       completedAt: new Date().toISOString(),
       gitBranch: gitAfter.branch,
@@ -478,13 +481,17 @@ async function addLoop(options: {
   );
 }
 
-async function resolveLoop(id: string, options: { resolution?: string }): Promise<void> {
+async function resolveLoop(
+  id: string,
+  options: { resolution?: string; expectedVersion?: number }
+): Promise<void> {
   printJson(
     await requestJson(`/open-loops/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: compact({
         status: "resolved",
-        resolution: options.resolution
+        resolution: options.resolution,
+        expectedVersion: options.expectedVersion
       })
     })
   );
@@ -886,6 +893,12 @@ function readResponseId(response: unknown, key: string): string {
   }
 
   throw new Error(`API response did not include ${key}.id`);
+}
+
+function readResponseVersion(response: unknown, key: string): number | undefined {
+  const envelope = asRecord(response);
+  const value = asRecord(envelope[key]).version;
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
 async function runCommand(command: string[], logPath: string): Promise<number> {

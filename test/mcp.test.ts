@@ -50,16 +50,16 @@ describe("mcp adapter", () => {
       },
       client
     );
-    await callRuntrailTool("journal_resume_run", { runId: "run_1" }, client);
-    await callRuntrailTool("journal_heartbeat_run", { runId: "run_1" }, client);
+    await callRuntrailTool("journal_resume_run", { runId: "run_1", expectedVersion: 2 }, client);
+    await callRuntrailTool("journal_heartbeat_run", { runId: "run_1", expectedVersion: 3 }, client);
     await callRuntrailTool(
       "journal_pause_run",
-      { runId: "run_1", status: "needs_review", summary: "Review" },
+      { runId: "run_1", expectedVersion: 4, status: "needs_review", summary: "Review" },
       client
     );
     await callRuntrailTool(
       "journal_finish_run",
-      { runId: "run_1", status: "completed", summary: "Done" },
+      { runId: "run_1", expectedVersion: 5, status: "completed", summary: "Done" },
       client
     );
 
@@ -77,13 +77,19 @@ describe("mcp adapter", () => {
           }
         }
       ],
-      ["/runs/run_1/resume", { method: "POST" }],
-      ["/runs/run_1/heartbeat", { method: "POST" }],
+      ["/runs/run_1/resume", { method: "POST", body: { expectedVersion: 2 } }],
+      ["/runs/run_1/heartbeat", { method: "POST", body: { expectedVersion: 3 } }],
       [
         "/runs/run_1/pause",
-        { method: "POST", body: { status: "needs_review", summary: "Review" } }
+        {
+          method: "POST",
+          body: { expectedVersion: 4, status: "needs_review", summary: "Review" }
+        }
       ],
-      ["/runs/run_1/finish", { method: "POST", body: { status: "completed", summary: "Done" } }]
+      [
+        "/runs/run_1/finish",
+        { method: "POST", body: { expectedVersion: 5, status: "completed", summary: "Done" } }
+      ]
     ]);
   });
 
@@ -93,6 +99,8 @@ describe("mcp adapter", () => {
     expect(mcpToolInputSchemas.runSearch.status.safeParse("not-a-status").success).toBe(false);
     expect(mcpToolInputSchemas.journalSearch.limit.safeParse(51).success).toBe(false);
     expect(mcpToolInputSchemas.journalSearch.limit.safeParse(50).success).toBe(true);
+    expect(mcpToolInputSchemas.runId.expectedVersion.safeParse(0).success).toBe(false);
+    expect(mcpToolInputSchemas.runId.expectedVersion.safeParse(1).success).toBe(true);
   });
 
   it("constructs the default server from env without requiring a config file", () => {
@@ -194,6 +202,7 @@ describe("mcp adapter", () => {
       "journal_resolve_open_loop",
       {
         id: "loop_1",
+        expectedVersion: 3,
         resolution: "Resolved"
       },
       client
@@ -266,7 +275,8 @@ describe("mcp adapter", () => {
         method: "PATCH",
         body: {
           status: "resolved",
-          resolution: "Resolved"
+          resolution: "Resolved",
+          expectedVersion: 3
         }
       })
     );

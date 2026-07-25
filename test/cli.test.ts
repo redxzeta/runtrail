@@ -164,7 +164,17 @@ describe("cli", () => {
       "--source-run-id",
       "run_1"
     ]);
-    await runCli(["node", "rt", "loop", "resolve", "loop_1", "--resolution", "Reviewed"]);
+    await runCli([
+      "node",
+      "rt",
+      "loop",
+      "resolve",
+      "loop_1",
+      "--expected-version",
+      "4",
+      "--resolution",
+      "Reviewed"
+    ]);
     await runCli([
       "node",
       "rt",
@@ -266,7 +276,8 @@ describe("cli", () => {
         method: "PATCH",
         body: JSON.stringify({
           status: "resolved",
-          resolution: "Reviewed"
+          resolution: "Reviewed",
+          expectedVersion: 4
         })
       })
     );
@@ -577,6 +588,12 @@ describe("cli", () => {
         body: expect.stringContaining('"status":"completed"')
       })
     );
+    const finishCall = fetchMock.mock.calls.find(
+      ([url]) => (url as URL).pathname === "/runs/run_wrap"
+    );
+    expect(JSON.parse(String(finishCall?.[1]?.body))).toEqual(
+      expect.objectContaining({ expectedVersion: 1, status: "completed" })
+    );
     expect(JSON.parse(output.at(-1) ?? "{}")).toEqual(
       expect.objectContaining({
         runId: "run_wrap",
@@ -773,7 +790,9 @@ function mockRunWrapperFetch(): ReturnType<typeof vi.fn> {
   vi.stubEnv("RUNTRAIL_TOKEN", "");
   const fetchMock = vi.fn(async (url: URL) => {
     if (url.pathname === "/runs") {
-      return new Response(JSON.stringify({ run: { id: "run_wrap" } }), { status: 201 });
+      return new Response(JSON.stringify({ run: { id: "run_wrap", version: 1 } }), {
+        status: 201
+      });
     }
 
     if (url.pathname === "/events") {

@@ -55,6 +55,7 @@ const tagsSchema = z.array(tagSchema).max(20).optional();
 const categorySchema = z.string().trim().min(1).max(80).optional();
 const clientRecordIdSchema = z.string().trim().min(1).max(255).optional();
 const workKeySchema = z.string().trim().min(1).max(500).optional();
+const expectedVersionSchema = z.number().int().positive().optional();
 
 export const createRunRequestSchema = z.object({
   source: z.string().trim().min(1).max(80),
@@ -82,27 +83,34 @@ export const closeStaleRunsRequestSchema = z.object({
 
 export const updateRunRequestSchema = z
   .object({
+    expectedVersion: expectedVersionSchema,
     status: runStatusSchema.optional(),
     summary: z.string().trim().min(1).max(2000).nullable().optional(),
     completedAt: z.string().datetime().nullable().optional(),
     gitBranch: z.string().trim().min(1).max(255).nullable().optional(),
     gitCommit: z.string().trim().min(1).max(80).nullable().optional()
   })
-  .refine((value) => Object.keys(value).length > 0, {
+  .refine((value) => Object.keys(value).some((key) => key !== "expectedVersion"), {
     message: "At least one field is required"
   });
 
 export const pauseRunRequestSchema = z.object({
+  expectedVersion: expectedVersionSchema,
   status: z.enum(["paused", "blocked", "needs_review", "decision_required"]),
   summary: z.string().trim().min(1).max(2000).optional()
 });
 
 export const finishRunRequestSchema = z.object({
+  expectedVersion: expectedVersionSchema,
   status: z.enum(["completed", "failed", "cancelled"]),
   summary: z.string().trim().min(1).max(2000),
   completedAt: z.string().datetime().optional(),
   gitBranch: z.string().trim().min(1).max(255).optional(),
   gitCommit: z.string().trim().min(1).max(80).optional()
+});
+
+export const versionedMutationRequestSchema = z.object({
+  expectedVersion: expectedVersionSchema
 });
 
 export const createEventRequestSchema = z.object({
@@ -149,6 +157,7 @@ export const createOpenLoopRequestSchema = z.object({
 
 export const updateOpenLoopRequestSchema = z
   .object({
+    expectedVersion: expectedVersionSchema,
     status: openLoopStatusSchema.optional(),
     title: z.string().trim().min(1).max(240).optional(),
     description: z.string().trim().min(1).max(4000).nullable().optional(),
@@ -160,7 +169,7 @@ export const updateOpenLoopRequestSchema = z
     resolution: z.string().trim().min(1).max(4000).nullable().optional(),
     resolvedAt: z.string().datetime().nullable().optional()
   })
-  .refine((value) => Object.keys(value).length > 0, {
+  .refine((value) => Object.keys(value).some((key) => key !== "expectedVersion"), {
     message: "At least one field is required"
   });
 
@@ -287,6 +296,7 @@ export type AgentRun = {
   summary?: string;
   category?: string;
   tags?: string[];
+  version: number;
   startedAt: string;
   completedAt?: string;
   createdAt: string;
@@ -295,7 +305,7 @@ export type AgentRun = {
 
 export type RunConflict = Pick<
   AgentRun,
-  "id" | "source" | "project" | "workKey" | "task" | "status" | "updatedAt"
+  "id" | "source" | "project" | "workKey" | "task" | "status" | "version" | "updatedAt"
 >;
 
 export type AgentEvent = {
@@ -327,6 +337,7 @@ export type OpenLoop = {
   sourceRunId?: string;
   status: OpenLoopStatus;
   resolution?: string;
+  version: number;
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string;
