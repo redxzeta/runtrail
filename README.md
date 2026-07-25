@@ -81,6 +81,13 @@ Fetch compact agent context:
 pnpm cli context --project runtrail --limit 5 --min-importance 4
 ```
 
+Every context and prepare-work response includes an opaque `cursor`. Pass it back with
+`--cursor <value>` to receive a bounded `changes` delta instead of rereading full project context:
+
+```sh
+pnpm cli context --project runtrail --cursor "$RUNTRAIL_CURSOR"
+```
+
 Prepare a deterministic working set before editing:
 
 ```sh

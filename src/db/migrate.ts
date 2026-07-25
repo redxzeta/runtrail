@@ -9,6 +9,7 @@ const optimisticConcurrencyMigrationName = "004_optimistic_concurrency";
 const workflowRelationshipsMigrationName = "005_workflow_relationships";
 const handoffLifecycleMigrationName = "006_handoff_lifecycle";
 const prepareWorkMigrationName = "007_authoritative_run_liveness";
+const contextCursorMigrationName = "008_incremental_context_cursors";
 
 export function migrate(db: Database.Database): void {
   const transaction = db.transaction(() => {
@@ -123,6 +124,9 @@ export function migrate(db: Database.Database): void {
     db.prepare(
       "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
     ).run(7, prepareWorkMigrationName, nowIso());
+    db.prepare(
+      "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
+    ).run(8, contextCursorMigrationName, nowIso());
   });
 
   transaction();

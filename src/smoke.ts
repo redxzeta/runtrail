@@ -229,6 +229,20 @@ export async function runLifecycleSmoke(hooks: SmokeHooks = {}): Promise<void> {
     );
     assertIncludes(readArray(context, "recent_events"), "type", "command_executed");
     assertIncludes(readArray(context, "decisions"), "title", "Use deterministic smoke lifecycle");
+    const contextCursor = (context as Record<string, unknown>).cursor;
+    if (typeof contextCursor !== "string") throw new Error("context cursor was not returned");
+    const incremental = await step(
+      "verify incremental context",
+      async () =>
+        await request(
+          baseUrl,
+          token,
+          `/agent/context?project=runtrail-smoke&min_importance=0&cursor=${encodeURIComponent(contextCursor)}`
+        )
+    );
+    if (readArray(readRecord(incremental, "changes"), "events").length !== 0) {
+      throw new Error("incremental context repeated an unchanged event");
+    }
 
     const prepared = await step(
       "verify prepare-work",

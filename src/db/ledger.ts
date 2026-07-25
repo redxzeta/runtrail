@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
 import { createId } from "../shared/ids.js";
 import { compareEventsForReceipts, computeEventHash } from "../shared/receipts.js";
@@ -20,6 +21,7 @@ import type {
   FinishRunRequest,
   Handoff,
   HandoffStatus,
+  IncrementalContextChanges,
   JournalSearchQuery,
   JournalSearchResults,
   ListArtifactsQuery,
@@ -117,6 +119,16 @@ export class RunRelationshipError extends Error {
   ) {
     super(`Invalid ${field}: ${code}`);
     this.name = "RunRelationshipError";
+  }
+}
+
+export class ContextCursorError extends Error {
+  readonly code = "invalid_cursor";
+  readonly action = "retry_without_cursor";
+
+  constructor(message = "Cursor is invalid, unsupported, or belongs to a different query") {
+    super(message);
+    this.name = "ContextCursorError";
   }
 }
 
@@ -1634,6 +1646,20 @@ export class LedgerRepository {
     ) {
       return undefined;
     }
+    const cursorEnvelope = this.contextCursorEnvelope(
+      {
+        kind: "prepare-work",
+        project: query.project,
+        source: query.source,
+        workKey: query.workKey,
+        runId: query.runId,
+        category: query.category,
+        tags: [...query.tags].sort()
+      },
+      query.cursor,
+      query.project,
+      query.limit
+    );
 
     const runFilters = ["project = @project"];
     const runParams: Record<string, string | number> = {
@@ -1832,6 +1858,7 @@ export class LedgerRepository {
       project: query.project,
       asOf,
       staleAfterSeconds,
+      ...cursorEnvelope,
       selectedRun: selectedSummary,
       relevantRuns,
       workflowRuns,
@@ -1885,7 +1912,148 @@ export class LedgerRepository {
     };
   }
 
+  private contextCursorEnvelope(
+    scope: Record<string, unknown>,
+    cursor: string | undefined,
+    project: string,
+    limit: number
+  ): {
+    mode: "full" | "incremental";
+    cursor: string;
+    changes?: IncrementalContextChanges;
+  } {
+    const scopeHash = createHash("sha256").update(JSON.stringify(scope)).digest("base64url");
+    if (!cursor) {
+      const row = this.db
+        .prepare("SELECT COALESCE(MAX(sequence), 0) AS sequence FROM ledger_changes")
+        .get() as {
+        sequence: number;
+      };
+      return {
+        mode: "full",
+        cursor: encodeContextCursor(scopeHash, {
+          runs: row.sequence,
+          events: row.sequence,
+          openLoops: row.sequence,
+          handoffs: row.sequence,
+          decisions: row.sequence
+        })
+      };
+    }
+
+    const parsed = decodeContextCursor(cursor, scopeHash);
+    const sections = {} as IncrementalContextChanges["sections"];
+    const next = { ...parsed.sections };
+    const idsByType = {} as Record<ContextChangeType, string[]>;
+    for (const type of contextChangeTypes) {
+      const result = this.changedRecordIds(
+        type,
+        project,
+        parsed.sections[type],
+        limit,
+        type === "decisions"
+      );
+      idsByType[type] = result.ids;
+      next[type] = result.sequence;
+      sections[type] = {
+        limit,
+        count: result.ids.length,
+        truncated: result.truncated
+      };
+    }
+
+    return {
+      mode: "incremental",
+      cursor: encodeContextCursor(scopeHash, next),
+      changes: {
+        runs: this.rowsByIds<RunRow>("agent_runs", idsByType.runs)
+          .map(mapRunRow)
+          .map(toIncrementalRun),
+        events: this.rowsByIds<EventRow>("agent_events", idsByType.events)
+          .map(mapEventContextRow)
+          .map(toIncrementalEvent),
+        openLoops: this.rowsByIds<OpenLoopRow>("open_loops", idsByType.openLoops)
+          .map(mapOpenLoopRow)
+          .map(toIncrementalOpenLoop),
+        handoffs: this.rowsByIds<HandoffRow>("handoffs", idsByType.handoffs)
+          .map(mapHandoffSummaryRow)
+          .map(toIncrementalHandoff),
+        decisions: this.rowsByIds<DecisionRow>("decisions", idsByType.decisions)
+          .map(mapDecisionRow)
+          .map(({ id, project, createdAt }) => ({ id, project, createdAt })),
+        sections
+      }
+    };
+  }
+
+  private changedRecordIds(
+    type: ContextChangeType,
+    project: string,
+    after: number,
+    limit: number,
+    includeGlobal: boolean
+  ): { ids: string[]; sequence: number; truncated: boolean } {
+    const rows = this.db
+      .prepare(
+        `SELECT record_id, MAX(sequence) AS sequence
+        FROM ledger_changes
+        WHERE record_type = @type
+          AND sequence > @after
+          AND (project = @project ${includeGlobal ? "OR project IS NULL" : ""})
+        GROUP BY record_id
+        ORDER BY sequence ASC, record_id ASC
+        LIMIT @limit`
+      )
+      .all({ type, after, project, limit: limit + 1 }) as Array<{
+      record_id: string;
+      sequence: number;
+    }>;
+    const delivered = rows.slice(0, limit);
+    return {
+      ids: delivered.map((row) => row.record_id),
+      sequence: delivered.at(-1)?.sequence ?? after,
+      truncated: rows.length > limit
+    };
+  }
+
+  private rowsByIds<T extends { id: string }>(
+    table: "agent_runs" | "agent_events" | "open_loops" | "handoffs" | "decisions",
+    ids: string[]
+  ): T[] {
+    if (ids.length === 0) return [];
+    const placeholders = ids.map(() => "?").join(", ");
+    const rows = this.db
+      .prepare(`SELECT * FROM ${table} WHERE id IN (${placeholders})`)
+      .all(...ids) as T[];
+    const order = new Map(ids.map((id, index) => [id, index]));
+    return rows.sort((left, right) => (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0));
+  }
+
   getAgentContext(query: AgentContextQuery): AgentContext {
+    const cursorEnvelope = this.contextCursorEnvelope(
+      {
+        kind: "context",
+        project: query.project,
+        minImportance: query.min_importance
+      },
+      query.cursor,
+      query.project,
+      query.limit
+    );
+    if (cursorEnvelope.mode === "incremental") {
+      return {
+        project: query.project,
+        recent_runs: [],
+        failed_runs: [],
+        recent_events: [],
+        pending_handoffs: [],
+        recent_handoffs: [],
+        open_loops: [],
+        decisions: [],
+        next_actions: [],
+        ...cursorEnvelope
+      };
+    }
     const params = {
       project: query.project,
       limit: query.limit,
@@ -2011,9 +2179,114 @@ export class LedgerRepository {
       recent_handoffs: handoffs.map(mapHandoffSummaryRow),
       open_loops: openLoops.map(mapOpenLoopRow),
       decisions: decisions.map(mapDecisionRow),
-      next_actions: openLoops.map((loop) => loop.next_action ?? loop.title)
+      next_actions: openLoops.map((loop) => loop.next_action ?? loop.title),
+      ...cursorEnvelope
     };
   }
+}
+
+const contextChangeTypes = ["runs", "events", "openLoops", "handoffs", "decisions"] as const;
+type ContextChangeType = (typeof contextChangeTypes)[number];
+type ContextCursorSections = Record<ContextChangeType, number>;
+type ContextCursorPayload = { version: 1; scope: string; sections: ContextCursorSections };
+
+function encodeContextCursor(scope: string, sections: ContextCursorSections): string {
+  return Buffer.from(JSON.stringify({ version: 1, scope, sections })).toString("base64url");
+}
+
+function decodeContextCursor(cursor: string, expectedScope: string): ContextCursorPayload {
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as unknown;
+    if (!isRecord(parsed) || parsed.version !== 1 || parsed.scope !== expectedScope) {
+      throw new ContextCursorError();
+    }
+    const sections = parsed.sections;
+    if (
+      !isRecord(sections) ||
+      contextChangeTypes.some(
+        (type) =>
+          !Number.isSafeInteger(sections[type]) ||
+          typeof sections[type] !== "number" ||
+          sections[type] < 0
+      )
+    ) {
+      throw new ContextCursorError();
+    }
+    return parsed as ContextCursorPayload;
+  } catch (error) {
+    if (error instanceof ContextCursorError) throw error;
+    throw new ContextCursorError();
+  }
+}
+
+function toIncrementalRun(run: AgentRun): IncrementalContextChanges["runs"][number] {
+  const {
+    id,
+    source,
+    project,
+    workKey,
+    workflowId,
+    parentRunId,
+    continuedFromRunId,
+    status,
+    category,
+    tags,
+    version,
+    startedAt,
+    updatedAt
+  } = run;
+  return {
+    id,
+    source,
+    project,
+    workKey,
+    workflowId,
+    parentRunId,
+    continuedFromRunId,
+    status,
+    category,
+    tags,
+    version,
+    startedAt,
+    updatedAt
+  };
+}
+
+function toIncrementalEvent(
+  event: Omit<AgentEvent, "data">
+): IncrementalContextChanges["events"][number] {
+  const { id, runId, type, importance, category, tags, createdAt } = event;
+  return { id, runId, type, importance, category, tags, createdAt };
+}
+
+function toIncrementalOpenLoop(openLoop: OpenLoop): IncrementalContextChanges["openLoops"][number] {
+  const { id, type, project, owner, source, sourceRunId, status, version, updatedAt } = openLoop;
+  return { id, type, project, owner, source, sourceRunId, status, version, updatedAt };
+}
+
+function toIncrementalHandoff(handoff: Handoff): IncrementalContextChanges["handoffs"][number] {
+  const {
+    id,
+    sourceRunId,
+    fromSource,
+    toSource,
+    project,
+    status,
+    targetRunId,
+    version,
+    updatedAt
+  } = handoff;
+  return {
+    id,
+    sourceRunId,
+    fromSource,
+    toSource,
+    project,
+    status,
+    targetRunId,
+    version,
+    updatedAt
+  };
 }
 
 type RecoveryReceiptRow = {

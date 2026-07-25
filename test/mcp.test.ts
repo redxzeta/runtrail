@@ -155,7 +155,8 @@ describe("mcp adapter", () => {
       {
         project: "runtrail",
         limit: 5,
-        min_importance: 4
+        min_importance: 4,
+        cursor: "cursor-1"
       },
       client
     );
@@ -198,7 +199,7 @@ describe("mcp adapter", () => {
 
     expect(client.requestJson).toHaveBeenNthCalledWith(
       1,
-      "/agent/context?project=runtrail&limit=5&min_importance=4"
+      "/agent/context?project=runtrail&limit=5&min_importance=4&cursor=cursor-1"
     );
     expect(client.requestJson).toHaveBeenNthCalledWith(
       2,

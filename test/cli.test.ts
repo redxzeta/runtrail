@@ -78,11 +78,16 @@ describe("cli", () => {
       "--limit",
       "5",
       "--min-importance",
-      "6"
+      "6",
+      "--cursor",
+      "cursor-1"
     ]);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      new URL("/agent/context?project=runtrail&limit=5&min_importance=6", "http://runtrail.test"),
+      new URL(
+        "/agent/context?project=runtrail&limit=5&min_importance=6&cursor=cursor-1",
+        "http://runtrail.test"
+      ),
       expect.any(Object)
     );
     expect(JSON.parse(output.join("\n"))).toEqual(

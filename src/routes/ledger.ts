@@ -2,7 +2,12 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type Database from "better-sqlite3";
 import { type Context, Hono } from "hono";
 import type { RuntrailConfig } from "../config.js";
-import { LedgerRepository, RunRelationshipError, VersionConflictError } from "../db/ledger.js";
+import {
+  ContextCursorError,
+  LedgerRepository,
+  RunRelationshipError,
+  VersionConflictError
+} from "../db/ledger.js";
 import {
   type AgentEvent,
   type AgentRun,
@@ -432,7 +437,11 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json(formatValidationError(parsed.error), 400);
     }
 
-    return c.json(ledger.getAgentContext(parsed.data));
+    try {
+      return c.json(ledger.getAgentContext(parsed.data));
+    } catch (error) {
+      return cursorErrorResponse(c, error);
+    }
   });
 
   route.get("/agent/prepare-work", (c) => {
@@ -446,8 +455,15 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json(formatValidationError(parsed.error), 400);
     }
 
-    const prepared = ledger.prepareWork(parsed.data, options.config.agentContext.staleAfterSeconds);
-    return prepared ? c.json(prepared) : c.json({ error: "Run not found" }, 404);
+    try {
+      const prepared = ledger.prepareWork(
+        parsed.data,
+        options.config.agentContext.staleAfterSeconds
+      );
+      return prepared ? c.json(prepared) : c.json({ error: "Run not found" }, 404);
+    } catch (error) {
+      return cursorErrorResponse(c, error);
+    }
   });
 
   route.get("/search", (c) => {
@@ -751,6 +767,20 @@ function mutationErrorResponse(c: Context, error: unknown): Response {
     );
   }
 
+  throw error;
+}
+
+function cursorErrorResponse(c: Context, error: unknown): Response {
+  if (error instanceof ContextCursorError) {
+    return c.json(
+      {
+        error: error.message,
+        code: error.code,
+        action: error.action
+      },
+      400
+    );
+  }
   throw error;
 }
 

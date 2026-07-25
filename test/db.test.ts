@@ -30,6 +30,9 @@ describe("database", () => {
     const livenessMigration = db
       .prepare("SELECT name FROM schema_migrations WHERE id = ?")
       .get(7) as { name: string } | undefined;
+    const cursorMigration = db.prepare("SELECT name FROM schema_migrations WHERE id = ?").get(8) as
+      | { name: string }
+      | undefined;
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as Array<{ name: string }>;
@@ -44,6 +47,7 @@ describe("database", () => {
     expect(concurrencyMigration?.name).toBe("004_optimistic_concurrency");
     expect(workflowMigration?.name).toBe("005_workflow_relationships");
     expect(livenessMigration?.name).toBe("007_authoritative_run_liveness");
+    expect(cursorMigration?.name).toBe("008_incremental_context_cursors");
     expect(tables.map((table) => table.name)).toEqual([
       "agent_event_tags",
       "agent_events",
@@ -53,9 +57,11 @@ describe("database", () => {
       "decisions",
       "handoff_tags",
       "handoffs",
+      "ledger_changes",
       "open_loops",
       "recovery_receipts",
-      "schema_migrations"
+      "schema_migrations",
+      "sqlite_sequence"
     ]);
     expect(indexes.map((index) => index.name)).toContain(
       "idx_agent_runs_project_status_updated_at"
