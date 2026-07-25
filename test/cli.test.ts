@@ -92,6 +92,37 @@ describe("cli", () => {
     );
   });
 
+  it("fetches prepare-work guidance with continuation filters", async () => {
+    const fetchMock = mockFetch({ project: "runtrail", recommendations: [] });
+    captureOutput();
+
+    await runCli([
+      "node",
+      "rt",
+      "prepare-work",
+      "--project",
+      "runtrail",
+      "--source",
+      "codex",
+      "--work-key",
+      "github:redxzeta/runtrail#114",
+      "--run-id",
+      "run_1",
+      "--tag",
+      "agent",
+      "--limit",
+      "5"
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL(
+        "/agent/prepare-work?project=runtrail&source=codex&workKey=github%3Aredxzeta%2Fruntrail%23114&runId=run_1&tag=agent&limit=5",
+        "http://runtrail.test"
+      ),
+      expect.any(Object)
+    );
+  });
+
   it("creates runs, events, loops, decisions, and handoffs through the API", async () => {
     const fetchMock = mockFetch({ ok: true });
     captureOutput();

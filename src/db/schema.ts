@@ -24,6 +24,7 @@ export const schemaStatements = [
     category TEXT,
     tags_json TEXT,
     version INTEGER NOT NULL DEFAULT 1,
+    last_liveness_at TEXT,
     started_at TEXT NOT NULL,
     completed_at TEXT,
     created_at TEXT NOT NULL,

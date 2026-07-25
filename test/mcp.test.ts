@@ -26,6 +26,7 @@ describe("mcp adapter", () => {
       "journal_pause_run",
       "journal_finish_run",
       "journal_get_context",
+      "journal_prepare_work",
       "journal_create_event",
       "journal_create_open_loop",
       "journal_resolve_open_loop",
@@ -113,6 +114,29 @@ describe("mcp adapter", () => {
     expect(mcpToolInputSchemas.journalSearch.limit.safeParse(50).success).toBe(true);
     expect(mcpToolInputSchemas.runId.expectedVersion.safeParse(0).success).toBe(false);
     expect(mcpToolInputSchemas.runId.expectedVersion.safeParse(1).success).toBe(true);
+    expect(mcpToolInputSchemas.prepareWork.limit.safeParse(21).success).toBe(false);
+  });
+
+  it("maps prepare-work to the bounded HTTP read", async () => {
+    const client = mockClient({ project: "runtrail" });
+
+    await callRuntrailTool(
+      "journal_prepare_work",
+      {
+        project: "runtrail",
+        source: "codex",
+        workKey: "github:redxzeta/runtrail#114",
+        runId: "run_1",
+        category: "implementation",
+        tags: ["agent", "context"],
+        limit: 5
+      },
+      client
+    );
+
+    expect(client.requestJson).toHaveBeenCalledWith(
+      "/agent/prepare-work?project=runtrail&source=codex&workKey=github%3Aredxzeta%2Fruntrail%23114&runId=run_1&category=implementation&tag=agent&tag=context&limit=5"
+    );
   });
 
   it("constructs the default server from env without requiring a config file", () => {
@@ -450,7 +474,7 @@ describe("mcp adapter", () => {
     });
 
     expect(server).toBeDefined();
-    expect(runtrailToolNames).toHaveLength(20);
+    expect(runtrailToolNames).toHaveLength(21);
   });
 
   it("fails fast when bridge config is missing", () => {

@@ -29,6 +29,7 @@ export type RunRow = {
   category: string | null;
   tags_json: string | null;
   version: number;
+  last_liveness_at: string | null;
   started_at: string;
   completed_at: string | null;
   created_at: string;
@@ -139,6 +140,7 @@ export function mapRunRow(row: RunRow): AgentRun {
     category: row.category ?? undefined,
     tags: parseTags(row.tags_json),
     version: row.version,
+    lastLivenessAt: row.last_liveness_at ?? undefined,
     startedAt: row.started_at,
     completedAt: row.completed_at ?? undefined,
     createdAt: row.created_at,

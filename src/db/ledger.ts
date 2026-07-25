@@ -30,8 +30,17 @@ import type {
   ListRunsQuery,
   OpenLoop,
   PauseRunRequest,
+  PrepareWorkConflict,
+  PrepareWorkHandoff,
+  PrepareWorkManifestSummary,
+  PrepareWorkOpenLoop,
+  PrepareWorkQuery,
+  PrepareWorkRecommendation,
+  PrepareWorkResponse,
+  PrepareWorkRunSummary,
   RecoveryReceipt,
   RunConflict,
+  RunFreshness,
   RunManifest,
   UpdateOpenLoopRequest,
   UpdateRunRequest,
@@ -148,6 +157,7 @@ export class LedgerRepository {
       category: input.category,
       tags,
       version: 1,
+      lastLivenessAt: timestamp,
       startedAt: input.startedAt ?? timestamp,
       createdAt: timestamp,
       updatedAt: timestamp
@@ -176,6 +186,7 @@ export class LedgerRepository {
             category,
             tags_json,
             version,
+            last_liveness_at,
             started_at,
             completed_at,
             created_at,
@@ -200,6 +211,7 @@ export class LedgerRepository {
             @category,
             @tagsJson,
             @version,
+            @lastLivenessAt,
             @startedAt,
             @completedAt,
             @createdAt,
@@ -381,7 +393,10 @@ export class LedgerRepository {
     assertExpectedVersion("run", run, expectedVersion);
     if (isTerminal(run.status)) return { error: `Cannot heartbeat ${run.status} run` };
     return {
-      run: this.updateRun(id, { expectedVersion, summary: run.summary ?? null }) as AgentRun
+      run: this.updateRunWithLiveness(id, {
+        expectedVersion,
+        summary: run.summary ?? null
+      }) as AgentRun
     };
   }
 
@@ -390,15 +405,23 @@ export class LedgerRepository {
     if (!run) return { error: "Run not found" };
     assertExpectedVersion("run", run, expectedVersion);
     if (run.status === "cancelled") return { error: "Cannot resume cancelled run" };
-    if (run.status === "running") return { run };
     return {
-      run: this.updateRun(id, {
+      run: this.updateRunWithLiveness(id, {
         expectedVersion,
         status: "running",
-        summary: null,
+        summary: run.summary ?? null,
         completedAt: null
       }) as AgentRun
     };
+  }
+
+  private updateRunWithLiveness(id: string, input: UpdateRunRequest): AgentRun | undefined {
+    return this.db.transaction(() => {
+      const updated = this.updateRun(id, input);
+      if (!updated) return undefined;
+      this.db.prepare("UPDATE agent_runs SET last_liveness_at = ? WHERE id = ?").run(nowIso(), id);
+      return this.getRun(id);
+    })();
   }
 
   pauseRun(id: string, input: PauseRunRequest): LifecycleResult {
@@ -1597,6 +1620,271 @@ export class LedgerRepository {
     };
   }
 
+  prepareWork(query: PrepareWorkQuery, staleAfterSeconds: number): PrepareWorkResponse | undefined {
+    const asOf = nowIso();
+    const selected = query.runId ? this.getRun(query.runId) : undefined;
+    if (
+      query.runId &&
+      (!selected ||
+        selected.project !== query.project ||
+        (query.source !== undefined && selected.source !== query.source) ||
+        (query.workKey !== undefined && selected.workKey !== query.workKey) ||
+        (query.category !== undefined && selected.category !== query.category) ||
+        query.tags.some((tag) => !selected.tags?.includes(tag)))
+    ) {
+      return undefined;
+    }
+
+    const runFilters = ["project = @project"];
+    const runParams: Record<string, string | number> = {
+      project: query.project,
+      limit: query.limit + 1
+    };
+    if (query.source) {
+      runFilters.push("source = @source");
+      runParams.source = query.source;
+    }
+    if (query.workKey) {
+      runFilters.push("work_key = @workKey");
+      runParams.workKey = query.workKey;
+    }
+    if (query.category) {
+      runFilters.push("category = @category");
+      runParams.category = query.category;
+    }
+    if (selected) {
+      runFilters.push("id != @selectedRunId");
+      runParams.selectedRunId = selected.id;
+    }
+    for (const [index, tag] of query.tags.entries()) {
+      const key = `tag${index}`;
+      runFilters.push(
+        `EXISTS (SELECT 1 FROM agent_run_tags WHERE agent_run_tags.run_id = agent_runs.id AND agent_run_tags.tag = @${key})`
+      );
+      runParams[key] = tag;
+    }
+
+    const relevantResult = takeBounded(
+      (
+        this.db
+          .prepare(
+            `SELECT * FROM agent_runs
+            WHERE ${runFilters.join(" AND ")}
+            ORDER BY updated_at DESC, id ASC
+            LIMIT @limit`
+          )
+          .all(runParams) as RunRow[]
+      ).map(mapRunRow),
+      query.limit
+    );
+
+    const selectedSummary = selected
+      ? toPrepareWorkRunSummary(selected, asOf, staleAfterSeconds)
+      : undefined;
+    const relevantRuns = relevantResult.items.map((run) =>
+      toPrepareWorkRunSummary(run, asOf, staleAfterSeconds)
+    );
+    const conflictWorkKey = query.workKey ?? selected?.workKey;
+    const conflictResult = conflictWorkKey
+      ? takeBounded(
+          (
+            this.db
+              .prepare(
+                `SELECT * FROM agent_runs
+                WHERE project = @project
+                  AND work_key = @workKey
+                  AND (@selectedRunId IS NULL OR id != @selectedRunId)
+                  AND status NOT IN ('completed', 'failed', 'cancelled')
+                ORDER BY updated_at DESC, id ASC
+                LIMIT @limit`
+              )
+              .all({
+                project: query.project,
+                workKey: conflictWorkKey,
+                selectedRunId: selected?.id ?? null,
+                limit: query.limit + 1
+              }) as RunRow[]
+          ).map(mapRunRow),
+          query.limit
+        )
+      : { items: [], truncated: false };
+    const conflicts = conflictResult.items.map((run): PrepareWorkConflict => {
+      const summary = toPrepareWorkRunSummary(run, asOf, staleAfterSeconds);
+      return {
+        ...summary,
+        conflictCode:
+          summary.freshness.state === "fresh"
+            ? "active_work_conflict"
+            : summary.freshness.state === "stale_candidate"
+              ? "stale_work_warning"
+              : "work_freshness_unknown"
+      };
+    });
+
+    const workflowResult = selected?.workflowId
+      ? takeBounded(
+          (
+            this.db
+              .prepare(
+                `SELECT * FROM agent_runs
+                WHERE project = @project AND workflow_id = @workflowId AND id != @selectedRunId
+                ORDER BY started_at ASC, id ASC
+                LIMIT @limit`
+              )
+              .all({
+                project: query.project,
+                workflowId: selected.workflowId,
+                selectedRunId: selected.id,
+                limit: query.limit + 1
+              }) as RunRow[]
+          ).map(mapRunRow),
+          query.limit
+        )
+      : { items: [], truncated: false };
+    const workflowRuns = workflowResult.items.map((run) =>
+      toPrepareWorkRunSummary(run, asOf, staleAfterSeconds)
+    );
+
+    const handoffFilters = ["project = @project", "status = 'pending'"];
+    const handoffParams: Record<string, string | number> = {
+      project: query.project,
+      limit: query.limit + 1
+    };
+    if (selected && query.source) {
+      handoffFilters.push("(source_run_id = @selectedRunId OR to_source = @source)");
+      handoffParams.selectedRunId = selected.id;
+      handoffParams.source = query.source;
+    } else if (selected) {
+      handoffFilters.push("source_run_id = @selectedRunId");
+      handoffParams.selectedRunId = selected.id;
+    } else if (query.source) {
+      handoffFilters.push("to_source = @source");
+      handoffParams.source = query.source;
+    }
+    const handoffResult = takeBounded(
+      (
+        this.db
+          .prepare(
+            `SELECT * FROM handoffs
+            WHERE ${handoffFilters.join(" AND ")}
+            ORDER BY updated_at DESC, id ASC
+            LIMIT @limit`
+          )
+          .all(handoffParams) as HandoffRow[]
+      ).map(mapHandoffRow),
+      query.limit
+    );
+    const pendingHandoffs = handoffResult.items.map(toPrepareWorkHandoff);
+
+    const loopFilters = ["project = @project", "status = 'open'"];
+    const loopParams: Record<string, string | number> = {
+      project: query.project,
+      limit: query.limit + 1
+    };
+    if (selected && query.source) {
+      loopFilters.push("(source_run_id = @selectedRunId OR source = @source)");
+      loopParams.selectedRunId = selected.id;
+      loopParams.source = query.source;
+    } else if (selected) {
+      loopFilters.push("source_run_id = @selectedRunId");
+      loopParams.selectedRunId = selected.id;
+    } else if (query.source) {
+      loopFilters.push("source = @source");
+      loopParams.source = query.source;
+    }
+    const loopResult = takeBounded(
+      (
+        this.db
+          .prepare(
+            `SELECT * FROM open_loops
+            WHERE ${loopFilters.join(" AND ")}
+            ORDER BY updated_at DESC, id ASC
+            LIMIT @limit`
+          )
+          .all(loopParams) as OpenLoopRow[]
+      ).map(mapOpenLoopRow),
+      query.limit
+    );
+    const openLoops = loopResult.items.map(toPrepareWorkOpenLoop);
+
+    const recommendationsResult = takeBounded(
+      prepareWorkRecommendations(selectedSummary, conflicts, pendingHandoffs, openLoops),
+      query.limit
+    );
+    const truncatedSections = [
+      ["relevantRuns", relevantResult.truncated],
+      ["workflowRuns", workflowResult.truncated],
+      ["conflicts", conflictResult.truncated],
+      ["pendingHandoffs", handoffResult.truncated],
+      ["openLoops", loopResult.truncated],
+      ["recommendations", recommendationsResult.truncated]
+    ] as const;
+    const warningLimit = Math.min(query.limit, 6);
+    const warningResult = takeBounded(
+      truncatedSections
+        .filter(([, truncated]) => truncated)
+        .map(([section]) => ({ code: "section_truncated" as const, section })),
+      warningLimit
+    );
+    const manifestRun = selected ?? relevantResult.items[0];
+
+    return {
+      project: query.project,
+      asOf,
+      staleAfterSeconds,
+      selectedRun: selectedSummary,
+      relevantRuns,
+      workflowRuns,
+      conflicts,
+      pendingHandoffs,
+      openLoops,
+      latestManifest: manifestRun ? this.getPrepareWorkManifestSummary(manifestRun) : undefined,
+      recommendations: recommendationsResult.items,
+      warnings: warningResult.items,
+      sections: {
+        relevantRuns: sectionMeta(query.limit, relevantRuns.length, relevantResult.truncated),
+        workflowRuns: sectionMeta(query.limit, workflowRuns.length, workflowResult.truncated),
+        conflicts: sectionMeta(query.limit, conflicts.length, conflictResult.truncated),
+        pendingHandoffs: sectionMeta(query.limit, pendingHandoffs.length, handoffResult.truncated),
+        openLoops: sectionMeta(query.limit, openLoops.length, loopResult.truncated),
+        recommendations: sectionMeta(
+          query.limit,
+          recommendationsResult.items.length,
+          recommendationsResult.truncated
+        ),
+        warnings: sectionMeta(warningLimit, warningResult.items.length, warningResult.truncated)
+      }
+    };
+  }
+
+  private getPrepareWorkManifestSummary(run: AgentRun): PrepareWorkManifestSummary {
+    const row = this.db
+      .prepare(
+        `SELECT
+          (SELECT COUNT(*) FROM agent_events WHERE run_id = @runId) AS event_count,
+          (SELECT COUNT(*) FROM open_loops WHERE source_run_id = @runId) AS open_loop_count,
+          (SELECT COUNT(*) FROM handoffs WHERE source_run_id = @runId) AS handoff_count,
+          (SELECT COUNT(*) FROM artifacts WHERE run_id = @runId) AS artifact_count,
+          (SELECT MAX(created_at) FROM agent_events WHERE run_id = @runId) AS last_event_at`
+      )
+      .get({ runId: run.id }) as {
+      event_count: number;
+      open_loop_count: number;
+      handoff_count: number;
+      artifact_count: number;
+      last_event_at: string | null;
+    };
+    return {
+      runId: run.id,
+      status: run.status,
+      eventCount: row.event_count,
+      openLoopCount: row.open_loop_count,
+      handoffCount: row.handoff_count,
+      artifactCount: row.artifact_count,
+      lastEventAt: row.last_event_at ?? undefined
+    };
+  }
+
   getAgentContext(query: AgentContextQuery): AgentContext {
     const params = {
       project: query.project,
@@ -1746,6 +2034,188 @@ type HandoffLifecycleResult =
 
 function isTerminal(status: AgentRun["status"]): boolean {
   return ["completed", "failed", "cancelled"].includes(status);
+}
+
+function toPrepareWorkRunSummary(
+  run: AgentRun,
+  asOf: string,
+  staleAfterSeconds: number
+): PrepareWorkRunSummary {
+  return {
+    id: run.id,
+    source: run.source,
+    project: run.project,
+    workKey: run.workKey,
+    workflowId: run.workflowId,
+    parentRunId: run.parentRunId,
+    continuedFromRunId: run.continuedFromRunId,
+    status: run.status,
+    category: run.category,
+    tags: run.tags,
+    version: run.version,
+    startedAt: run.startedAt,
+    updatedAt: run.updatedAt,
+    freshness: classifyRunFreshness(run, asOf, staleAfterSeconds)
+  };
+}
+
+function classifyRunFreshness(
+  run: AgentRun,
+  asOf: string,
+  staleAfterSeconds: number
+): RunFreshness {
+  const base = { staleAfterSeconds, asOf };
+  if (isTerminal(run.status)) {
+    return { ...base, state: "not_applicable", reasonCode: "terminal_status" };
+  }
+  if (!run.lastLivenessAt) {
+    return { ...base, state: "unknown", reasonCode: "no_authoritative_liveness" };
+  }
+
+  const staleBoundary = Date.parse(asOf) - staleAfterSeconds * 1000;
+  if (Date.parse(run.lastLivenessAt) < staleBoundary) {
+    return {
+      ...base,
+      state: "stale_candidate",
+      lastLivenessAt: run.lastLivenessAt,
+      reasonCode: "run_liveness_exceeds_window"
+    };
+  }
+  return {
+    ...base,
+    state: "fresh",
+    lastLivenessAt: run.lastLivenessAt,
+    reasonCode: "authoritative_liveness_within_window"
+  };
+}
+
+function toPrepareWorkHandoff(handoff: Handoff): PrepareWorkHandoff {
+  return {
+    id: handoff.id,
+    sourceRunId: handoff.sourceRunId,
+    fromSource: handoff.fromSource,
+    toSource: handoff.toSource,
+    status: handoff.status,
+    version: handoff.version,
+    updatedAt: handoff.updatedAt
+  };
+}
+
+function toPrepareWorkOpenLoop(openLoop: OpenLoop): PrepareWorkOpenLoop {
+  return {
+    id: openLoop.id,
+    type: openLoop.type,
+    owner: openLoop.owner,
+    source: openLoop.source,
+    sourceRunId: openLoop.sourceRunId,
+    status: openLoop.status,
+    version: openLoop.version,
+    updatedAt: openLoop.updatedAt
+  };
+}
+
+function prepareWorkRecommendations(
+  selected: PrepareWorkRunSummary | undefined,
+  conflicts: PrepareWorkConflict[],
+  handoffs: PrepareWorkHandoff[],
+  openLoops: PrepareWorkOpenLoop[]
+): PrepareWorkRecommendation[] {
+  const recommendations: PrepareWorkRecommendation[] = [];
+  const blockingLoops = openLoops.filter((loop) =>
+    ["blocked", "decision_required", "failed_unresolved"].includes(loop.type)
+  );
+  for (const conflict of conflicts) {
+    recommendations.push({
+      actionCode:
+        conflict.freshness.state === "fresh"
+          ? "inspect_active_conflict"
+          : conflict.freshness.state === "stale_candidate"
+            ? "inspect_stale_run"
+            : "stop_and_reread",
+      targetRefs: [{ type: "run", id: conflict.id, version: conflict.version }],
+      reasonCodes: [
+        conflict.freshness.state === "fresh"
+          ? "fresh_nonterminal_same_work_key"
+          : conflict.freshness.state === "stale_candidate"
+            ? "run_liveness_exceeds_window"
+            : "run_liveness_unknown"
+      ],
+      requiresReread: true
+    });
+  }
+  for (const openLoop of blockingLoops) {
+    recommendations.push({
+      actionCode: "resolve_blocker",
+      targetRefs: [{ type: "openLoop", id: openLoop.id, version: openLoop.version }],
+      reasonCodes: ["blocking_open_loop"],
+      requiresReread: true
+    });
+  }
+  for (const handoff of handoffs) {
+    recommendations.push({
+      actionCode: "accept_handoff",
+      targetRefs: [{ type: "handoff", id: handoff.id, version: handoff.version }],
+      reasonCodes: ["pending_targeted_handoff"],
+      requiresReread: true
+    });
+  }
+  if (selected) {
+    if (selected.status === "failed") {
+      recommendations.push({
+        actionCode: "inspect_failed_manifest",
+        targetRefs: [{ type: "run", id: selected.id, version: selected.version }],
+        reasonCodes: ["selected_run_failed"],
+        requiresReread: true
+      });
+    } else if (selected.freshness.state === "unknown") {
+      recommendations.push({
+        actionCode: "stop_and_reread",
+        targetRefs: [{ type: "run", id: selected.id, version: selected.version }],
+        reasonCodes: ["run_liveness_unknown"],
+        requiresReread: true
+      });
+    } else if (selected.freshness.state === "stale_candidate") {
+      recommendations.push({
+        actionCode: "inspect_stale_run",
+        targetRefs: [{ type: "run", id: selected.id, version: selected.version }],
+        reasonCodes: ["run_liveness_exceeds_window"],
+        requiresReread: true
+      });
+    } else if (selected.freshness.state === "not_applicable") {
+      if (conflicts.length === 0 && handoffs.length === 0 && blockingLoops.length === 0) {
+        recommendations.push({
+          actionCode: "start_new_run",
+          targetRefs: [{ type: "run", id: selected.id, version: selected.version }],
+          reasonCodes: ["selected_run_terminal"],
+          requiresReread: false
+        });
+      }
+    } else {
+      recommendations.push({
+        actionCode: "resume_run",
+        targetRefs: [{ type: "run", id: selected.id, version: selected.version }],
+        reasonCodes: ["selected_run_can_resume"],
+        requiresReread: true
+      });
+    }
+  }
+  if (!selected && conflicts.length === 0 && handoffs.length === 0 && blockingLoops.length === 0) {
+    recommendations.push({
+      actionCode: "start_new_run",
+      targetRefs: [],
+      reasonCodes: ["no_conflicting_or_blocked_work"],
+      requiresReread: false
+    });
+  }
+  return recommendations;
+}
+
+function takeBounded<T>(items: T[], limit: number): { items: T[]; truncated: boolean } {
+  return { items: items.slice(0, limit), truncated: items.length > limit };
+}
+
+function sectionMeta(limit: number, count: number, truncated: boolean) {
+  return { limit, count, truncated };
 }
 
 function toWorkflowRunSummary(run: AgentRun): WorkflowRunSummary {

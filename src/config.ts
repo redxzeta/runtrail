@@ -22,7 +22,8 @@ const yamlConfigSchema = z.object({
   }),
   agentContext: z.object({
     defaultLimit: z.number().int().positive(),
-    minImportance: z.number().int().min(0)
+    minImportance: z.number().int().min(0),
+    staleAfterSeconds: z.number().int().positive().max(31_536_000).default(3600)
   })
 });
 
@@ -73,6 +74,14 @@ export function loadConfig(configPath = defaultConfigPath()): RuntrailConfig {
         webhookUrl: emptyToUndefined(process.env.DISCORD_WEBHOOK_URL)
       }
     },
+    agentContext: {
+      ...yamlConfig.agentContext,
+      staleAfterSeconds: parsePositiveInteger(
+        process.env.RUNTRAIL_AGENT_STALE_AFTER_SECONDS,
+        yamlConfig.agentContext.staleAfterSeconds,
+        "RUNTRAIL_AGENT_STALE_AFTER_SECONDS"
+      )
+    },
     url: process.env.RUNTRAIL_URL ?? `http://${host}:${port}`
   });
 }
@@ -88,6 +97,19 @@ function parsePort(value: string | undefined, fallback: number): number {
   }
 
   return port;
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number, name: string): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 31_536_000) {
+    throw new Error(`Invalid ${name}: ${value}`);
+  }
+
+  return parsed;
 }
 
 function emptyToUndefined(value: string | undefined): string | undefined {

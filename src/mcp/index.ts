@@ -27,6 +27,7 @@ export const runtrailToolNames = [
   "journal_pause_run",
   "journal_finish_run",
   "journal_get_context",
+  "journal_prepare_work",
   "journal_create_event",
   "journal_create_open_loop",
   "journal_resolve_open_loop",
@@ -61,6 +62,16 @@ export function createRuntrailMcpServer(
       inputSchema: mcpToolInputSchemas.context
     },
     async (args) => mcpText(await callRuntrailTool("journal_get_context", args, client))
+  );
+
+  server.registerTool(
+    "journal_prepare_work",
+    {
+      title: "Prepare Runtrail work",
+      description: "Get bounded deterministic continuation guidance before editing",
+      inputSchema: mcpToolInputSchemas.prepareWork
+    },
+    async (args) => mcpText(await callRuntrailTool("journal_prepare_work", args, client))
   );
 
   server.registerTool(
@@ -279,6 +290,20 @@ export async function callRuntrailTool(
       appendOptional(query, "limit", args.limit ?? 10);
       appendOptional(query, "min_importance", args.min_importance);
       return await client.requestJson(`/agent/context?${query.toString()}`);
+    }
+    case "journal_prepare_work": {
+      const query = new URLSearchParams({ project: requireString(args, "project") });
+      appendOptional(query, "source", args.source);
+      appendOptional(query, "workKey", args.workKey);
+      appendOptional(query, "runId", args.runId);
+      appendOptional(query, "category", args.category);
+      if (Array.isArray(args.tags)) {
+        for (const tag of args.tags) {
+          if (typeof tag === "string") query.append("tag", tag);
+        }
+      }
+      appendOptional(query, "limit", args.limit);
+      return await client.requestJson(`/agent/prepare-work?${query.toString()}`);
     }
     case "journal_create_event":
       return await client.requestJson("/events", {

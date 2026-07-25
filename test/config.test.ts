@@ -19,6 +19,7 @@ describe("config", () => {
     expect(config.server.port).toBe(8787);
     expect(config.storage.dbPath).toBe("./data/runtrail.sqlite");
     expect(config.security.authRequired).toBe(true);
+    expect(config.agentContext.staleAfterSeconds).toBe(3600);
   });
 
   it("uses RUNTRAIL_CONFIG for the default config path", () => {
@@ -36,6 +37,7 @@ describe("config", () => {
     vi.stubEnv("RUNTRAIL_LOG_DIR", "/tmp/runtrail-logs");
     vi.stubEnv("RUNTRAIL_TOKEN", "test-token");
     vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");
+    vi.stubEnv("RUNTRAIL_AGENT_STALE_AFTER_SECONDS", "7200");
     vi.stubEnv("DISCORD_WEBHOOK_URL", "https://discord.test/webhook");
 
     const config = loadConfig();
@@ -46,7 +48,11 @@ describe("config", () => {
     expect(config.storage.logDir).toBe("/tmp/runtrail-logs");
     expect(config.security.token).toBe("test-token");
     expect(config.url).toBe("http://runtrail.test");
+    expect(config.agentContext.staleAfterSeconds).toBe(7200);
     expect(config.notifications.discord.webhookUrl).toBe("https://discord.test/webhook");
+
+    vi.stubEnv("RUNTRAIL_AGENT_STALE_AFTER_SECONDS", "0");
+    expect(() => loadConfig()).toThrow("Invalid RUNTRAIL_AGENT_STALE_AFTER_SECONDS");
   });
 });
 

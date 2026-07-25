@@ -2375,6 +2375,184 @@ describe("ledger routes", () => {
     ]);
   });
 
+  it("prepares bounded work from authoritative liveness without trusting append timestamps", async () => {
+    vi.useFakeTimers();
+    const db = new Database(":memory:");
+    databases.push(db);
+    migrate(db);
+    const ledger = new LedgerRepository(db);
+    const create = (time: string, status: string, task: string) => {
+      vi.setSystemTime(time);
+      return ledger.createRun({
+        source: "codex",
+        project: "ice-council",
+        task,
+        status: status as "running",
+        workKey: "github:redxzeta/runtrail#114",
+        cwd: "/home/agent/dev/runtrail"
+      }).run;
+    };
+
+    const stale = create("2026-07-25T10:00:00.000Z", "running", "private stale task");
+    const unknown = create("2026-07-25T10:15:00.000Z", "blocked", "private unknown task");
+    db.prepare("UPDATE agent_runs SET last_liveness_at = NULL WHERE id = ?").run(unknown.id);
+    const resumable = create("2026-07-25T10:30:00.000Z", "paused", "private paused task");
+    const boundary = create("2026-07-25T11:00:00.000Z", "needs_review", "boundary");
+    create("2026-07-25T11:58:00.000Z", "decision_required", "fresh conflict");
+    const selected = create("2026-07-25T12:00:00.000Z", "paused", "selected private prompt");
+    ledger.createOpenLoop({
+      type: "blocked",
+      project: "ice-council",
+      title: "private blocker detail",
+      source: "codex",
+      sourceRunId: selected.id
+    });
+    ledger.createHandoff({
+      sourceRunId: selected.id,
+      fromSource: "codex",
+      toSource: "codex",
+      project: "ice-council",
+      summary: "private handoff detail"
+    });
+    ledger.createEventResult({
+      runId: stale.id,
+      clientRecordId: "delayed-event",
+      type: "progress",
+      message: "private event transcript",
+      importance: 3,
+      createdAt: "2030-01-01T00:00:00.000Z"
+    });
+    ledger.createEventResult({
+      runId: stale.id,
+      clientRecordId: "delayed-event",
+      type: "progress",
+      message: "replacement",
+      importance: 3,
+      createdAt: "2031-01-01T00:00:00.000Z"
+    });
+    ledger.createEvent({
+      runId: stale.id,
+      type: "progress",
+      message: "past event",
+      importance: 3,
+      createdAt: "2020-01-01T00:00:00.000Z"
+    });
+
+    const config = loadConfig();
+    config.agentContext.staleAfterSeconds = 3600;
+    config.security.token = "test-token";
+    const app = createApp({ config, db });
+    const response = await app.request(
+      `/agent/prepare-work?project=ice-council&source=codex&runId=${selected.id}&limit=20`,
+      { headers: authHeaders() }
+    );
+    const prepared = (await response.json()) as {
+      asOf: string;
+      selectedRun: { id: string; status: string; version: number; freshness: { state: string } };
+      conflicts: Array<{
+        id: string;
+        status: string;
+        conflictCode: string;
+        freshness: { state: string; lastLivenessAt?: string };
+      }>;
+      pendingHandoffs: Array<{ version: number }>;
+      openLoops: Array<{ version: number }>;
+      recommendations: Array<{ actionCode: string; targetRefs: Array<{ version: number }> }>;
+      sections: Record<string, { limit: number; count: number; truncated: boolean }>;
+    };
+    const serialized = JSON.stringify(prepared);
+
+    expect(response.status).toBe(200);
+    expect(prepared.asOf).toBe("2026-07-25T12:00:00.000Z");
+    expect(prepared.selectedRun).toEqual(
+      expect.objectContaining({
+        id: selected.id,
+        status: "paused",
+        version: 1,
+        freshness: expect.objectContaining({ state: "fresh" })
+      })
+    );
+    expect(prepared.conflicts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: stale.id,
+          conflictCode: "stale_work_warning",
+          freshness: expect.objectContaining({
+            state: "stale_candidate",
+            lastLivenessAt: "2026-07-25T10:00:00.000Z"
+          })
+        }),
+        expect.objectContaining({
+          id: unknown.id,
+          conflictCode: "work_freshness_unknown",
+          freshness: expect.objectContaining({ state: "unknown" })
+        }),
+        expect.objectContaining({
+          conflictCode: "active_work_conflict",
+          freshness: expect.objectContaining({ state: "fresh" })
+        })
+      ])
+    );
+    expect(prepared.pendingHandoffs[0]?.version).toBe(1);
+    expect(prepared.openLoops[0]?.version).toBe(1);
+    expect(prepared.conflicts.map(({ status }) => status)).toEqual(
+      expect.arrayContaining(["running", "blocked", "paused", "needs_review", "decision_required"])
+    );
+    expect(prepared.recommendations.map(({ actionCode }) => actionCode)).toEqual(
+      expect.arrayContaining([
+        "inspect_active_conflict",
+        "inspect_stale_run",
+        "stop_and_reread",
+        "resolve_blocker",
+        "accept_handoff",
+        "resume_run"
+      ])
+    );
+    expect(prepared.recommendations.every(({ targetRefs }) => targetRefs.length <= 1)).toBe(true);
+    expect(Object.values(prepared.sections).every(({ limit, count }) => count <= limit)).toBe(true);
+    expect(serialized).not.toMatch(
+      /private stale task|private unknown task|selected private prompt|private blocker detail|private handoff detail|private event transcript|\/home\/agent/
+    );
+
+    vi.setSystemTime("2026-07-25T11:59:59.999Z");
+    expect(
+      ledger.prepareWork({ project: "ice-council", runId: boundary.id, tags: [], limit: 10 }, 3600)
+        ?.selectedRun?.freshness.state
+    ).toBe("fresh");
+    vi.setSystemTime("2026-07-25T12:00:00.000Z");
+    expect(
+      ledger.prepareWork({ project: "ice-council", runId: boundary.id, tags: [], limit: 10 }, 3600)
+        ?.selectedRun?.freshness.state
+    ).toBe("fresh");
+    vi.setSystemTime("2026-07-25T12:00:00.001Z");
+    expect(
+      ledger.prepareWork({ project: "ice-council", runId: boundary.id, tags: [], limit: 10 }, 3600)
+        ?.selectedRun?.freshness.state
+    ).toBe("stale_candidate");
+
+    expect(ledger.heartbeatRun(stale.id, stale.version).run?.lastLivenessAt).toBe(
+      "2026-07-25T12:00:00.001Z"
+    );
+    expect(ledger.resumeRun(resumable.id, resumable.version).run).toEqual(
+      expect.objectContaining({
+        status: "running",
+        version: 2,
+        lastLivenessAt: "2026-07-25T12:00:00.001Z"
+      })
+    );
+    const terminal = ledger.finishRun(selected.id, {
+      expectedVersion: selected.version,
+      status: "completed",
+      summary: "done"
+    }).run;
+    expect(
+      new LedgerRepository(db).prepareWork(
+        { project: "ice-council", runId: terminal?.id, tags: [], limit: 10 },
+        3600
+      )?.selectedRun?.freshness.state
+    ).toBe("not_applicable");
+  });
+
   it("sends Discord notifications only for high-signal events", async () => {
     const fetchMock = vi.fn(async () => new Response("", { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);

@@ -50,6 +50,16 @@ export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): Mcp
   );
 
   server.registerTool(
+    "journal_prepare_work",
+    {
+      title: "Prepare Runtrail work",
+      description: "Get bounded deterministic continuation guidance before editing",
+      inputSchema: mcpToolInputSchemas.prepareWork
+    },
+    async (args) => await forwardTool(client, "journal_prepare_work", args)
+  );
+
+  server.registerTool(
     "journal_create_event",
     {
       title: "Create Runtrail event",

@@ -28,6 +28,7 @@ import {
   listRunsQuerySchema,
   type OpenLoop,
   pauseRunRequestSchema,
+  prepareWorkQuerySchema,
   updateOpenLoopRequestSchema,
   updateRunRequestSchema,
   versionedMutationRequestSchema,
@@ -432,6 +433,21 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     }
 
     return c.json(ledger.getAgentContext(parsed.data));
+  });
+
+  route.get("/agent/prepare-work", (c) => {
+    const url = new URL(c.req.url);
+    const parsed = prepareWorkQuerySchema.safeParse({
+      ...Object.fromEntries(url.searchParams),
+      tags: url.searchParams.getAll("tag")
+    });
+
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+
+    const prepared = ledger.prepareWork(parsed.data, options.config.agentContext.staleAfterSeconds);
+    return prepared ? c.json(prepared) : c.json({ error: "Run not found" }, 404);
   });
 
   route.get("/search", (c) => {
