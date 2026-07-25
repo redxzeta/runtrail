@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../src/cli/index.js";
+import { listOutbox, readPendingOutbox } from "../src/cli/outbox.js";
 import { computeEventHash } from "../src/shared/receipts.js";
 import type { AgentEvent } from "../src/shared/schemas.js";
 
@@ -785,6 +786,45 @@ describe("cli", () => {
     );
   });
 
+  it("preserves wrapped exit status when telemetry is queued", async () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-wrapper-outbox-"));
+    vi.stubEnv("RUNTRAIL_STATE_DIR", tempDir);
+    vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");
+    vi.stubEnv("RUNTRAIL_TOKEN", "");
+    vi.stubEnv("RUNTRAIL_LOG_DIR", path.join(tempDir, "logs"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: URL) => {
+        if (url.pathname === "/runs") {
+          return new Response(JSON.stringify({ run: { id: "run_wrap", version: 1 } }), {
+            status: 201
+          });
+        }
+        throw new Error("offline");
+      })
+    );
+
+    await runCli([
+      "node",
+      "rt",
+      "run",
+      "--source",
+      "codex",
+      "--project",
+      "runtrail",
+      "--task",
+      "wrapper queued telemetry",
+      "--",
+      process.execPath,
+      "-e",
+      "process.exit(7)"
+    ]);
+
+    expect(process.exitCode).toBe(7);
+    expect(listOutbox().length).toBeGreaterThanOrEqual(2);
+  });
+
   it("exports project context as Markdown", async () => {
     const fetchMock = mockFetch({
       project: "runtrail",
@@ -892,6 +932,70 @@ describe("cli", () => {
       ),
       expect.any(Object)
     );
+  });
+
+  it("queues transient idempotent writes and replays or quarantines them explicitly", async () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-cli-outbox-"));
+    vi.stubEnv("RUNTRAIL_STATE_DIR", tempDir);
+    vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");
+    vi.stubEnv("RUNTRAIL_TOKEN", "");
+    const argv = [
+      "node",
+      "rt",
+      "event",
+      "create",
+      "--run-id",
+      "run_1",
+      "--client-record-id",
+      "event-outbox-1",
+      "--type",
+      "progress",
+      "--message",
+      "queued progress"
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new Error("offline")))
+    );
+
+    await expect(runCli(argv)).rejects.toThrow(/queued outbox record/);
+    await expect(runCli(argv)).rejects.toThrow(/queued outbox record/);
+    expect(listOutbox()).toHaveLength(2);
+    const output = captureOutput();
+    await runCli(["node", "rt", "outbox", "list"]);
+    expect(output[0]).not.toContain("queued progress");
+
+    const deliveredFetch = vi.fn(
+      async () => new Response(JSON.stringify({ event: { id: "evt_1" } }), { status: 200 })
+    );
+    vi.stubGlobal("fetch", deliveredFetch);
+    await runCli(["node", "rt", "outbox", "retry"]);
+    expect(deliveredFetch).toHaveBeenCalledTimes(2);
+    expect(listOutbox()).toEqual([]);
+    expect(JSON.parse(output.at(-1) ?? "{}")).toEqual({
+      delivered: 2,
+      quarantined: 0,
+      remaining: 0,
+      diagnostics: []
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new Error("offline")))
+    );
+    await expect(runCli(argv)).rejects.toThrow(/queued outbox record/);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: "invalid payload" }), {
+            status: 400,
+            headers: { "content-type": "application/json" }
+          })
+      )
+    );
+    await runCli(["node", "rt", "sync"]);
+    expect(readPendingOutbox().valid).toEqual([]);
   });
 });
 

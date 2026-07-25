@@ -347,6 +347,7 @@ RUNTRAIL_TOKEN=change-me-to-a-long-random-secret
 RUNTRAIL_URL=http://127.0.0.1:8787
 RUNTRAIL_REQUEST_TIMEOUT_MS=15000
 RUNTRAIL_AGENT_STALE_AFTER_SECONDS=3600
+RUNTRAIL_STATE_DIR=
 DISCORD_WEBHOOK_URL=
 ```
 
@@ -357,6 +358,20 @@ headers.
 
 `RUNTRAIL_AGENT_STALE_AFTER_SECONDS` overrides the non-secret server-owned freshness window used by
 prepare-work. Callers cannot supply their own threshold.
+
+Idempotency-keyed CLI writes that fail because of connectivity, timeout, rate limiting, or a 5xx
+response are stored in a local outbox. Inspect and replay them explicitly:
+
+```sh
+rt outbox list
+rt outbox retry
+rt sync
+```
+
+The default state root is `~/Library/Application Support/runtrail` on macOS and
+`${XDG_STATE_HOME:-~/.local/state}/runtrail` elsewhere; `RUNTRAIL_STATE_DIR` overrides it. Pending
+and quarantined records use owner-only directories and files. Tokens, authorization values,
+environment dumps, and unkeyed or lifecycle mutations are never queued.
 
 Do not commit real tokens or webhook URLs.
 

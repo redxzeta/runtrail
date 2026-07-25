@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import path from "node:path";
@@ -14,6 +15,14 @@ import {
 } from "../shared/httpClient.js";
 import { verifyEventChain } from "../shared/receipts.js";
 import { type AgentEvent, healthResponseSchema } from "../shared/schemas.js";
+import {
+  enqueueOutbox,
+  listOutbox,
+  quarantineOutbox,
+  readPendingOutbox,
+  removeOutboxRecord,
+  updateOutboxRetry
+} from "./outbox.js";
 
 export async function runCli(argv = process.argv): Promise<void> {
   if (argv[2] === "run" && argv[3] !== "create") {
@@ -26,6 +35,16 @@ export async function runCli(argv = process.argv): Promise<void> {
   program.name("rt").description("Runtrail CLI").showHelpAfterError().exitOverride();
 
   program.command("health").description("Check Runtrail service health").action(health);
+  const outbox = program.command("outbox").description("Inspect and replay queued writes");
+  outbox.command("list").description("List bounded safe outbox metadata").action(showOutbox);
+  outbox
+    .command("retry")
+    .description("Replay queued writes")
+    .action(() => retryOutbox());
+  program
+    .command("sync")
+    .description("Replay queued Runtrail writes")
+    .action(() => retryOutbox());
   program
     .command("context")
     .description("Fetch compact project context")
@@ -217,6 +236,53 @@ async function health(): Promise<void> {
   printJson(parsed);
 }
 
+async function showOutbox(): Promise<void> {
+  const pending = readPendingOutbox();
+  printJson({
+    records: listOutbox().slice(0, 100),
+    malformed: pending.malformed.slice(0, 100).map(({ file, error }) => ({
+      id: path.basename(file, ".json"),
+      error
+    }))
+  });
+}
+
+async function retryOutbox(printResult = true): Promise<void> {
+  const pending = readPendingOutbox();
+  const diagnostics: Array<{ id: string; reason: string }> = [];
+  for (const malformed of pending.malformed) {
+    quarantineOutbox(malformed.file, malformed.error);
+    diagnostics.push({ id: path.basename(malformed.file, ".json"), reason: "malformed_record" });
+  }
+  let delivered = 0;
+  let quarantined = pending.malformed.length;
+  let remaining = 0;
+  for (const { file, record } of pending.valid) {
+    try {
+      await requestJson(record.path, { method: record.method, body: record.payload });
+      removeOutboxRecord(file);
+      delivered += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "replay failed";
+      const status = / HTTP (\d{3}) /.exec(message)?.[1];
+      if (
+        status &&
+        Number(status) >= 400 &&
+        Number(status) < 500 &&
+        !["408", "429"].includes(status)
+      ) {
+        quarantineOutbox(file, message);
+        quarantined += 1;
+        diagnostics.push({ id: record.id, reason: `permanent_http_${status}` });
+      } else {
+        updateOutboxRetry(file, record);
+        remaining += 1;
+      }
+    }
+  }
+  if (printResult) printJson({ delivered, quarantined, remaining, diagnostics });
+}
+
 async function context(options: {
   project: string;
   limit?: number;
@@ -273,23 +339,29 @@ async function createRun(options: {
   tag?: string[];
 }): Promise<void> {
   printJson(
-    await requestJson("/runs", {
-      method: "POST",
-      body: compact({
-        source: options.source,
-        project: options.project,
-        clientRunId: options.clientRunId,
-        workKey: options.workKey,
-        workflowId: options.workflowId,
-        parentRunId: options.parentRunId,
-        continuedFromRunId: options.continuedFromRunId,
-        task: options.task,
-        status: options.status,
-        summary: options.summary,
-        category: options.category,
-        tags: optionTags(options.tag)
-      })
-    })
+    await requestJson(
+      "/runs",
+      {
+        method: "POST",
+        body: compact({
+          source: options.source,
+          project: options.project,
+          clientRunId: options.clientRunId,
+          workKey: options.workKey,
+          workflowId: options.workflowId,
+          parentRunId: options.parentRunId,
+          continuedFromRunId: options.continuedFromRunId,
+          task: options.task,
+          status: options.status,
+          summary: options.summary,
+          category: options.category,
+          tags: optionTags(options.tag)
+        })
+      },
+      options.clientRunId
+        ? { operation: "create_run", idempotencyKey: options.clientRunId }
+        : undefined
+    )
   );
 }
 
@@ -338,28 +410,35 @@ async function wrapRun(
     throw new Error("A command is required after --");
   }
 
+  await bestEffortWrapperWrite(() => retryOutbox(false));
   const config = loadConfig();
+  const wrapperKey = randomUUID();
   const cwd = process.cwd();
   const gitBefore = readGitSnapshot(cwd);
-  const created = await requestJson("/runs", {
-    method: "POST",
-    body: compact({
-      source: options.source,
-      project: options.project,
-      task: options.task,
-      workflowId: options.workflowId,
-      parentRunId: options.parentRunId,
-      continuedFromRunId: options.continuedFromRunId,
-      hostname: hostname(),
-      cwd,
-      gitRepoPath: gitBefore.repoPath,
-      gitBranch: gitBefore.branch,
-      gitCommit: gitBefore.commit,
-      category: options.category,
-      tags: options.tags,
-      startedAt: new Date().toISOString()
-    })
-  });
+  const created = await requestJson(
+    "/runs",
+    {
+      method: "POST",
+      body: compact({
+        source: options.source,
+        project: options.project,
+        clientRunId: `wrapper-${wrapperKey}`,
+        task: options.task,
+        workflowId: options.workflowId,
+        parentRunId: options.parentRunId,
+        continuedFromRunId: options.continuedFromRunId,
+        hostname: hostname(),
+        cwd,
+        gitRepoPath: gitBefore.repoPath,
+        gitBranch: gitBefore.branch,
+        gitCommit: gitBefore.commit,
+        category: options.category,
+        tags: options.tags,
+        startedAt: new Date().toISOString()
+      })
+    },
+    { operation: "create_run", idempotencyKey: `wrapper-${wrapperKey}` }
+  );
   const runId = readResponseId(created, "run");
   const expectedVersion = readResponseVersion(created, "run");
   const logPath = path.join(config.storage.logDir, `${runId}.log`);
@@ -373,65 +452,100 @@ async function wrapRun(
   const changedFiles = gitAfter.repoPath ? readChangedFiles(cwd) : [];
   const status = exitCode === 0 ? "completed" : "failed";
 
-  await requestJson("/events", {
-    method: "POST",
-    body: {
-      runId,
-      type: "command_executed",
-      message: `Executed ${path.basename(command[0] ?? "command")}`,
-      importance: exitCode === 0 ? 4 : 7,
-      category: options.category,
-      tags: options.tags,
-      data: {
-        argv: sanitizeCommandArgv(command),
-        exitCode,
-        durationMs,
-        logPath,
-        gitBefore,
-        gitAfter
-      }
-    }
-  });
+  await bestEffortWrapperWrite(() =>
+    requestJson(
+      "/events",
+      {
+        method: "POST",
+        body: {
+          runId,
+          clientRecordId: `wrapper-${wrapperKey}-command`,
+          type: "command_executed",
+          message: `Executed ${path.basename(command[0] ?? "command")}`,
+          importance: exitCode === 0 ? 4 : 7,
+          category: options.category,
+          tags: options.tags,
+          data: {
+            argv: sanitizeCommandArgv(command),
+            exitCode,
+            durationMs,
+            logPath,
+            gitBefore,
+            gitAfter
+          }
+        }
+      },
+      { operation: "create_event", idempotencyKey: `wrapper-${wrapperKey}-command` }
+    )
+  );
   if (changedFiles.length > 0) {
-    await requestJson("/events", {
-      method: "POST",
-      body: {
-        runId,
-        type: "files_changed",
-        message: `${changedFiles.length} file${changedFiles.length === 1 ? "" : "s"} changed`,
-        importance: 4,
-        category: options.category,
-        tags: options.tags,
-        data: { changedFiles }
-      }
-    });
+    await bestEffortWrapperWrite(() =>
+      requestJson(
+        "/events",
+        {
+          method: "POST",
+          body: {
+            runId,
+            clientRecordId: `wrapper-${wrapperKey}-files`,
+            type: "files_changed",
+            message: `${changedFiles.length} file${changedFiles.length === 1 ? "" : "s"} changed`,
+            importance: 4,
+            category: options.category,
+            tags: options.tags,
+            data: { changedFiles }
+          }
+        },
+        { operation: "create_event", idempotencyKey: `wrapper-${wrapperKey}-files` }
+      )
+    );
   }
-  await requestJson("/events", {
-    method: "POST",
-    body: {
-      runId,
-      type: status,
-      message: exitCode === 0 ? "Command completed" : `Command failed with exit code ${exitCode}`,
-      importance: exitCode === 0 ? 5 : 8,
-      category: options.category,
-      tags: options.tags,
-      data: { exitCode }
-    }
-  });
-  await requestJson(`/runs/${encodeURIComponent(runId)}`, {
-    method: "PATCH",
-    body: compact({
-      status,
-      expectedVersion,
-      summary: exitCode === 0 ? "Command completed" : `Command failed with exit code ${exitCode}`,
-      completedAt: new Date().toISOString(),
-      gitBranch: gitAfter.branch,
-      gitCommit: gitAfter.commit
+  await bestEffortWrapperWrite(() =>
+    requestJson(
+      "/events",
+      {
+        method: "POST",
+        body: {
+          runId,
+          clientRecordId: `wrapper-${wrapperKey}-result`,
+          type: status,
+          message:
+            exitCode === 0 ? "Command completed" : `Command failed with exit code ${exitCode}`,
+          importance: exitCode === 0 ? 5 : 8,
+          category: options.category,
+          tags: options.tags,
+          data: { exitCode }
+        }
+      },
+      { operation: "create_event", idempotencyKey: `wrapper-${wrapperKey}-result` }
+    )
+  );
+  await bestEffortWrapperWrite(() =>
+    requestJson(`/runs/${encodeURIComponent(runId)}`, {
+      method: "PATCH",
+      body: compact({
+        status,
+        expectedVersion,
+        summary: exitCode === 0 ? "Command completed" : `Command failed with exit code ${exitCode}`,
+        completedAt: new Date().toISOString(),
+        gitBranch: gitAfter.branch,
+        gitCommit: gitAfter.commit
+      })
     })
-  });
+  );
+  await bestEffortWrapperWrite(() => retryOutbox(false));
 
   printJson({ runId, status, exitCode, logPath });
   process.exitCode = exitCode;
+}
+
+async function bestEffortWrapperWrite(action: () => Promise<unknown>): Promise<void> {
+  try {
+    await action();
+  } catch (error) {
+    console.error(
+      error instanceof Error ? error.message : "Runtrail write failed; work may be unsynced"
+    );
+  }
 }
 
 async function wrapRunFromArgv(args: string[]): Promise<void> {
@@ -534,19 +648,25 @@ async function createEvent(options: {
   dataJson?: string;
 }): Promise<void> {
   printJson(
-    await requestJson("/events", {
-      method: "POST",
-      body: compact({
-        runId: options.runId,
-        clientRecordId: options.clientRecordId,
-        type: options.type,
-        message: options.message,
-        importance: options.importance,
-        category: options.category,
-        tags: optionTags(options.tag),
-        data: options.dataJson ? parseJsonOption(options.dataJson, "--data-json") : undefined
-      })
-    })
+    await requestJson(
+      "/events",
+      {
+        method: "POST",
+        body: compact({
+          runId: options.runId,
+          clientRecordId: options.clientRecordId,
+          type: options.type,
+          message: options.message,
+          importance: options.importance,
+          category: options.category,
+          tags: optionTags(options.tag),
+          data: options.dataJson ? parseJsonOption(options.dataJson, "--data-json") : undefined
+        })
+      },
+      options.clientRecordId
+        ? { operation: "create_event", idempotencyKey: options.clientRecordId }
+        : undefined
+    )
   );
 }
 
@@ -563,21 +683,27 @@ async function addLoop(options: {
   sourceRunId?: string;
 }): Promise<void> {
   printJson(
-    await requestJson("/open-loops", {
-      method: "POST",
-      body: compact({
-        type: options.type,
-        project: options.project,
-        clientRecordId: options.clientRecordId,
-        title: options.title,
-        description: options.description,
-        owner: options.owner,
-        source: options.source,
-        nextAction: options.nextAction,
-        blockerRef: options.blockerRef,
-        sourceRunId: options.sourceRunId
-      })
-    })
+    await requestJson(
+      "/open-loops",
+      {
+        method: "POST",
+        body: compact({
+          type: options.type,
+          project: options.project,
+          clientRecordId: options.clientRecordId,
+          title: options.title,
+          description: options.description,
+          owner: options.owner,
+          source: options.source,
+          nextAction: options.nextAction,
+          blockerRef: options.blockerRef,
+          sourceRunId: options.sourceRunId
+        })
+      },
+      options.clientRecordId
+        ? { operation: "create_open_loop", idempotencyKey: options.clientRecordId }
+        : undefined
+    )
   );
 }
 
@@ -605,16 +731,22 @@ async function addDecision(options: {
   rationale?: string;
 }): Promise<void> {
   printJson(
-    await requestJson("/decisions", {
-      method: "POST",
-      body: compact({
-        project: options.project,
-        clientRecordId: options.clientRecordId,
-        title: options.title,
-        decision: options.decision,
-        rationale: options.rationale
-      })
-    })
+    await requestJson(
+      "/decisions",
+      {
+        method: "POST",
+        body: compact({
+          project: options.project,
+          clientRecordId: options.clientRecordId,
+          title: options.title,
+          decision: options.decision,
+          rationale: options.rationale
+        })
+      },
+      options.clientRecordId
+        ? { operation: "create_decision", idempotencyKey: options.clientRecordId }
+        : undefined
+    )
   );
 }
 
@@ -631,23 +763,29 @@ async function createHandoff(options: {
   contextJson?: string;
 }): Promise<void> {
   printJson(
-    await requestJson("/handoffs", {
-      method: "POST",
-      body: compact({
-        sourceRunId: options.sourceRunId,
-        clientRecordId: options.clientRecordId,
-        fromSource: options.fromSource,
-        toSource: options.toSource,
-        project: options.project,
-        summary: options.summary,
-        nextAction: options.nextAction,
-        category: options.category,
-        tags: optionTags(options.tag),
-        context: options.contextJson
-          ? parseJsonOption(options.contextJson, "--context-json")
-          : undefined
-      })
-    })
+    await requestJson(
+      "/handoffs",
+      {
+        method: "POST",
+        body: compact({
+          sourceRunId: options.sourceRunId,
+          clientRecordId: options.clientRecordId,
+          fromSource: options.fromSource,
+          toSource: options.toSource,
+          project: options.project,
+          summary: options.summary,
+          nextAction: options.nextAction,
+          category: options.category,
+          tags: optionTags(options.tag),
+          context: options.contextJson
+            ? parseJsonOption(options.contextJson, "--context-json")
+            : undefined
+        })
+      },
+      options.clientRecordId
+        ? { operation: "create_handoff", idempotencyKey: options.clientRecordId }
+        : undefined
+    )
   );
 }
 
@@ -796,7 +934,8 @@ async function verifyRun(runId: string): Promise<void> {
 
 async function requestJson(
   path: string,
-  options: { method?: string; body?: Record<string, unknown> } = {}
+  options: { method?: string; body?: Record<string, unknown> } = {},
+  queue?: { operation: string; idempotencyKey: string }
 ): Promise<unknown> {
   const config = loadConfig();
   const timeoutMs = readRequestTimeoutMs();
@@ -825,17 +964,53 @@ async function requestJson(
       timeoutMs
     );
   } catch (error) {
-    throw formatClientFailure(error, timeoutMs, context);
+    const failure = formatClientFailure(error, timeoutMs, context);
+    if (queue && options.method === "POST" && options.body) {
+      failure.message += queueFailedWrite(path, options.body, queue, config.security.token);
+    }
+    throw failure;
   }
 
   const text = await response.text();
   const body = text ? parseJsonBody(text) : undefined;
 
   if (!response.ok) {
-    throw formatHttpFailure(response.status, body, context);
+    const failure = formatHttpFailure(response.status, body, context);
+    if (
+      queue &&
+      options.method === "POST" &&
+      options.body &&
+      (response.status >= 500 || response.status === 408 || response.status === 429)
+    ) {
+      failure.message += queueFailedWrite(path, options.body, queue, config.security.token);
+    }
+    throw failure;
   }
 
   return body;
+}
+
+function queueFailedWrite(
+  requestPath: string,
+  payload: Record<string, unknown>,
+  queue: { operation: string; idempotencyKey: string },
+  token?: string
+): string {
+  try {
+    if (token && JSON.stringify(payload).includes(token)) {
+      throw new Error("payload contains the configured token");
+    }
+    const saved = enqueueOutbox({
+      operation: queue.operation,
+      path: requestPath,
+      method: "POST",
+      payload,
+      idempotencyKey: queue.idempotencyKey
+    });
+    return `; queued outbox record ${saved.id}`;
+  } catch {
+    return "; write was not queued because the payload failed outbox safety checks";
+  }
 }
 
 function parseInteger(value: string): number {
