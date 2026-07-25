@@ -26,9 +26,18 @@ available in Terminal may still be absent from a GUI MCP client. The generic pat
 the token at rest in the login Keychain and uses a per-user LaunchAgent to export it into the GUI
 bootstrap environment at login.
 
-This pattern applies to any GUI client whose MCP configuration names a bearer-token environment
-variable. Codex is only an example. For a Codex configuration that already uses an
-environment-backed bearer token, the relevant shape is:
+This setup is optional. Use it only when all of the following are true:
+
+- the MCP client is a GUI application launched outside an existing terminal;
+- its supported authentication configuration requires a bearer-token environment variable; and
+- the variable must persist across login or application restarts.
+
+It is not needed when the client is launched from a terminal that already has the variable, has a
+native secret store or OAuth flow, or uses an existing protected stdio wrapper that loads its own
+local environment file. Prefer a client-native secret mechanism when one is available.
+
+For a qualifying GUI client, Codex is only an example. For a Codex configuration that already uses
+an environment-backed bearer token, the relevant shape is:
 
 ```toml
 [mcp_servers.runtrail]
@@ -217,9 +226,13 @@ Configure persistent, environment-backed MCP authentication for my macOS GUI cli
 
 Before changing anything:
 
-1. Inspect the existing MCP client configuration and relevant client process. Determine the
-   endpoint, bearer-token environment-variable name, transport, proposed Keychain service/account,
-   LaunchAgent label, and per-user plist path without reading or printing any secret value.
+1. Inspect the existing MCP client configuration and relevant client process. First determine
+   whether Keychain plus a LaunchAgent is necessary: do not use it for a terminal-launched client,
+   a client-native secret store or OAuth flow, or a protected stdio wrapper that already loads its
+   own environment file. If it is unnecessary, explain why and stop without changing local state.
+   Otherwise determine the endpoint, bearer-token environment-variable name, transport, proposed
+   Keychain service/account, LaunchAgent label, and per-user plist path without reading or printing
+   any secret value.
 2. Use discovered values or explicit placeholders. Do not assume a username, host, token variable,
    Keychain identifier, application, or installation path.
 3. Check whether the exact Keychain item and LaunchAgent already exist. Explain the proposed
