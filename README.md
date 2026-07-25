@@ -85,7 +85,9 @@ pnpm cli capabilities --json
 The versioned manifest advertises stable feature identifiers, schema versions, MCP transports and
 tools, and actual default/maximum list limits. Unknown feature identifiers are additive and safe to
 ignore. Capability support describes the protocol contract; it does not claim that a particular
-client-supplied verification record is independently proven.
+client-supplied verification record is independently proven. See the
+[protocol compatibility and client support policy](docs/protocol-compatibility.md) for actionable
+version handling, deprecation rules, and evidence-backed client status.
 
 Run the offline synthetic continuation contract:
 
