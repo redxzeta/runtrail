@@ -157,7 +157,7 @@ curl -X POST http://127.0.0.1:8787/decisions \
 CLI equivalents:
 
 ```sh
-pnpm cli run create --source codex --project runtrail --client-run-id local-session-id --task "implement CLI core" --category implementation --tag codex --tag issue-123
+pnpm cli run create --source codex --project runtrail --client-run-id local-session-id --workflow-id issue-123-workflow --task "implement CLI core" --category implementation --tag codex --tag issue-123
 pnpm cli runs close-stale --older-than 24h
 # After reviewing the dry-run candidates:
 pnpm cli runs close-stale --older-than 24h --apply
@@ -174,6 +174,11 @@ Runs and open loops expose a `version`. Pass the last observed value as `expecte
 HTTP requests or `--expected-version` for CLI loop resolution. A stale write returns `409 Conflict`
 with compact current metadata and must be followed by a reread. The precondition is optional for
 compatibility with existing clients, but new callers should provide it.
+
+Related runs can share a `workflowId`; child runs use `parentRunId`, while a new session continuing
+an earlier run uses `continuedFromRunId`. These links are immutable coordination facts, not
+automatic scheduling instructions. Query bounded workflow summaries through
+`GET /workflows/:workflowId/runs?project=<project>` or `journal_get_workflow`.
 
 Wrap a command and journal its result:
 
@@ -270,7 +275,7 @@ MCP startup paths must read local environment/config only. Do not SSH, sudo, or
 scrape `/etc/runtrail/runtrail.env` from an MCP startup command.
 
 Agent continuity tools include `journal_get_context`, `journal_search`,
-`journal_search_runs`, `journal_get_run_manifest`, `journal_create_handoff`,
+`journal_search_runs`, `journal_get_run_manifest`, `journal_get_workflow`, `journal_create_handoff`,
 `journal_create_event`, `journal_create_open_loop`,
 `journal_resolve_open_loop`, and `journal_record_decision`.
 See [docs/mcp-safe-surface.md](docs/mcp-safe-surface.md) for the proposed safe read/write tool surface and default response limits.

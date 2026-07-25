@@ -55,6 +55,7 @@ const tagsSchema = z.array(tagSchema).max(20).optional();
 const categorySchema = z.string().trim().min(1).max(80).optional();
 const clientRecordIdSchema = z.string().trim().min(1).max(255).optional();
 const workKeySchema = z.string().trim().min(1).max(500).optional();
+const runRelationshipIdSchema = z.string().trim().min(1).max(255).optional();
 const expectedVersionSchema = z.number().int().positive().optional();
 
 export const createRunRequestSchema = z.object({
@@ -62,6 +63,9 @@ export const createRunRequestSchema = z.object({
   project: z.string().trim().min(1).max(120),
   clientRunId: z.string().trim().min(1).max(255).optional(),
   workKey: workKeySchema,
+  workflowId: runRelationshipIdSchema,
+  parentRunId: runRelationshipIdSchema,
+  continuedFromRunId: runRelationshipIdSchema,
   task: z.string().trim().min(1).max(1000),
   status: runStatusSchema.default("running"),
   hostname: z.string().trim().min(1).max(255).optional(),
@@ -134,6 +138,11 @@ export const listRunsQuerySchema = z.object({
   started_from: z.string().datetime().optional(),
   started_to: z.string().datetime().optional(),
   limit: z.coerce.number().int().positive().max(100).default(50)
+});
+
+export const workflowRunsQuerySchema = z.object({
+  project: z.string().trim().min(1).max(120),
+  limit: z.coerce.number().int().positive().max(50).default(20)
 });
 
 export const listEventsQuerySchema = z.object({
@@ -267,6 +276,7 @@ export type PauseRunRequest = z.infer<typeof pauseRunRequestSchema>;
 export type FinishRunRequest = z.infer<typeof finishRunRequestSchema>;
 export type CreateEventRequest = z.infer<typeof createEventRequestSchema>;
 export type ListRunsQuery = z.infer<typeof listRunsQuerySchema>;
+export type WorkflowRunsQuery = z.infer<typeof workflowRunsQuerySchema>;
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;
 export type CreateOpenLoopRequest = z.infer<typeof createOpenLoopRequestSchema>;
 export type UpdateOpenLoopRequest = z.infer<typeof updateOpenLoopRequestSchema>;
@@ -286,6 +296,9 @@ export type AgentRun = {
   project: string;
   clientRunId?: string;
   workKey?: string;
+  workflowId?: string;
+  parentRunId?: string;
+  continuedFromRunId?: string;
   task: string;
   status: RunStatus;
   hostname?: string;
@@ -302,6 +315,21 @@ export type AgentRun = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type WorkflowRunSummary = Pick<
+  AgentRun,
+  | "id"
+  | "source"
+  | "project"
+  | "task"
+  | "status"
+  | "workflowId"
+  | "parentRunId"
+  | "continuedFromRunId"
+  | "version"
+  | "startedAt"
+  | "updatedAt"
+>;
 
 export type RunConflict = Pick<
   AgentRun,

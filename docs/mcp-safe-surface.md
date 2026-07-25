@@ -18,12 +18,13 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
 | Tool | Mode | HTTP route | Input | Output |
 | --- | --- | --- | --- | --- |
 | `journal_search_runs` | Read-only | `GET /runs` | `{ project?: string, workKey?: string, status?: string, category?: string, tag?: string, limit?: number }` | `{ runs: AgentRun[] }` capped and ordered by recent update |
-| `journal_start_run` | Write | `POST /runs` | Bounded run identity and task fields, including optional `workKey` | `{ run, recovery?, conflicts }` |
+| `journal_start_run` | Write | `POST /runs` | Bounded run identity and task fields, including optional `workKey`, `workflowId`, `parentRunId`, and `continuedFromRunId` | `{ run, recovery?, conflicts }` |
 | `journal_resume_run` | Write | `POST /runs/:id/resume` | `{ runId, expectedVersion? }` | `{ run }` |
 | `journal_heartbeat_run` | Write | `POST /runs/:id/heartbeat` | `{ runId, expectedVersion? }` | `{ run }` without a new event |
 | `journal_pause_run` | Write | `POST /runs/:id/pause` | `{ runId, expectedVersion?, status, summary? }` | `{ run }` |
 | `journal_finish_run` | Write | `POST /runs/:id/finish` | `{ runId, expectedVersion?, status, summary, completedAt?, gitBranch?, gitCommit? }` | `{ run }` |
 | `journal_get_run_manifest` | Read-only | `GET /runs/:id/manifest` | `{ runId: string }` | Compact run manifest with linked events, changed files, commands, tests, open loops, handoffs, and artifacts |
+| `journal_get_workflow` | Read-only | `GET /workflows/:workflowId/runs` | `{ workflowId: string, project: string, limit?: number }` | Bounded oldest-first related-run summaries with explicit truncation |
 | `journal_get_context` | Read-only | `GET /agent/context` | `{ project: string, limit?: number, min_importance?: number }` | Compact project context with recent runs, failed runs, compact events, compact handoffs, open loops, decisions, and next actions |
 | `journal_search` | Read-only | `GET /search` | `{ project?: string, source?: string, status?: string, category?: string, tag?: string, text?: string, date_from?: string, date_to?: string, limit?: number }` | Compact runs, events, open loops, handoffs, and decisions matching the filters |
 | `journal_create_event` | Write | `POST /events` | `{ runId: string, clientRecordId?: string, type: EventType, message: string, importance?: number, category?: string, tags?: string[], data?: object }` | `{ event: AgentEvent }` |
@@ -46,6 +47,9 @@ Runtrail's MCP adapter is a thin HTTP client. It should expose small, filtered j
   project with the same work key, and never include the authoritative run returned by a replay.
 - Mutable run and open-loop tools should send the last observed `version` as `expectedVersion`.
   Stale writes return the HTTP conflict unchanged through MCP so the agent can reread safely.
+- Run relationships are immutable and explicit: `parentRunId` means delegation/child lineage,
+  `continuedFromRunId` means a new run continuing a previous run, and `workflowId` groups related
+  runs without scheduling them.
 
 ## Guardrails
 

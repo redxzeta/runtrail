@@ -32,6 +32,7 @@ describe("mcp adapter", () => {
       "journal_record_decision",
       "journal_create_handoff",
       "journal_get_run_manifest",
+      "journal_get_workflow",
       "journal_search",
       "journal_search_runs"
     ]);
@@ -46,6 +47,9 @@ describe("mcp adapter", () => {
         project: "runtrail",
         clientRunId: "s1",
         workKey: "github:redxzeta/runtrail#110",
+        workflowId: "workflow-112",
+        parentRunId: "run_parent",
+        continuedFromRunId: "run_previous",
         task: "work"
       },
       client
@@ -73,6 +77,9 @@ describe("mcp adapter", () => {
             project: "runtrail",
             clientRunId: "s1",
             workKey: "github:redxzeta/runtrail#110",
+            workflowId: "workflow-112",
+            parentRunId: "run_parent",
+            continuedFromRunId: "run_previous",
             task: "work"
           }
         }
@@ -150,6 +157,15 @@ describe("mcp adapter", () => {
       },
       client
     );
+    await callRuntrailTool(
+      "journal_get_workflow",
+      {
+        workflowId: "workflow-112",
+        project: "runtrail",
+        limit: 10
+      },
+      client
+    );
 
     expect(client.requestJson).toHaveBeenNthCalledWith(
       1,
@@ -162,6 +178,10 @@ describe("mcp adapter", () => {
     expect(client.requestJson).toHaveBeenNthCalledWith(
       3,
       "/runs?project=runtrail&workKey=github%3Aredxzeta%2Fruntrail%23110&status=failed&category=implementation&tag=mcp&limit=10"
+    );
+    expect(client.requestJson).toHaveBeenNthCalledWith(
+      4,
+      "/workflows/workflow-112/runs?project=runtrail&limit=10"
     );
   });
 
@@ -365,7 +385,7 @@ describe("mcp adapter", () => {
     });
 
     expect(server).toBeDefined();
-    expect(runtrailToolNames).toHaveLength(14);
+    expect(runtrailToolNames).toHaveLength(15);
   });
 
   it("fails fast when bridge config is missing", () => {

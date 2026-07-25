@@ -15,6 +15,9 @@ export type RunRow = {
   project: string;
   client_run_id: string | null;
   work_key: string | null;
+  workflow_id: string | null;
+  parent_run_id: string | null;
+  continued_from_run_id: string | null;
   task: string;
   status: AgentRun["status"];
   hostname: string | null;
@@ -114,6 +117,9 @@ export function mapRunRow(row: RunRow): AgentRun {
     project: row.project,
     clientRunId: row.client_run_id ?? undefined,
     workKey: row.work_key ?? undefined,
+    workflowId: row.workflow_id ?? undefined,
+    parentRunId: row.parent_run_id ?? undefined,
+    continuedFromRunId: row.continued_from_run_id ?? undefined,
     task: row.task,
     status: row.status,
     hostname: row.hostname ?? undefined,

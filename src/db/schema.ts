@@ -10,6 +10,9 @@ export const schemaStatements = [
     project TEXT NOT NULL,
     client_run_id TEXT,
     work_key TEXT,
+    workflow_id TEXT,
+    parent_run_id TEXT,
+    continued_from_run_id TEXT,
     task TEXT NOT NULL,
     status TEXT NOT NULL,
     hostname TEXT,
@@ -24,7 +27,9 @@ export const schemaStatements = [
     started_at TEXT NOT NULL,
     completed_at TEXT,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (parent_run_id) REFERENCES agent_runs (id) ON DELETE SET NULL,
+    FOREIGN KEY (continued_from_run_id) REFERENCES agent_runs (id) ON DELETE SET NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_agent_runs_project_updated_at
     ON agent_runs (project, updated_at DESC)`,

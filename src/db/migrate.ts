@@ -6,6 +6,7 @@ const initialMigrationName = "001_initial_schema";
 const idempotencyMigrationName = "002_append_record_idempotency";
 const workKeyMigrationName = "003_run_work_keys";
 const optimisticConcurrencyMigrationName = "004_optimistic_concurrency";
+const workflowRelationshipsMigrationName = "005_workflow_relationships";
 
 export function migrate(db: Database.Database): void {
   const transaction = db.transaction(() => {
@@ -22,6 +23,9 @@ export function migrate(db: Database.Database): void {
     addColumnIfMissing(db, "agent_runs", "tags_json", "tags_json TEXT");
     addColumnIfMissing(db, "agent_runs", "client_run_id", "client_run_id TEXT");
     addColumnIfMissing(db, "agent_runs", "work_key", "work_key TEXT");
+    addColumnIfMissing(db, "agent_runs", "workflow_id", "workflow_id TEXT");
+    addColumnIfMissing(db, "agent_runs", "parent_run_id", "parent_run_id TEXT");
+    addColumnIfMissing(db, "agent_runs", "continued_from_run_id", "continued_from_run_id TEXT");
     addColumnIfMissing(db, "agent_runs", "version", "version INTEGER NOT NULL DEFAULT 1");
     addColumnIfMissing(db, "agent_events", "category", "category TEXT");
     addColumnIfMissing(db, "agent_events", "tags_json", "tags_json TEXT");
@@ -52,6 +56,10 @@ export function migrate(db: Database.Database): void {
     db.exec(
       `CREATE INDEX IF NOT EXISTS idx_agent_runs_project_work_key_status
       ON agent_runs (project, work_key, status, updated_at DESC)`
+    );
+    db.exec(
+      `CREATE INDEX IF NOT EXISTS idx_agent_runs_project_workflow_started_at
+      ON agent_runs (project, workflow_id, started_at ASC, id ASC)`
     );
     db.exec(
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_events_client_record_id
@@ -91,6 +99,9 @@ export function migrate(db: Database.Database): void {
     db.prepare(
       "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
     ).run(4, optimisticConcurrencyMigrationName, nowIso());
+    db.prepare(
+      "INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)"
+    ).run(5, workflowRelationshipsMigrationName, nowIso());
   });
 
   transaction();
