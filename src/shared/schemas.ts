@@ -62,10 +62,39 @@ export const capabilitiesManifestSchema = z.object({
     verificationEvidence: z.literal("recorded_client_evidence")
   })
 });
+export const conformanceResultSchema = z.object({
+  resultSchemaVersion: z.literal("1"),
+  serviceProtocolVersion: z.literal("1"),
+  profiles: z.array(
+    z.object({
+      name: z.enum(["baseline", "agent-continuation-v1"]),
+      version: z.literal("1"),
+      steps: z.array(
+        z.object({
+          name: z.string(),
+          capability: z.string().optional(),
+          transport: z.enum(["http", "direct_mcp", "stdio_bridge", "local_client"]),
+          expected: z.string(),
+          actual: z.string(),
+          result: z.enum(["passed", "failed", "not_supported"]),
+          diagnostic: z.string().max(160)
+        })
+      )
+    })
+  ),
+  capabilities: z.array(capabilityFeatureIdSchema),
+  summary: z.object({
+    passed: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    notSupported: z.number().int().nonnegative()
+  }),
+  cleanup: z.object({ status: z.enum(["passed", "failed"]) })
+});
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export type CapabilityFeatureId = z.infer<typeof capabilityFeatureIdSchema>;
 export type CapabilitiesManifest = z.infer<typeof capabilitiesManifestSchema>;
+export type ConformanceResult = z.infer<typeof conformanceResultSchema>;
 
 export const runStatusSchema = z.enum([
   "running",

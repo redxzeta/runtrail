@@ -87,6 +87,20 @@ tools, and actual default/maximum list limits. Unknown feature identifiers are a
 ignore. Capability support describes the protocol contract; it does not claim that a particular
 client-supplied verification record is independently proven.
 
+Run the offline synthetic continuation contract:
+
+```sh
+pnpm conformance
+pnpm conformance --output conformance.json
+# Expected nonzero result used to verify diagnostics and cleanup:
+pnpm conformance --induce-failure
+```
+
+The suite uses only disposable storage, an authenticated in-process service, a controlled clock,
+and synthetic `agent-a`/`agent-b` clients. It never targets configured live storage. See
+[docs/conformance.md](docs/conformance.md) for profiles, capability gates, result schema, cleanup,
+and activation rules.
+
 Fetch compact agent context:
 
 ```sh

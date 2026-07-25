@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "tsx src/smoke.ts",
+    "conformance": "tsx src/conformance.ts",
     "lint": "biome check . && knip",
     "format": "biome check --write .",
     "release": "semantic-release",
