@@ -1,3 +1,10 @@
+## [1.41.1](https://github.com/redxzeta/runtrail/compare/v1.41.0...v1.41.1) (2026-07-25)
+
+
+### Bug Fixes
+
+* **deploy:** restore and verify Compose persistence ([#162](https://github.com/redxzeta/runtrail/issues/162)) ([69e00a1](https://github.com/redxzeta/runtrail/commit/69e00a1d5066372c5e79fd0097941bc2d3423c4d))
+
 # [1.41.0](https://github.com/redxzeta/runtrail/compare/v1.40.0...v1.41.0) (2026-07-25)
 
 
