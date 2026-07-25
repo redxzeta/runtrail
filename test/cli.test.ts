@@ -145,6 +145,42 @@ describe("cli", () => {
     );
   });
 
+  it("writes workflow packet JSON without implicit overwrite", async () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-packet-"));
+    const outputPath = path.join(tempDir, "packet.json");
+    const packet = { schemaVersion: "1", workflow: { id: "workflow-142" } };
+    const fetchMock = mockFetch(packet);
+    captureOutput();
+    const command = [
+      "node",
+      "rt",
+      "workflow",
+      "packet",
+      "--workflow-id",
+      "workflow-142",
+      "--project",
+      "runtrail",
+      "--limit",
+      "5",
+      "--output",
+      outputPath
+    ];
+
+    await runCli(command);
+    expect(JSON.parse(readFileSync(outputPath, "utf8"))).toEqual(packet);
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL(
+        "/workflows/workflow-142/review-packet?project=runtrail&limit=5",
+        "http://runtrail.test"
+      ),
+      expect.any(Object)
+    );
+    await expect(runCli(command)).rejects.toThrow("Refusing to overwrite");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await runCli([...command, "--force"]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("creates runs, events, verification, loops, decisions, and handoffs through the API", async () => {
     const fetchMock = mockFetch({ ok: true });
     captureOutput();

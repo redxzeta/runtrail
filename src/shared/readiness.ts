@@ -344,13 +344,16 @@ function verificationSourceRef(item: VerificationEvidence): ReadinessSourceRef {
     type: "verification",
     id: item.id,
     origin: "client_reported",
-    assurance:
-      item.support.type === "unavailable"
-        ? "unknown"
-        : item.support.type === "client_reported"
-          ? "asserted"
-          : "evidence_backed"
+    assurance: verificationAssurance(item)
   };
+}
+
+export function verificationAssurance(item: VerificationEvidence): ProvenanceAssurance {
+  return item.support.type === "unavailable"
+    ? "unknown"
+    : item.support.type === "client_reported"
+      ? "asserted"
+      : "evidence_backed";
 }
 
 function aggregateAssurance(refs: ReadinessSourceRef[]): ProvenanceAssurance {

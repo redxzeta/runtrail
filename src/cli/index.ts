@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import path from "node:path";
 import { Command } from "commander";
@@ -102,6 +102,15 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--workflow-id <workflowId>", "Workflow identifier")
     .requiredOption("--project <project>", "Project name")
     .action(readWorkflowReadiness);
+  workflow
+    .command("packet")
+    .description("Fetch a versioned bounded workflow review packet")
+    .requiredOption("--workflow-id <workflowId>", "Workflow identifier")
+    .requiredOption("--project <project>", "Project name")
+    .option("--limit <limit>", "Maximum items per section", parseInteger)
+    .option("--output <path>", "Write packet JSON to a file")
+    .option("--force", "Overwrite an existing output file", false)
+    .action(readWorkflowPacket);
 
   const event = program.command("event").description("Manage events");
   event
@@ -439,6 +448,28 @@ async function readWorkflowReadiness(options: {
       `/workflows/${encodeURIComponent(options.workflowId)}/readiness?${query.toString()}`
     )
   );
+}
+
+async function readWorkflowPacket(options: {
+  workflowId: string;
+  project: string;
+  limit?: number;
+  output?: string;
+  force: boolean;
+}): Promise<void> {
+  if (options.output && existsSync(options.output) && !options.force) {
+    throw new Error(`Refusing to overwrite ${options.output}; pass --force to replace it`);
+  }
+  const query = new URLSearchParams({ project: options.project });
+  if (options.limit !== undefined) query.set("limit", String(options.limit));
+  const packet = await requestJson(
+    `/workflows/${encodeURIComponent(options.workflowId)}/review-packet?${query.toString()}`
+  );
+  if (!options.output) return printJson(packet);
+  writeFileSync(options.output, `${JSON.stringify(packet, null, 2)}\n`, {
+    flag: options.force ? "w" : "wx"
+  });
+  console.log(`Wrote ${options.output}`);
 }
 
 async function wrapRun(

@@ -41,6 +41,7 @@ import {
   updateRunRequestSchema,
   versionedMutationRequestSchema,
   workflowReadinessQuerySchema,
+  workflowReviewPacketQuerySchema,
   workflowRunsQuerySchema
 } from "../shared/schemas.js";
 import { nowIso } from "../shared/time.js";
@@ -308,6 +309,19 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     return readiness
       ? c.json({ workflowId: c.req.param("workflowId"), project: parsed.data.project, readiness })
       : c.json({ error: "Workflow not found" }, 404);
+  });
+
+  route.get("/workflows/:workflowId/review-packet", (c) => {
+    const parsed = workflowReviewPacketQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams)
+    );
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    const packet = ledger.getWorkflowReviewPacket(
+      c.req.param("workflowId"),
+      parsed.data,
+      options.config.agentContext.staleAfterSeconds
+    );
+    return packet ? c.json(packet) : c.json({ error: "Workflow not found" }, 404);
   });
 
   route.get("/runs/:id", (c) => {
