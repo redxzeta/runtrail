@@ -25,6 +25,7 @@ export type RunRow = {
   summary: string | null;
   category: string | null;
   tags_json: string | null;
+  version: number;
   started_at: string;
   completed_at: string | null;
   created_at: string;
@@ -63,6 +64,7 @@ export type OpenLoopRow = {
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
+  version: number;
 };
 
 export type DecisionRow = {
@@ -122,6 +124,7 @@ export function mapRunRow(row: RunRow): AgentRun {
     summary: row.summary ?? undefined,
     category: row.category ?? undefined,
     tags: parseTags(row.tags_json),
+    version: row.version,
     startedAt: row.started_at,
     completedAt: row.completed_at ?? undefined,
     createdAt: row.created_at,
@@ -175,6 +178,7 @@ export function mapOpenLoopRow(row: OpenLoopRow): OpenLoop {
     sourceRunId: row.source_run_id ?? undefined,
     status: row.status,
     resolution: row.resolution ?? undefined,
+    version: row.version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     resolvedAt: row.resolved_at ?? undefined

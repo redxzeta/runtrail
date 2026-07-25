@@ -12,7 +12,8 @@ import {
   openLoopStatusSchema,
   pauseRunRequestSchema,
   runStatusSchema,
-  updateOpenLoopRequestSchema
+  updateOpenLoopRequestSchema,
+  versionedMutationRequestSchema
 } from "../shared/schemas.js";
 
 const idSchema = z.string().trim().min(1);
@@ -32,7 +33,7 @@ export const mcpToolInputSchemas = {
     category: createRunRequestSchema.shape.category,
     tags: createRunRequestSchema.shape.tags
   },
-  runId: { runId: idSchema },
+  runId: { runId: idSchema, ...versionedMutationRequestSchema.shape },
   pauseRun: { runId: idSchema, ...pauseRunRequestSchema.shape },
   finishRun: { runId: idSchema, ...finishRunRequestSchema.shape },
   context: {
@@ -64,6 +65,7 @@ export const mcpToolInputSchemas = {
   },
   resolveOpenLoop: {
     id: idSchema,
+    expectedVersion: versionedMutationRequestSchema.shape.expectedVersion,
     resolution: updateOpenLoopRequestSchema.shape.resolution.unwrap().optional()
   },
   decision: {

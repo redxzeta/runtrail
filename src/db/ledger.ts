@@ -72,6 +72,29 @@ function isUniqueConstraint(error: unknown): boolean {
   );
 }
 
+type VersionedRecord = AgentRun | OpenLoop;
+
+export class VersionConflictError extends Error {
+  readonly current: Pick<VersionedRecord, "id" | "status" | "updatedAt" | "version">;
+
+  constructor(
+    readonly recordType: "run" | "openLoop",
+    readonly expectedVersion: number,
+    current: VersionedRecord
+  ) {
+    super(
+      `Expected ${recordType} version ${expectedVersion}, current version is ${current.version}`
+    );
+    this.name = "VersionConflictError";
+    this.current = {
+      id: current.id,
+      status: current.status,
+      updatedAt: current.updatedAt,
+      version: current.version
+    };
+  }
+}
+
 export class LedgerRepository {
   constructor(private readonly db: Database.Database) {}
 
@@ -99,6 +122,7 @@ export class LedgerRepository {
       summary: input.summary,
       category: input.category,
       tags,
+      version: 1,
       startedAt: input.startedAt ?? timestamp,
       createdAt: timestamp,
       updatedAt: timestamp
@@ -123,6 +147,7 @@ export class LedgerRepository {
             summary,
             category,
             tags_json,
+            version,
             started_at,
             completed_at,
             created_at,
@@ -143,6 +168,7 @@ export class LedgerRepository {
             @summary,
             @category,
             @tagsJson,
+            @version,
             @startedAt,
             @completedAt,
             @createdAt,
@@ -225,8 +251,12 @@ export class LedgerRepository {
         SET status = 'cancelled',
             summary = @summary,
             completed_at = @completedAt,
-            updated_at = @completedAt
-        WHERE id = @id AND status = 'running' AND updated_at < @updatedBefore`
+            updated_at = @completedAt,
+            version = version + 1
+        WHERE id = @id
+          AND status = 'running'
+          AND updated_at < @updatedBefore
+          AND version = @expectedVersion`
       );
 
       for (const candidate of mappedCandidates) {
@@ -234,7 +264,8 @@ export class LedgerRepository {
           id: candidate.id,
           summary,
           completedAt,
-          updatedBefore
+          updatedBefore,
+          expectedVersion: candidate.version
         });
 
         if (result.changes === 1) {
@@ -267,6 +298,8 @@ export class LedgerRepository {
       return undefined;
     }
 
+    assertExpectedVersion("run", existing, input.expectedVersion);
+
     const updated: AgentRun = {
       ...existing,
       status: input.status ?? existing.status,
@@ -279,10 +312,11 @@ export class LedgerRepository {
         input.gitBranch === undefined ? existing.gitBranch : (input.gitBranch ?? undefined),
       gitCommit:
         input.gitCommit === undefined ? existing.gitCommit : (input.gitCommit ?? undefined),
+      version: existing.version + 1,
       updatedAt: nowIso()
     };
 
-    this.db
+    const result = this.db
       .prepare(
         `UPDATE agent_runs
         SET status = @status,
@@ -290,49 +324,75 @@ export class LedgerRepository {
             completed_at = @completedAt,
             git_branch = @gitBranch,
             git_commit = @gitCommit,
-            updated_at = @updatedAt
-        WHERE id = @id`
+            updated_at = @updatedAt,
+            version = version + 1
+        WHERE id = @id
+          ${input.expectedVersion === undefined ? "" : "AND version = @expectedVersion"}`
       )
       .run({
         ...updated,
+        expectedVersion: input.expectedVersion,
         summary: toSqlValue(updated.summary),
         completedAt: toSqlValue(updated.completedAt),
         gitBranch: toSqlValue(updated.gitBranch),
         gitCommit: toSqlValue(updated.gitCommit)
       });
 
-    return updated;
+    if (result.changes === 0) {
+      const current = this.getRun(id);
+      if (current && input.expectedVersion !== undefined) {
+        throw new VersionConflictError("run", input.expectedVersion, current);
+      }
+      return undefined;
+    }
+
+    return this.getRun(id);
   }
 
-  heartbeatRun(id: string): LifecycleResult {
+  heartbeatRun(id: string, expectedVersion?: number): LifecycleResult {
     const run = this.getRun(id);
     if (!run) return { error: "Run not found" };
+    assertExpectedVersion("run", run, expectedVersion);
     if (isTerminal(run.status)) return { error: `Cannot heartbeat ${run.status} run` };
-    return { run: this.updateRun(id, { summary: run.summary ?? null }) as AgentRun };
+    return {
+      run: this.updateRun(id, { expectedVersion, summary: run.summary ?? null }) as AgentRun
+    };
   }
 
-  resumeRun(id: string): LifecycleResult {
+  resumeRun(id: string, expectedVersion?: number): LifecycleResult {
     const run = this.getRun(id);
     if (!run) return { error: "Run not found" };
+    assertExpectedVersion("run", run, expectedVersion);
     if (run.status === "cancelled") return { error: "Cannot resume cancelled run" };
     if (run.status === "running") return { run };
     return {
-      run: this.updateRun(id, { status: "running", summary: null, completedAt: null }) as AgentRun
+      run: this.updateRun(id, {
+        expectedVersion,
+        status: "running",
+        summary: null,
+        completedAt: null
+      }) as AgentRun
     };
   }
 
   pauseRun(id: string, input: PauseRunRequest): LifecycleResult {
     const run = this.getRun(id);
     if (!run) return { error: "Run not found" };
+    assertExpectedVersion("run", run, input.expectedVersion);
     if (isTerminal(run.status)) return { error: `Cannot pause ${run.status} run` };
     return {
-      run: this.updateRun(id, { status: input.status, summary: input.summary }) as AgentRun
+      run: this.updateRun(id, {
+        expectedVersion: input.expectedVersion,
+        status: input.status,
+        summary: input.summary
+      }) as AgentRun
     };
   }
 
   finishRun(id: string, input: FinishRunRequest): LifecycleResult {
     const run = this.getRun(id);
     if (!run) return { error: "Run not found" };
+    assertExpectedVersion("run", run, input.expectedVersion);
     if (isTerminal(run.status)) {
       return run.status === input.status
         ? { run }
@@ -340,6 +400,7 @@ export class LedgerRepository {
     }
     return {
       run: this.updateRun(id, {
+        expectedVersion: input.expectedVersion,
         status: input.status,
         summary: input.summary,
         completedAt: input.completedAt,
@@ -420,15 +481,18 @@ export class LedgerRepository {
         LIMIT 10`
       )
       .all({ project: run.project, workKey: run.workKey, id: run.id }) as RunRow[];
-    return rows.map(mapRunRow).map(({ id, source, project, workKey, task, status, updatedAt }) => ({
-      id,
-      source,
-      project,
-      workKey,
-      task,
-      status,
-      updatedAt
-    }));
+    return rows
+      .map(mapRunRow)
+      .map(({ id, source, project, workKey, task, status, version, updatedAt }) => ({
+        id,
+        source,
+        project,
+        workKey,
+        task,
+        status,
+        version,
+        updatedAt
+      }));
   }
 
   getRun(id: string): AgentRun | undefined {
@@ -705,6 +769,7 @@ export class LedgerRepository {
       blockerRef: input.blockerRef,
       sourceRunId: input.sourceRunId,
       status: "open",
+      version: 1,
       createdAt: timestamp,
       updatedAt: timestamp
     };
@@ -715,11 +780,11 @@ export class LedgerRepository {
           `INSERT INTO open_loops (
             id, type, project, client_record_id, title, description, owner, source,
             next_action, blocker_ref, source_run_id, status, resolution, created_at,
-            updated_at, resolved_at
+            updated_at, resolved_at, version
           ) VALUES (
             @id, @type, @project, @clientRecordId, @title, @description, @owner, @source,
             @nextAction, @blockerRef, @sourceRunId, @status, @resolution, @createdAt,
-            @updatedAt, @resolvedAt
+            @updatedAt, @resolvedAt, @version
           )`
         )
         .run({
@@ -756,6 +821,8 @@ export class LedgerRepository {
       return undefined;
     }
 
+    assertExpectedVersion("openLoop", existing, input.expectedVersion);
+
     if (input.sourceRunId && !this.getRun(input.sourceRunId)) {
       return undefined;
     }
@@ -780,10 +847,11 @@ export class LedgerRepository {
         input.resolvedAt === undefined
           ? deriveResolvedAt(existing, input)
           : (input.resolvedAt ?? undefined),
+      version: existing.version + 1,
       updatedAt: nowIso()
     };
 
-    this.db
+    const result = this.db
       .prepare(
         `UPDATE open_loops
         SET status = @status,
@@ -796,11 +864,14 @@ export class LedgerRepository {
             source_run_id = @sourceRunId,
             resolution = @resolution,
             updated_at = @updatedAt,
-            resolved_at = @resolvedAt
-        WHERE id = @id`
+            resolved_at = @resolvedAt,
+            version = version + 1
+        WHERE id = @id
+          ${input.expectedVersion === undefined ? "" : "AND version = @expectedVersion"}`
       )
       .run({
         ...updated,
+        expectedVersion: input.expectedVersion,
         description: toSqlValue(updated.description),
         owner: toSqlValue(updated.owner),
         source: toSqlValue(updated.source),
@@ -811,7 +882,15 @@ export class LedgerRepository {
         resolvedAt: toSqlValue(updated.resolvedAt)
       });
 
-    return updated;
+    if (result.changes === 0) {
+      const current = this.getOpenLoop(id);
+      if (current && input.expectedVersion !== undefined) {
+        throw new VersionConflictError("openLoop", input.expectedVersion, current);
+      }
+      return undefined;
+    }
+
+    return this.getOpenLoop(id);
   }
 
   listOpenLoops(query: ListOpenLoopsQuery): OpenLoop[] {
@@ -1374,6 +1453,16 @@ type LifecycleResult = { run: AgentRun; error?: never } | { run?: never; error: 
 
 function isTerminal(status: AgentRun["status"]): boolean {
   return ["completed", "failed", "cancelled"].includes(status);
+}
+
+function assertExpectedVersion(
+  recordType: "run" | "openLoop",
+  current: VersionedRecord,
+  expectedVersion: number | undefined
+): void {
+  if (expectedVersion !== undefined && expectedVersion !== current.version) {
+    throw new VersionConflictError(recordType, expectedVersion, current);
+  }
 }
 
 function mapRecoveryReceipt(row: RecoveryReceiptRow): RecoveryReceipt {

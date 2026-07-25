@@ -31,6 +31,19 @@ that omit `clientRecordId` keep the existing append behavior. Keys are bounded i
 payload hashes: never derive them from prompts, logs, environment values, credentials, or other
 secret-bearing content.
 
+## Mutable Record Versions
+
+Runs and open loops include a positive integer `version`, initialized to `1`. Clients should reread
+the record, send that value as `expectedVersion` with lifecycle or update requests, and retain the
+new version returned after a successful mutation. A successful mutation increments the version
+exactly once. Append-only event creation does not increment it.
+
+During rollout, `expectedVersion` remains optional so existing clients continue to work with
+last-write-wins behavior. New and upgraded clients should provide it. A stale precondition returns
+`409 Conflict` with `recordType`, `expectedVersion`, compact current `id`, `status`, `version`, and
+`updatedAt` fields, plus `action: "reread"`. On conflict, reread the record and decide whether the
+mutation is still valid; do not retry blindly with a substituted version.
+
 Automatic session creation records an allowlisted recovery receipt in the selected run manifest.
 Receipts identify the client session, normalized workspace, selected run, action, optional previous
 run, and bounded stale reason. `create_new`, `reuse`, `reopen`, and `mark_stale` decisions remain

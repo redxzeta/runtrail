@@ -21,6 +21,9 @@ describe("database", () => {
     const idempotencyMigration = db
       .prepare("SELECT name FROM schema_migrations WHERE id = ?")
       .get(2) as { name: string } | undefined;
+    const concurrencyMigration = db
+      .prepare("SELECT name FROM schema_migrations WHERE id = ?")
+      .get(4) as { name: string } | undefined;
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as Array<{ name: string }>;
@@ -32,6 +35,7 @@ describe("database", () => {
     expect(existsSync(config.storage.dbPath)).toBe(true);
     expect(migration?.name).toBe("001_initial_schema");
     expect(idempotencyMigration?.name).toBe("002_append_record_idempotency");
+    expect(concurrencyMigration?.name).toBe("004_optimistic_concurrency");
     expect(tables.map((table) => table.name)).toEqual([
       "agent_event_tags",
       "agent_events",
@@ -118,6 +122,21 @@ describe("database", () => {
         created_at TEXT NOT NULL
       )
     `);
+    db.exec(`
+      INSERT INTO agent_runs (
+        id, source, project, task, status, started_at, created_at, updated_at
+      ) VALUES (
+        'run_legacy', 'codex', 'runtrail', 'legacy run', 'running',
+        '2026-07-01T00:00:00.000Z', '2026-07-01T00:00:00.000Z',
+        '2026-07-01T00:00:00.000Z'
+      );
+      INSERT INTO open_loops (
+        id, type, project, title, status, created_at, updated_at
+      ) VALUES (
+        'loop_legacy', 'blocked', 'runtrail', 'legacy loop', 'open',
+        '2026-07-01T00:00:00.000Z', '2026-07-01T00:00:00.000Z'
+      )
+    `);
 
     migrate(db);
     const runColumns = db.prepare("PRAGMA table_info(agent_runs)").all() as Array<{ name: string }>;
@@ -139,10 +158,16 @@ describe("database", () => {
     const indexes = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
       .all() as Array<{ name: string }>;
+    const runVersion = db.prepare("SELECT version FROM agent_runs LIMIT 1").get() as
+      | { version: number }
+      | undefined;
+    const loopVersion = db.prepare("SELECT version FROM open_loops LIMIT 1").get() as
+      | { version: number }
+      | undefined;
     db.close();
 
     expect(runColumns.map((column) => column.name)).toEqual(
-      expect.arrayContaining(["category", "tags_json", "client_run_id", "work_key"])
+      expect.arrayContaining(["category", "tags_json", "client_run_id", "work_key", "version"])
     );
     expect(eventColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining([
@@ -163,9 +188,12 @@ describe("database", () => {
         "next_action",
         "blocker_ref",
         "source_run_id",
-        "client_record_id"
+        "client_record_id",
+        "version"
       ])
     );
+    expect(runVersion?.version).toBe(1);
+    expect(loopVersion?.version).toBe(1);
     expect(decisionColumns.map((column) => column.name)).toContain("client_record_id");
     expect(artifactColumns.map((column) => column.name)).toContain("client_record_id");
     expect(indexes.map((index) => index.name)).toEqual(
