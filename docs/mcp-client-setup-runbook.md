@@ -4,6 +4,10 @@ Use the hosted Runtrail `/mcp` endpoint for remote-capable clients. Use a local 
 
 Do not SSH into the Runtrail LXC during MCP startup. MCP startup must read only local config and environment files.
 
+Setup instructions do not by themselves establish client support. See the
+[protocol compatibility and client support policy](protocol-compatibility.md) for the current
+evidence level, version handling, and known limitations for each client and transport.
+
 ## Shared Environment
 
 Keep secrets in an ignored local env file or secret store:
