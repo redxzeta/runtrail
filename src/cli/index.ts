@@ -95,6 +95,14 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--apply", "Mark candidates cancelled", false)
     .action(closeStaleRuns);
 
+  const workflow = program.command("workflow").description("Inspect workflow state");
+  workflow
+    .command("readiness")
+    .description("Fetch deterministic advisory workflow readiness")
+    .requiredOption("--workflow-id <workflowId>", "Workflow identifier")
+    .requiredOption("--project <project>", "Project name")
+    .action(readWorkflowReadiness);
+
   const event = program.command("event").description("Manage events");
   event
     .command("create")
@@ -418,6 +426,18 @@ async function closeStaleRuns(options: {
         limit: options.limit
       }
     })
+  );
+}
+
+async function readWorkflowReadiness(options: {
+  workflowId: string;
+  project: string;
+}): Promise<void> {
+  const query = new URLSearchParams({ project: options.project });
+  printJson(
+    await requestJson(
+      `/workflows/${encodeURIComponent(options.workflowId)}/readiness?${query.toString()}`
+    )
   );
 }
 

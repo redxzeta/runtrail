@@ -368,7 +368,11 @@ describe("ledger routes", () => {
           parentRunId: root.run.id
         })
       ],
-      truncated: true
+      truncated: true,
+      readiness: expect.objectContaining({
+        status: "in_progress",
+        reasonCodes: ["fresh_related_run_active"]
+      })
     });
 
     const complete = (await (
@@ -419,6 +423,76 @@ describe("ledger routes", () => {
         expect.objectContaining({ id: continuation.run.id, workflowId })
       ])
     );
+  });
+
+  it("serializes equivalent bounded readiness through workflow, prepare-work, and manifests", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-25T19:00:00.000Z"));
+    const app = createTestApp();
+    const workflowId = "workflow-readiness";
+    const created = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        workflowId,
+        task: "Review readiness"
+      })
+    ).json()) as { run: { id: string; version: number } };
+    await postJson(app, `/runs/${created.run.id}/finish`, {
+      expectedVersion: created.run.version,
+      status: "completed",
+      summary: "Done"
+    });
+    await postJson(app, "/verifications", {
+      runId: created.run.id,
+      checkId: "unit",
+      kind: "test",
+      outcome: "passed",
+      name: "Unit tests",
+      summary: "secret transcript must not be projected",
+      support: { type: "exit_code", exitCode: 0 },
+      completedAt: "2026-07-25T18:59:00.000Z"
+    });
+
+    const workflow = (await (
+      await app.request(`/workflows/${workflowId}/runs?project=ice-council`, {
+        headers: authHeaders()
+      })
+    ).json()) as { readiness: unknown };
+    const direct = (await (
+      await app.request(`/workflows/${workflowId}/readiness?project=ice-council`, {
+        headers: authHeaders()
+      })
+    ).json()) as { readiness: unknown };
+    const prepared = (await (
+      await app.request(`/agent/prepare-work?project=ice-council&runId=${created.run.id}`, {
+        headers: authHeaders()
+      })
+    ).json()) as { readiness: unknown };
+    const manifest = (await (
+      await app.request(`/runs/${created.run.id}/manifest`, { headers: authHeaders() })
+    ).json()) as { manifest: { readiness: unknown } };
+
+    expect(workflow.readiness).toEqual(direct.readiness);
+    expect(prepared.readiness).toEqual(direct.readiness);
+    expect(manifest.manifest.readiness).toEqual(direct.readiness);
+    expect(direct.readiness).toEqual(
+      expect.objectContaining({
+        status: "ready_for_review",
+        reasonCodes: ["workflow_ready_for_review"],
+        asOf: "2026-07-25T19:00:00.000Z",
+        findings: [
+          expect.objectContaining({
+            origin: "deterministic_derivation",
+            assurance: "mixed",
+            sourceRefs: expect.arrayContaining([
+              expect.objectContaining({ type: "run", id: created.run.id, version: 2 }),
+              expect.objectContaining({ type: "verification", origin: "client_reported" })
+            ])
+          })
+        ]
+      })
+    );
+    expect(JSON.stringify(direct)).not.toContain("secret transcript");
   });
 
   it("rejects invalid run relationships without changing existing runs", async () => {

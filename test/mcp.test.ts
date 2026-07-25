@@ -150,7 +150,14 @@ describe("mcp adapter", () => {
   });
 
   it("maps context and search tools to HTTP GET requests", async () => {
-    const client = mockClient({ ok: true });
+    const readiness = {
+      status: "ready_for_review",
+      reasonCodes: ["workflow_ready_for_review"],
+      findings: [],
+      nextActions: [],
+      asOf: "2026-07-25T19:00:00.000Z"
+    };
+    const client = mockClient({ readiness });
 
     await callRuntrailTool(
       "journal_get_context",
@@ -190,7 +197,7 @@ describe("mcp adapter", () => {
       },
       client
     );
-    await callRuntrailTool(
+    const workflow = await callRuntrailTool(
       "journal_get_workflow",
       {
         workflowId: "workflow-112",
@@ -216,6 +223,7 @@ describe("mcp adapter", () => {
       4,
       "/workflows/workflow-112/runs?project=runtrail&limit=10"
     );
+    expect(workflow).toEqual({ readiness });
   });
 
   it("maps write tools to existing HTTP API endpoints", async () => {

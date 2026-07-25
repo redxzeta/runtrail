@@ -187,6 +187,62 @@ Use `journal_search`, `journal_get_context`, and `journal_get_run_manifest` only
 prepare-work recommendation calls for more detail. A recommendation is advisory and never performs
 a mutation.
 
+## Workflow Readiness
+
+Workflow reads, targeted prepare-work responses, and run manifests expose the same canonical
+`readiness` object. Read it directly with
+`GET /workflows/:workflowId/readiness?project=<project>` or
+`rt workflow readiness --workflow-id <id> --project <project>`. The projection is advisory: it
+never completes work, retries checks, changes handoffs, or blocks an external action.
+
+Origins are `client_reported`, `server_observed`, and `deterministic_derivation`. Assurance is
+independent and uses `asserted`, `evidence_backed`, `mixed`, or `unknown`; readiness never upgrades
+weaker input. The pure projection applies these rules:
+
+| Input | Origin | Assurance |
+| --- | --- | --- |
+| Run lifecycle and version | `server_observed` | `asserted` |
+| Open-loop claim and version | `client_reported` | `asserted` |
+| Handoff transition and version | `server_observed` | `evidence_backed` |
+| Persisted decision lineage | `server_observed` | `evidence_backed` |
+| Verification with `client_reported` support | `client_reported` | `asserted` |
+| Verification with exit code, receipt, or artifact digest | `client_reported` | `evidence_backed` |
+| Verification with unavailable support | `client_reported` | `unknown` |
+| Readiness finding | `deterministic_derivation` | weakest/combined assurance of its references |
+
+Effective replacement decisions reference both prior and current IDs as lineage, but only the
+current decision is actionable. For repeated `(runId, checkId)` verification, the latest
+`completedAt` and ID wins. A terminal run never implies verification success.
+
+Rules use this fixed precedence:
+
+1. incomplete relationships or bounded-input truncation → `unknown`
+2. blocked runs or unresolved hard/decision loops → `blocked`
+3. pending or accepted handoffs → `in_progress`
+4. fresh nonterminal related runs → `in_progress`
+5. stale-candidate or unknown-freshness related runs → `unknown`
+6. failed verification → `needs_evidence`
+7. explicit `not_run` → `needs_evidence`
+8. missing verification disposition → `needs_evidence`
+9. terminal runs with explicit nonblocking dispositions → `ready_for_review`
+10. unclassifiable legacy state → `unknown`
+
+Stable reason codes are `workflow_relationships_incomplete`, `workflow_inputs_truncated`,
+`related_run_blocked`, `unresolved_hard_blocker`, `handoff_incomplete`,
+`fresh_related_run_active`, `stale_related_run_requires_inspection`,
+`related_run_freshness_unknown`, `verification_failed`, `required_verification_not_run`,
+`required_verification_missing`, `workflow_ready_for_review`, and
+`legacy_workflow_unclassified`. Actions reuse `inspect_active_conflict`, `inspect_stale_run`,
+`resolve_blocker`, `complete_handoff`, `record_verification_disposition`,
+`rerun_failed_verification`, `inspect_effective_decision`, and `stop_and_reread`.
+
+Each finding contains at most 20 deterministically ordered `sourceRefs` with `type`, `id`, optional
+current `version`, origin, and assurance. Findings and actions are also capped at 20. Caveats use
+`verification_client_reported`, `verification_support_unavailable`,
+`workflow_inputs_truncated`, and `legacy_relationships_missing`. No readiness response embeds raw
+records, event data, summaries, logs, prompts, transcripts, credentials, headers, environment
+data, or private paths. Older unlinked runs remain readable and return conservative `unknown`.
+
 ## Incremental Context
 
 `journal_get_context` and `journal_prepare_work` return an opaque versioned `cursor`. Supplying that

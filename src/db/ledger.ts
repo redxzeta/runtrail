@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
 import { createId } from "../shared/ids.js";
+import { evaluateWorkflowReadiness } from "../shared/readiness.js";
 import { compareEventsForReceipts, computeEventHash } from "../shared/receipts.js";
 import type {
   AcceptHandoffRequest,
@@ -50,6 +51,7 @@ import type {
   UpdateOpenLoopRequest,
   UpdateRunRequest,
   VerificationEvidence,
+  WorkflowReadiness,
   WorkflowRunSummary,
   WorkflowRunsQuery
 } from "../shared/schemas.js";
@@ -96,6 +98,7 @@ const decisionProjection = `decisions.*,
     ORDER BY replacement.created_at DESC, replacement.id DESC
     LIMIT 1
   ) AS replacing_decision_id`;
+const readinessInputLimit = 100;
 
 function isUniqueConstraint(error: unknown): boolean {
   return (
@@ -592,6 +595,101 @@ export class LedgerRepository {
       runs: rows.slice(0, query.limit).map(mapRunRow).map(toWorkflowRunSummary),
       truncated
     };
+  }
+
+  getWorkflowReadiness(
+    workflowId: string,
+    project: string,
+    staleAfterSeconds: number,
+    asOf = nowIso()
+  ): WorkflowReadiness | undefined {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM agent_runs
+        WHERE project = @project AND workflow_id = @workflowId
+        ORDER BY started_at ASC, id ASC
+        LIMIT @limit`
+      )
+      .all({ project, workflowId, limit: readinessInputLimit + 1 }) as RunRow[];
+    if (rows.length === 0) return undefined;
+    return this.evaluateReadiness(
+      rows.slice(0, readinessInputLimit).map(mapRunRow),
+      workflowId,
+      staleAfterSeconds,
+      asOf,
+      rows.length > readinessInputLimit
+    );
+  }
+
+  getRunReadiness(
+    runId: string,
+    staleAfterSeconds: number,
+    asOf = nowIso()
+  ): WorkflowReadiness | undefined {
+    const run = this.getRun(runId);
+    if (!run) return undefined;
+    return run.workflowId
+      ? this.getWorkflowReadiness(run.workflowId, run.project, staleAfterSeconds, asOf)
+      : this.evaluateReadiness([run], undefined, staleAfterSeconds, asOf, false);
+  }
+
+  private evaluateReadiness(
+    runs: AgentRun[],
+    workflowId: string | undefined,
+    staleAfterSeconds: number,
+    asOf: string,
+    runsTruncated: boolean
+  ): WorkflowReadiness {
+    const runIds = runs.map((run) => run.id);
+    const placeholders = runIds.map(() => "?").join(", ");
+    const openLoopRows = this.db
+      .prepare(
+        `SELECT * FROM open_loops
+        WHERE status = 'open' AND source_run_id IN (${placeholders})
+        ORDER BY updated_at ASC, id ASC
+        LIMIT ?`
+      )
+      .all(...runIds, readinessInputLimit + 1) as OpenLoopRow[];
+    const handoffRows = this.db
+      .prepare(
+        `SELECT * FROM handoffs
+        WHERE (source_run_id IN (${placeholders}) OR target_run_id IN (${placeholders}))
+          AND status IN ('pending', 'accepted')
+        ORDER BY updated_at ASC, id ASC
+        LIMIT ?`
+      )
+      .all(...runIds, ...runIds, readinessInputLimit + 1) as HandoffRow[];
+    const verificationRows = this.db
+      .prepare(
+        `SELECT * FROM verification_evidence
+        WHERE run_id IN (${placeholders})
+        ORDER BY completed_at ASC, id ASC
+        LIMIT ?`
+      )
+      .all(...runIds, readinessInputLimit + 1) as VerificationRow[];
+    const decisions = this.listDecisions({
+      project: runs[0]?.project,
+      includeGlobal: true,
+      effectiveOnly: true,
+      limit: readinessInputLimit + 1
+    });
+    const inputsTruncated =
+      runsTruncated ||
+      openLoopRows.length > readinessInputLimit ||
+      handoffRows.length > readinessInputLimit ||
+      verificationRows.length > readinessInputLimit ||
+      decisions.length > readinessInputLimit;
+
+    return evaluateWorkflowReadiness({
+      workflowId,
+      asOf,
+      runs: runs.map((run) => toPrepareWorkRunSummary(run, asOf, staleAfterSeconds)),
+      openLoops: openLoopRows.slice(0, readinessInputLimit).map(mapOpenLoopRow),
+      handoffs: handoffRows.slice(0, readinessInputLimit).map(mapHandoffRow),
+      effectiveDecisions: decisions.slice(0, readinessInputLimit),
+      verifications: verificationRows.slice(0, readinessInputLimit).map(mapVerificationRow),
+      inputsTruncated
+    });
   }
 
   private findActiveWorkConflicts(run: AgentRun): RunConflict[] {
@@ -1800,12 +1898,14 @@ export class LedgerRepository {
     };
   }
 
-  getRunManifest(id: string): RunManifest | undefined {
+  getRunManifest(id: string, staleAfterSeconds = 3600, asOf = nowIso()): RunManifest | undefined {
     const run = this.getRun(id);
 
     if (!run) {
       return undefined;
     }
+    const readiness = this.getRunReadiness(id, staleAfterSeconds, asOf);
+    if (!readiness) return undefined;
 
     const events = this.listEventsForRun(id);
     const openLoops = this.db
@@ -1832,7 +1932,8 @@ export class LedgerRepository {
       handoffs: this.listHandoffs({ sourceRunId: id, status: "all", limit: 100 }),
       artifacts: this.listArtifacts({ runId: id, limit: 100 }),
       verifications: this.listVerifications({ runId: id, limit: 100 }),
-      recovery_receipts: this.listRecoveryReceipts(id)
+      recovery_receipts: this.listRecoveryReceipts(id),
+      readiness
     };
   }
 
@@ -2082,6 +2183,7 @@ export class LedgerRepository {
       openLoops,
       effectiveDecisions,
       latestManifest: manifestRun ? this.getPrepareWorkManifestSummary(manifestRun) : undefined,
+      readiness: selected ? this.getRunReadiness(selected.id, staleAfterSeconds, asOf) : undefined,
       recommendations: recommendationsResult.items,
       warnings: warningResult.items,
       sections: {

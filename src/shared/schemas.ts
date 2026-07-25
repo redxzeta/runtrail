@@ -379,6 +379,97 @@ export const listVerificationsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(50)
 });
 
+export const provenanceOriginSchema = z.enum([
+  "client_reported",
+  "server_observed",
+  "deterministic_derivation"
+]);
+export const provenanceAssuranceSchema = z.enum([
+  "asserted",
+  "evidence_backed",
+  "mixed",
+  "unknown"
+]);
+export const readinessStatusSchema = z.enum([
+  "in_progress",
+  "blocked",
+  "needs_evidence",
+  "ready_for_review",
+  "unknown"
+]);
+export const readinessReasonCodeSchema = z.enum([
+  "workflow_relationships_incomplete",
+  "workflow_inputs_truncated",
+  "related_run_blocked",
+  "unresolved_hard_blocker",
+  "handoff_incomplete",
+  "fresh_related_run_active",
+  "stale_related_run_requires_inspection",
+  "related_run_freshness_unknown",
+  "verification_failed",
+  "required_verification_not_run",
+  "required_verification_missing",
+  "workflow_ready_for_review",
+  "legacy_workflow_unclassified"
+]);
+export const readinessActionCodeSchema = z.enum([
+  "inspect_active_conflict",
+  "inspect_stale_run",
+  "resolve_blocker",
+  "complete_handoff",
+  "record_verification_disposition",
+  "rerun_failed_verification",
+  "inspect_effective_decision",
+  "stop_and_reread"
+]);
+export const readinessCaveatCodeSchema = z.enum([
+  "verification_client_reported",
+  "verification_support_unavailable",
+  "workflow_inputs_truncated",
+  "legacy_relationships_missing"
+]);
+const readinessRecordTypeSchema = z.enum([
+  "run",
+  "handoff",
+  "openLoop",
+  "decision",
+  "verification"
+]);
+export const readinessSourceRefSchema = z.object({
+  type: readinessRecordTypeSchema,
+  id: z.string().trim().min(1).max(255),
+  version: z.number().int().positive().optional(),
+  origin: provenanceOriginSchema,
+  assurance: provenanceAssuranceSchema
+});
+export const readinessTargetRefSchema = readinessSourceRefSchema.pick({
+  type: true,
+  id: true,
+  version: true
+});
+export const readinessFindingSchema = z.object({
+  reasonCode: readinessReasonCodeSchema,
+  origin: z.literal("deterministic_derivation"),
+  assurance: provenanceAssuranceSchema,
+  sourceRefs: z.array(readinessSourceRefSchema).max(20),
+  caveatCodes: z.array(readinessCaveatCodeSchema).max(20)
+});
+export const readinessNextActionSchema = z.object({
+  actionCode: readinessActionCodeSchema,
+  targetRefs: z.array(readinessTargetRefSchema).max(20),
+  requiresReread: z.boolean()
+});
+export const workflowReadinessSchema = z.object({
+  status: readinessStatusSchema,
+  reasonCodes: z.array(readinessReasonCodeSchema).max(20),
+  findings: z.array(readinessFindingSchema).max(20),
+  nextActions: z.array(readinessNextActionSchema).max(20),
+  asOf: z.string().datetime()
+});
+export const workflowReadinessQuerySchema = z.object({
+  project: z.string().trim().min(1).max(120)
+});
+
 export const journalSearchQuerySchema = z.object({
   project: z.string().trim().min(1).max(120).optional(),
   source: z.string().trim().min(1).max(80).optional(),
@@ -440,6 +531,17 @@ export type VerificationOutcome = z.infer<typeof verificationOutcomeSchema>;
 export type VerificationSupport = z.infer<typeof verificationSupportSchema>;
 export type CreateVerificationRequest = z.infer<typeof createVerificationRequestSchema>;
 export type ListVerificationsQuery = z.infer<typeof listVerificationsQuerySchema>;
+export type ProvenanceOrigin = z.infer<typeof provenanceOriginSchema>;
+export type ProvenanceAssurance = z.infer<typeof provenanceAssuranceSchema>;
+export type ReadinessStatus = z.infer<typeof readinessStatusSchema>;
+export type ReadinessReasonCode = z.infer<typeof readinessReasonCodeSchema>;
+export type ReadinessActionCode = z.infer<typeof readinessActionCodeSchema>;
+export type ReadinessCaveatCode = z.infer<typeof readinessCaveatCodeSchema>;
+export type ReadinessSourceRef = z.infer<typeof readinessSourceRefSchema>;
+export type ReadinessTargetRef = z.infer<typeof readinessTargetRefSchema>;
+export type ReadinessFinding = z.infer<typeof readinessFindingSchema>;
+export type ReadinessNextAction = z.infer<typeof readinessNextActionSchema>;
+export type WorkflowReadiness = z.infer<typeof workflowReadinessSchema>;
 export type JournalSearchQuery = z.infer<typeof journalSearchQuerySchema>;
 export type AgentContextQuery = z.infer<typeof agentContextQuerySchema>;
 export type PrepareWorkQuery = z.infer<typeof prepareWorkQuerySchema>;
@@ -790,6 +892,7 @@ export type PrepareWorkResponse = {
   openLoops: PrepareWorkOpenLoop[];
   effectiveDecisions: PrepareWorkDecision[];
   latestManifest?: PrepareWorkManifestSummary;
+  readiness?: WorkflowReadiness;
   recommendations: PrepareWorkRecommendation[];
   warnings: Array<{ code: "section_truncated"; section: PrepareWorkSectionName }>;
   sections: {
@@ -836,6 +939,7 @@ export type RunManifest = {
   artifacts: Artifact[];
   verifications: VerificationEvidence[];
   recovery_receipts: RecoveryReceipt[];
+  readiness: WorkflowReadiness;
 };
 
 export type JournalSearchResults = {
