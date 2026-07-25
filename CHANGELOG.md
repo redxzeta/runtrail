@@ -1,3 +1,10 @@
+# [1.31.0](https://github.com/redxzeta/runtrail/compare/v1.30.0...v1.31.0) (2026-07-25)
+
+
+### Features
+
+* **runs:** add workflow and continuation relationships ([#147](https://github.com/redxzeta/runtrail/issues/147)) ([b1b9215](https://github.com/redxzeta/runtrail/commit/b1b92156129d8980eb5a618ade59b9f20a546653))
+
 # [1.30.0](https://github.com/redxzeta/runtrail/compare/v1.29.1...v1.30.0) (2026-07-25)
 
 
