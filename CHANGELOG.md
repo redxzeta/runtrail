@@ -1,3 +1,10 @@
+# [1.41.0](https://github.com/redxzeta/runtrail/compare/v1.40.0...v1.41.0) (2026-07-25)
+
+
+### Features
+
+* **protocol:** expose capabilities manifest ([#158](https://github.com/redxzeta/runtrail/issues/158)) ([3822390](https://github.com/redxzeta/runtrail/commit/3822390343aa983fe951f1c764198d76e6531060))
+
 # [1.40.0](https://github.com/redxzeta/runtrail/compare/v1.39.0...v1.40.0) (2026-07-25)
 
 
