@@ -40,8 +40,10 @@ import {
   updateOpenLoopRequestSchema,
   updateRunRequestSchema,
   versionedMutationRequestSchema,
+  workflowReadinessQuerySchema,
   workflowRunsQuerySchema
 } from "../shared/schemas.js";
+import { nowIso } from "../shared/time.js";
 import {
   dashboardSummary,
   decisionList,
@@ -258,7 +260,10 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
   });
 
   route.get("/runs/:id/manifest", (c) => {
-    const manifest = ledger.getRunManifest(c.req.param("id"));
+    const manifest = ledger.getRunManifest(
+      c.req.param("id"),
+      options.config.agentContext.staleAfterSeconds
+    );
 
     if (!manifest) {
       return c.json({ error: "Run not found" }, 404);
@@ -274,12 +279,35 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     if (!parsed.success) {
       return c.json(formatValidationError(parsed.error), 400);
     }
+    const asOf = nowIso();
     const result = ledger.listWorkflowRuns(c.req.param("workflowId"), parsed.data);
+    const readiness = ledger.getWorkflowReadiness(
+      c.req.param("workflowId"),
+      parsed.data.project,
+      options.config.agentContext.staleAfterSeconds,
+      asOf
+    );
     return c.json({
       workflowId: c.req.param("workflowId"),
       project: parsed.data.project,
-      ...result
+      ...result,
+      readiness
     });
+  });
+
+  route.get("/workflows/:workflowId/readiness", (c) => {
+    const parsed = workflowReadinessQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams)
+    );
+    if (!parsed.success) return c.json(formatValidationError(parsed.error), 400);
+    const readiness = ledger.getWorkflowReadiness(
+      c.req.param("workflowId"),
+      parsed.data.project,
+      options.config.agentContext.staleAfterSeconds
+    );
+    return readiness
+      ? c.json({ workflowId: c.req.param("workflowId"), project: parsed.data.project, readiness })
+      : c.json({ error: "Workflow not found" }, 404);
   });
 
   route.get("/runs/:id", (c) => {
@@ -290,7 +318,7 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     }
 
     if (wantsHtml(c.req.raw)) {
-      const manifest = ledger.getRunManifest(run.id);
+      const manifest = ledger.getRunManifest(run.id, options.config.agentContext.staleAfterSeconds);
       return c.html(page(run.task, [runDetail(run, ledger.listEventsForRun(run.id), manifest)]));
     }
 

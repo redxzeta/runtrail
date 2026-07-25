@@ -198,6 +198,7 @@ pnpm cli handoff create --source-run-id run_abc123 --from-source codex --to-sour
 pnpm cli handoff pending --project runtrail --to-source openclaw
 pnpm cli handoff accept handoff_abc123 --expected-version 1 --accepted-by openclaw --target-run-id run_def456
 pnpm cli handoff complete handoff_abc123 --expected-version 2
+pnpm cli workflow readiness --workflow-id issue-123-workflow --project runtrail
 ```
 
 Runs, open loops, and handoffs expose a `version`. Pass the last observed value as `expectedVersion`
@@ -210,6 +211,10 @@ Related runs can share a `workflowId`; child runs use `parentRunId`, while a new
 an earlier run uses `continuedFromRunId`. These links are immutable coordination facts, not
 automatic scheduling instructions. Query bounded workflow summaries through
 `GET /workflows/:workflowId/runs?project=<project>` or `journal_get_workflow`.
+These reads, targeted prepare-work, and manifests include one bounded deterministic advisory
+`readiness` projection. The statuses are `in_progress`, `blocked`, `needs_evidence`,
+`ready_for_review`, and `unknown`; provenance distinguishes client reports, server observations,
+and derivations without treating terminal status or command text as verification.
 
 Wrap a command and journal its result:
 

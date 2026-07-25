@@ -98,7 +98,7 @@ describe("cli", () => {
     );
   });
 
-  it("fetches prepare-work guidance with continuation filters", async () => {
+  it("fetches prepare-work guidance and workflow readiness", async () => {
     const fetchMock = mockFetch({ project: "runtrail", recommendations: [] });
     captureOutput();
 
@@ -119,12 +119,28 @@ describe("cli", () => {
       "--limit",
       "5"
     ]);
+    await runCli([
+      "node",
+      "rt",
+      "workflow",
+      "readiness",
+      "--workflow-id",
+      "workflow-140",
+      "--project",
+      "runtrail"
+    ]);
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
       new URL(
         "/agent/prepare-work?project=runtrail&source=codex&workKey=github%3Aredxzeta%2Fruntrail%23114&runId=run_1&tag=agent&limit=5",
         "http://runtrail.test"
       ),
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      new URL("/workflows/workflow-140/readiness?project=runtrail", "http://runtrail.test"),
       expect.any(Object)
     );
   });
