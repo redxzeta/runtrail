@@ -176,5 +176,31 @@ export const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_artifacts_run_id_created_at
     ON artifacts (run_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_artifacts_kind_created_at
-    ON artifacts (kind, created_at DESC)`
+    ON artifacts (kind, created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS ledger_changes (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_type TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    project TEXT,
+    changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_ledger_changes_type_project_sequence
+    ON ledger_changes (record_type, project, sequence)`,
+  `CREATE TRIGGER IF NOT EXISTS trg_agent_runs_change_insert AFTER INSERT ON agent_runs
+    BEGIN INSERT INTO ledger_changes (record_type, record_id, project) VALUES ('runs', NEW.id, NEW.project); END`,
+  `CREATE TRIGGER IF NOT EXISTS trg_agent_runs_change_update AFTER UPDATE ON agent_runs
+    BEGIN INSERT INTO ledger_changes (record_type, record_id, project) VALUES ('runs', NEW.id, NEW.project); END`,
+  `CREATE TRIGGER IF NOT EXISTS trg_agent_events_change_insert AFTER INSERT ON agent_events
+    BEGIN INSERT INTO ledger_changes (record_type, record_id, project)
+      SELECT 'events', NEW.id, project FROM agent_runs WHERE id = NEW.run_id; END`,
+  `CREATE TRIGGER IF NOT EXISTS trg_open_loops_change_insert AFTER INSERT ON open_loops
+    BEGIN INSERT INTO ledger_changes (record_type, record_id, project) VALUES ('openLoops', NEW.id, NEW.project); END`,
+  `CREATE TRIGGER IF NOT EXISTS trg_open_loops_change_update AFTER UPDATE ON open_loops
+    BEGIN INSERT INTO ledger_changes (record_type, record_id, project) VALUES ('openLoops', NEW.id, NEW.project); END`,
+  `CREATE TRIGGER IF NOT EXISTS trg_handoffs_change_insert AFTER INSERT ON handoffs
+    BEGIN INSERT INTO ledger_changes (record_type, record_id, project) VALUES ('handoffs', NEW.id, NEW.project); END`,
+  `CREATE TRIGGER IF NOT EXISTS trg_handoffs_change_update AFTER UPDATE ON handoffs
+    BEGIN INSERT INTO ledger_changes (record_type, record_id, project) VALUES ('handoffs', NEW.id, NEW.project); END`,
+  `CREATE TRIGGER IF NOT EXISTS trg_decisions_change_insert AFTER INSERT ON decisions
+    BEGIN INSERT INTO ledger_changes (record_type, record_id, project) VALUES ('decisions', NEW.id, NEW.project); END`
 ] as const;

@@ -2375,6 +2375,138 @@ describe("ledger routes", () => {
     ]);
   });
 
+  it("returns bounded incremental context with opaque cursors and deterministic ties", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime("2026-07-25T12:00:00.000Z");
+    const app = createTestApp();
+    const initial = (await (
+      await app.request("/agent/context?project=ice-council", { headers: authHeaders() })
+    ).json()) as { mode: string; cursor: string };
+
+    expect(initial.mode).toBe("full");
+    expect(initial.cursor).not.toContain("ice-council");
+
+    const run = (await (await postJson(app, "/runs", validRunRequest())).json()) as {
+      run: { id: string };
+    };
+    const firstEvent = (await (
+      await postJson(app, "/events", {
+        runId: run.run.id,
+        type: "progress",
+        message: "first tied event",
+        importance: 5
+      })
+    ).json()) as { event: { id: string } };
+    const secondEvent = (await (
+      await postJson(app, "/events", {
+        runId: run.run.id,
+        type: "progress",
+        message: "second tied event",
+        importance: 5
+      })
+    ).json()) as { event: { id: string } };
+    await postJson(app, "/open-loops", {
+      type: "blocked",
+      project: "ice-council",
+      title: "cursor blocker"
+    });
+    await postJson(app, "/handoffs", {
+      sourceRunId: run.run.id,
+      fromSource: "codex",
+      project: "ice-council",
+      summary: "cursor handoff"
+    });
+    await postJson(app, "/decisions", {
+      project: "ice-council",
+      title: "Cursor decision",
+      decision: "Use server sequences"
+    });
+
+    const firstDelta = (await (
+      await app.request(
+        `/agent/context?project=ice-council&limit=1&cursor=${encodeURIComponent(initial.cursor)}`,
+        { headers: authHeaders() }
+      )
+    ).json()) as {
+      mode: string;
+      cursor: string;
+      recent_runs: unknown[];
+      changes: {
+        runs: Array<{ id: string }>;
+        events: Array<{ id: string; createdAt: string }>;
+        openLoops: unknown[];
+        handoffs: unknown[];
+        decisions: unknown[];
+        sections: { events: { count: number; truncated: boolean } };
+      };
+    };
+
+    expect(firstDelta.mode).toBe("incremental");
+    expect(firstDelta.recent_runs).toEqual([]);
+    expect(firstDelta.changes.runs[0]?.id).toBe(run.run.id);
+    expect(firstDelta.changes.openLoops).toHaveLength(1);
+    expect(firstDelta.changes.handoffs).toHaveLength(1);
+    expect(firstDelta.changes.decisions).toHaveLength(1);
+    expect(firstDelta.changes.events).toEqual([
+      expect.objectContaining({
+        id: firstEvent.event.id,
+        createdAt: "2026-07-25T12:00:00.000Z"
+      })
+    ]);
+    expect(firstDelta.changes.sections.events).toEqual({ limit: 1, count: 1, truncated: true });
+    expect(JSON.stringify(firstDelta.changes)).not.toMatch(
+      /Implement the ledger API|first tied event|cursor blocker|cursor handoff|Use server sequences|\/home\/agent/
+    );
+
+    const secondDelta = (await (
+      await app.request(
+        `/agent/context?project=ice-council&limit=1&cursor=${encodeURIComponent(firstDelta.cursor)}`,
+        { headers: authHeaders() }
+      )
+    ).json()) as {
+      cursor: string;
+      changes: { events: Array<{ id: string }> };
+    };
+    expect(secondDelta.changes.events[0]?.id).toBe(secondEvent.event.id);
+
+    const noChanges = (await (
+      await app.request(
+        `/agent/context?project=ice-council&cursor=${encodeURIComponent(secondDelta.cursor)}`,
+        { headers: authHeaders() }
+      )
+    ).json()) as { changes: { events: unknown[]; runs: unknown[] } };
+    expect(noChanges.changes.events).toEqual([]);
+    expect(noChanges.changes.runs).toEqual([]);
+
+    const invalid = await app.request("/agent/context?project=ice-council&cursor=not-a-cursor", {
+      headers: authHeaders()
+    });
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toEqual(
+      expect.objectContaining({ code: "invalid_cursor", action: "retry_without_cursor" })
+    );
+
+    const prepare = (await (
+      await app.request("/agent/prepare-work?project=ice-council", { headers: authHeaders() })
+    ).json()) as { cursor: string };
+    const prepareEvent = (await (
+      await postJson(app, "/events", {
+        runId: run.run.id,
+        type: "progress",
+        message: "prepare delta",
+        importance: 5
+      })
+    ).json()) as { event: { id: string } };
+    const preparedDelta = (await (
+      await app.request(
+        `/agent/prepare-work?project=ice-council&cursor=${encodeURIComponent(prepare.cursor)}`,
+        { headers: authHeaders() }
+      )
+    ).json()) as { mode: string; changes: { events: Array<{ id: string }> } };
+    expect(preparedDelta.mode).toBe("incremental");
+    expect(preparedDelta.changes.events[0]?.id).toBe(prepareEvent.event.id);
+  });
+
   it("prepares bounded work from authoritative liveness without trusting append timestamps", async () => {
     vi.useFakeTimers();
     const db = new Database(":memory:");

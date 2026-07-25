@@ -46,7 +46,8 @@ export const mcpToolInputSchemas = {
   context: {
     project: agentContextQuerySchema.shape.project,
     limit: mcpLimitSchema,
-    min_importance: agentContextQuerySchema.shape.min_importance.optional()
+    min_importance: agentContextQuerySchema.shape.min_importance.optional(),
+    cursor: agentContextQuerySchema.shape.cursor
   },
   prepareWork: {
     project: prepareWorkQuerySchema.shape.project,
@@ -55,7 +56,8 @@ export const mcpToolInputSchemas = {
     runId: prepareWorkQuerySchema.shape.runId,
     category: prepareWorkQuerySchema.shape.category,
     tags: prepareWorkQuerySchema.shape.tags.optional(),
-    limit: prepareWorkQuerySchema.shape.limit.optional()
+    limit: prepareWorkQuerySchema.shape.limit.optional(),
+    cursor: prepareWorkQuerySchema.shape.cursor
   },
   event: {
     runId: createEventRequestSchema.shape.runId,

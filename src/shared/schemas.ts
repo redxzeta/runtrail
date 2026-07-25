@@ -301,7 +301,8 @@ export const journalSearchQuerySchema = z.object({
 export const agentContextQuerySchema = z.object({
   project: z.string().trim().min(1).max(120),
   limit: z.coerce.number().int().positive().max(50).default(10),
-  min_importance: z.coerce.number().int().min(0).max(10).default(4)
+  min_importance: z.coerce.number().int().min(0).max(10).default(4),
+  cursor: z.string().trim().min(1).max(2048).optional()
 });
 
 export const prepareWorkQuerySchema = z.object({
@@ -311,7 +312,8 @@ export const prepareWorkQuerySchema = z.object({
   runId: z.string().trim().min(1).max(255).optional(),
   category: categorySchema,
   tags: z.array(tagSchema).max(10).default([]),
-  limit: z.coerce.number().int().positive().max(20).default(10)
+  limit: z.coerce.number().int().positive().max(20).default(10),
+  cursor: z.string().trim().min(1).max(2048).optional()
 });
 
 export type RunStatus = z.infer<typeof runStatusSchema>;
@@ -481,6 +483,66 @@ export type AgentContext = {
   open_loops: OpenLoop[];
   decisions: Decision[];
   next_actions: string[];
+  mode: "full" | "incremental";
+  cursor: string;
+  changes?: IncrementalContextChanges;
+};
+
+export type IncrementalContextChanges = {
+  runs: Array<
+    Pick<
+      AgentRun,
+      | "id"
+      | "source"
+      | "project"
+      | "workKey"
+      | "workflowId"
+      | "parentRunId"
+      | "continuedFromRunId"
+      | "status"
+      | "category"
+      | "tags"
+      | "version"
+      | "startedAt"
+      | "updatedAt"
+    >
+  >;
+  events: Array<
+    Pick<AgentEvent, "id" | "runId" | "type" | "importance" | "category" | "tags" | "createdAt">
+  >;
+  openLoops: Array<
+    Pick<
+      OpenLoop,
+      | "id"
+      | "type"
+      | "project"
+      | "owner"
+      | "source"
+      | "sourceRunId"
+      | "status"
+      | "version"
+      | "updatedAt"
+    >
+  >;
+  handoffs: Array<
+    Pick<
+      Handoff,
+      | "id"
+      | "sourceRunId"
+      | "fromSource"
+      | "toSource"
+      | "project"
+      | "status"
+      | "targetRunId"
+      | "version"
+      | "updatedAt"
+    >
+  >;
+  decisions: Array<Pick<Decision, "id" | "project" | "createdAt">>;
+  sections: Record<
+    "runs" | "events" | "openLoops" | "handoffs" | "decisions",
+    { limit: number; count: number; truncated: boolean }
+  >;
 };
 
 export type RunFreshness = {
@@ -586,6 +648,9 @@ export type PrepareWorkResponse = {
   project: string;
   asOf: string;
   staleAfterSeconds: number;
+  mode: "full" | "incremental";
+  cursor: string;
+  changes?: IncrementalContextChanges;
   selectedRun?: PrepareWorkRunSummary;
   relevantRuns: PrepareWorkRunSummary[];
   workflowRuns: PrepareWorkRunSummary[];

@@ -153,6 +153,24 @@ Use `journal_search`, `journal_get_context`, and `journal_get_run_manifest` only
 prepare-work recommendation calls for more detail. A recommendation is advisory and never performs
 a mutation.
 
+## Incremental Context
+
+`journal_get_context` and `journal_prepare_work` return an opaque versioned `cursor`. Supplying that
+cursor on the next read returns `mode: "incremental"` and a bounded `changes` envelope for runs,
+events, open loops, handoffs, and decisions. Context incremental mode leaves the legacy full-context
+arrays empty; prepare-work retains its bounded current safety snapshot so recommendations never rely
+on partial state.
+
+Cursors are scoped to the normalized query and contain only a version, a query fingerprint, and
+server-owned numeric change positions. They contain no record data, timestamps, database paths, or
+SQL. Limits may change between reads without invalidating a cursor. When a section is truncated,
+use the returned cursor again until that section is empty. Server sequences and record-ID
+tie-breakers prevent equal or client-dated timestamps from skipping or repeating records.
+
+An invalid, unsupported, or wrong-query cursor returns `invalid_cursor` with
+`action: "retry_without_cursor"`. Restart with a full read rather than guessing or editing the
+cursor.
+
 ## Copyable Snippets
 
 Codex `AGENTS.md` snippet:

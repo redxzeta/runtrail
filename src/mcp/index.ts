@@ -289,6 +289,7 @@ export async function callRuntrailTool(
       });
       appendOptional(query, "limit", args.limit ?? 10);
       appendOptional(query, "min_importance", args.min_importance);
+      appendOptional(query, "cursor", args.cursor);
       return await client.requestJson(`/agent/context?${query.toString()}`);
     }
     case "journal_prepare_work": {
@@ -303,6 +304,7 @@ export async function callRuntrailTool(
         }
       }
       appendOptional(query, "limit", args.limit);
+      appendOptional(query, "cursor", args.cursor);
       return await client.requestJson(`/agent/prepare-work?${query.toString()}`);
     }
     case "journal_create_event":
