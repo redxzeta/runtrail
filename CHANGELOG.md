@@ -1,3 +1,10 @@
+# [1.36.0](https://github.com/redxzeta/runtrail/compare/v1.35.0...v1.36.0) (2026-07-25)
+
+
+### Features
+
+* **runs:** record agent provenance ([#152](https://github.com/redxzeta/runtrail/issues/152)) ([dd51dd8](https://github.com/redxzeta/runtrail/commit/dd51dd8c4244749aa55d324b7cc0997831474d94))
+
 # [1.35.0](https://github.com/redxzeta/runtrail/compare/v1.34.0...v1.35.0) (2026-07-25)
 
 
