@@ -1,3 +1,10 @@
+# [1.34.0](https://github.com/redxzeta/runtrail/compare/v1.33.0...v1.34.0) (2026-07-25)
+
+
+### Features
+
+* **context:** add incremental context cursors ([#150](https://github.com/redxzeta/runtrail/issues/150)) ([0e2055c](https://github.com/redxzeta/runtrail/commit/0e2055c68f2696b956387818b071051fabaf2a3c)), closes [#115](https://github.com/redxzeta/runtrail/issues/115)
+
 # [1.33.0](https://github.com/redxzeta/runtrail/compare/v1.32.0...v1.33.0) (2026-07-25)
 
 
