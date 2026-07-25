@@ -1,3 +1,10 @@
+# [1.35.0](https://github.com/redxzeta/runtrail/compare/v1.34.0...v1.35.0) (2026-07-25)
+
+
+### Features
+
+* **client:** add durable local write outbox ([#151](https://github.com/redxzeta/runtrail/issues/151)) ([8daea2a](https://github.com/redxzeta/runtrail/commit/8daea2a38dc0297062c7e505a46ed04da2f765d1)), closes [#117](https://github.com/redxzeta/runtrail/issues/117)
+
 # [1.34.0](https://github.com/redxzeta/runtrail/compare/v1.33.0...v1.34.0) (2026-07-25)
 
 
