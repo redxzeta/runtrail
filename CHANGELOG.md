@@ -1,3 +1,10 @@
+# [1.30.0](https://github.com/redxzeta/runtrail/compare/v1.29.1...v1.30.0) (2026-07-25)
+
+
+### Features
+
+* **concurrency:** reject stale mutable-record updates ([#146](https://github.com/redxzeta/runtrail/issues/146)) ([d0bf7aa](https://github.com/redxzeta/runtrail/commit/d0bf7aa956ca0530038e5851282c451af1c35247))
+
 ## [1.29.1](https://github.com/redxzeta/runtrail/compare/v1.29.0...v1.29.1) (2026-07-13)
 
 
