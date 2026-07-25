@@ -31,7 +31,9 @@ import type {
   RunConflict,
   RunManifest,
   UpdateOpenLoopRequest,
-  UpdateRunRequest
+  UpdateRunRequest,
+  WorkflowRunSummary,
+  WorkflowRunsQuery
 } from "../shared/schemas.js";
 import { nowIso } from "../shared/time.js";
 import {
@@ -95,6 +97,17 @@ export class VersionConflictError extends Error {
   }
 }
 
+export class RunRelationshipError extends Error {
+  constructor(
+    readonly code: "missing_reference" | "project_mismatch" | "workflow_mismatch",
+    readonly field: "parentRunId" | "continuedFromRunId" | "workflowId",
+    readonly referenceId: string
+  ) {
+    super(`Invalid ${field}: ${code}`);
+    this.name = "RunRelationshipError";
+  }
+}
+
 export class LedgerRepository {
   constructor(private readonly db: Database.Database) {}
 
@@ -104,6 +117,14 @@ export class LedgerRepository {
     recovery?: RecoveryReceipt;
     conflicts: RunConflict[];
   } {
+    if (input.clientRunId) {
+      const existing = this.findRunByClientRunId(input.source, input.project, input.clientRunId);
+      if (existing) {
+        return this.recoverExistingRun(existing);
+      }
+    }
+
+    const relationships = this.resolveRunRelationships(input);
     const timestamp = nowIso();
     const tags = normalizeTags(input.tags);
     const run: AgentRun = {
@@ -112,6 +133,7 @@ export class LedgerRepository {
       project: input.project,
       clientRunId: input.clientRunId,
       workKey: input.workKey,
+      ...relationships,
       task: input.task,
       status: input.status,
       hostname: input.hostname,
@@ -137,6 +159,9 @@ export class LedgerRepository {
             project,
             client_run_id,
             work_key,
+            workflow_id,
+            parent_run_id,
+            continued_from_run_id,
             task,
             status,
             hostname,
@@ -158,6 +183,9 @@ export class LedgerRepository {
             @project,
             @clientRunId,
             @workKey,
+            @workflowId,
+            @parentRunId,
+            @continuedFromRunId,
             @task,
             @status,
             @hostname,
@@ -179,6 +207,9 @@ export class LedgerRepository {
           ...run,
           clientRunId: toSqlValue(run.clientRunId),
           workKey: toSqlValue(run.workKey),
+          workflowId: toSqlValue(run.workflowId),
+          parentRunId: toSqlValue(run.parentRunId),
+          continuedFromRunId: toSqlValue(run.continuedFromRunId),
           hostname: toSqlValue(run.hostname),
           cwd: toSqlValue(run.cwd),
           gitRepoPath: toSqlValue(run.gitRepoPath),
@@ -210,15 +241,7 @@ export class LedgerRepository {
         throw error;
       }
 
-      const action = existing.status === "running" ? "reuse" : "reopen";
-      const recovery = this.recordRecovery(existing, action);
-      this.ensureRecoveryOutcome(existing, recovery);
-      return {
-        run: existing,
-        created: false,
-        recovery,
-        conflicts: this.findActiveWorkConflicts(existing)
-      };
+      return this.recoverExistingRun(existing);
     }
   }
 
@@ -467,6 +490,31 @@ export class LedgerRepository {
     return rows.map(mapRunRow);
   }
 
+  listWorkflowRuns(
+    workflowId: string,
+    query: WorkflowRunsQuery
+  ): { runs: WorkflowRunSummary[]; truncated: boolean } {
+    const rows = this.db
+      .prepare(
+        `SELECT *
+        FROM agent_runs
+        WHERE project = @project AND workflow_id = @workflowId
+        ORDER BY started_at ASC, id ASC
+        LIMIT @limit`
+      )
+      .all({
+        project: query.project,
+        workflowId,
+        limit: query.limit + 1
+      }) as RunRow[];
+    const truncated = rows.length > query.limit;
+
+    return {
+      runs: rows.slice(0, query.limit).map(mapRunRow).map(toWorkflowRunSummary),
+      truncated
+    };
+  }
+
   private findActiveWorkConflicts(run: AgentRun): RunConflict[] {
     if (!run.workKey) return [];
 
@@ -502,6 +550,59 @@ export class LedgerRepository {
     return row ? mapRunRow(row) : undefined;
   }
 
+  private resolveRunRelationships(
+    input: CreateRunRequest
+  ): Pick<AgentRun, "workflowId" | "parentRunId" | "continuedFromRunId"> {
+    const references = [
+      ["parentRunId", input.parentRunId],
+      ["continuedFromRunId", input.continuedFromRunId]
+    ] as const;
+    const referencedRuns: Array<{
+      field: "parentRunId" | "continuedFromRunId";
+      run: AgentRun;
+    }> = [];
+
+    for (const [field, referenceId] of references) {
+      if (!referenceId) continue;
+      const run = this.getRun(referenceId);
+      if (!run) {
+        throw new RunRelationshipError("missing_reference", field, referenceId);
+      }
+      if (run.project !== input.project) {
+        throw new RunRelationshipError("project_mismatch", field, referenceId);
+      }
+      referencedRuns.push({ field, run });
+    }
+
+    const referencedWorkflowIds = [
+      ...new Set(
+        referencedRuns
+          .map(({ run }) => run.workflowId)
+          .filter((workflowId): workflowId is string => workflowId !== undefined)
+      )
+    ];
+    if (referencedWorkflowIds.length > 1) {
+      const reference = referencedRuns.find(
+        ({ run }) => run.workflowId !== referencedWorkflowIds[0]
+      );
+      throw new RunRelationshipError(
+        "workflow_mismatch",
+        reference?.field ?? "workflowId",
+        reference?.run.id ?? input.workflowId ?? ""
+      );
+    }
+    const referencedWorkflowId = referencedWorkflowIds[0];
+    if (input.workflowId && referencedWorkflowId && input.workflowId !== referencedWorkflowId) {
+      throw new RunRelationshipError("workflow_mismatch", "workflowId", input.workflowId);
+    }
+
+    return {
+      workflowId: input.workflowId ?? referencedWorkflowId,
+      parentRunId: input.parentRunId,
+      continuedFromRunId: input.continuedFromRunId
+    };
+  }
+
   private findRunByClientRunId(
     source: string,
     project: string,
@@ -514,6 +615,23 @@ export class LedgerRepository {
       )
       .get(source, project, clientRunId) as RunRow | undefined;
     return row ? mapRunRow(row) : undefined;
+  }
+
+  private recoverExistingRun(existing: AgentRun): {
+    run: AgentRun;
+    created: false;
+    recovery: RecoveryReceipt;
+    conflicts: RunConflict[];
+  } {
+    const action = existing.status === "running" ? "reuse" : "reopen";
+    const recovery = this.recordRecovery(existing, action);
+    this.ensureRecoveryOutcome(existing, recovery);
+    return {
+      run: existing,
+      created: false,
+      recovery,
+      conflicts: this.findActiveWorkConflicts(existing)
+    };
   }
 
   private recordRecovery(
@@ -1453,6 +1571,22 @@ type LifecycleResult = { run: AgentRun; error?: never } | { run?: never; error: 
 
 function isTerminal(status: AgentRun["status"]): boolean {
   return ["completed", "failed", "cancelled"].includes(status);
+}
+
+function toWorkflowRunSummary(run: AgentRun): WorkflowRunSummary {
+  return {
+    id: run.id,
+    source: run.source,
+    project: run.project,
+    task: run.task,
+    status: run.status,
+    workflowId: run.workflowId,
+    parentRunId: run.parentRunId,
+    continuedFromRunId: run.continuedFromRunId,
+    version: run.version,
+    startedAt: run.startedAt,
+    updatedAt: run.updatedAt
+  };
 }
 
 function assertExpectedVersion(

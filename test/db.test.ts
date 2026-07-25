@@ -24,6 +24,9 @@ describe("database", () => {
     const concurrencyMigration = db
       .prepare("SELECT name FROM schema_migrations WHERE id = ?")
       .get(4) as { name: string } | undefined;
+    const workflowMigration = db
+      .prepare("SELECT name FROM schema_migrations WHERE id = ?")
+      .get(5) as { name: string } | undefined;
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as Array<{ name: string }>;
@@ -36,6 +39,7 @@ describe("database", () => {
     expect(migration?.name).toBe("001_initial_schema");
     expect(idempotencyMigration?.name).toBe("002_append_record_idempotency");
     expect(concurrencyMigration?.name).toBe("004_optimistic_concurrency");
+    expect(workflowMigration?.name).toBe("005_workflow_relationships");
     expect(tables.map((table) => table.name)).toEqual([
       "agent_event_tags",
       "agent_events",
@@ -56,6 +60,9 @@ describe("database", () => {
     expect(indexes.map((index) => index.name)).toContain("idx_handoff_tags_tag_handoff_id");
     expect(indexes.map((index) => index.name)).toContain("idx_agent_runs_client_run_id");
     expect(indexes.map((index) => index.name)).toContain("idx_agent_runs_project_work_key_status");
+    expect(indexes.map((index) => index.name)).toContain(
+      "idx_agent_runs_project_workflow_started_at"
+    );
     expect(indexes.map((index) => index.name)).toContain("idx_agent_events_client_record_id");
   });
 
@@ -167,7 +174,16 @@ describe("database", () => {
     db.close();
 
     expect(runColumns.map((column) => column.name)).toEqual(
-      expect.arrayContaining(["category", "tags_json", "client_run_id", "work_key", "version"])
+      expect.arrayContaining([
+        "category",
+        "tags_json",
+        "client_run_id",
+        "work_key",
+        "workflow_id",
+        "parent_run_id",
+        "continued_from_run_id",
+        "version"
+      ])
     );
     expect(eventColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining([

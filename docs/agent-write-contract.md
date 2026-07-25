@@ -44,6 +44,24 @@ last-write-wins behavior. New and upgraded clients should provide it. A stale pr
 `updatedAt` fields, plus `action: "reread"`. On conflict, reread the record and decide whether the
 mutation is still valid; do not retry blindly with a substituted version.
 
+## Workflow Relationships
+
+Runs may declare three immutable relationships at creation:
+
+- `workflowId` groups planning, implementation, review, retry, and continuation runs under one
+  caller-selected stable identifier.
+- `parentRunId` identifies the run that delegated or spawned this child run.
+- `continuedFromRunId` identifies the previous run whose work this new run continues.
+
+Parent and continuation references must already exist in the same project. A linked run inherits the
+referenced run's `workflowId` when the caller omits one; conflicting workflow IDs are rejected.
+Because relationships are create-time-only and point to existing runs, API-created relationship
+cycles cannot occur. Retrying `POST /runs` with the same `clientRunId` returns the original run and
+is not a continuation; create a new run with `continuedFromRunId` for a new agent session.
+
+Use `GET /workflows/:workflowId/runs?project=<project>` or `journal_get_workflow` for a bounded,
+oldest-first summary of the related runs.
+
 Automatic session creation records an allowlisted recovery receipt in the selected run manifest.
 Receipts identify the client session, normalized workspace, selected run, action, optional previous
 run, and bounded stale reason. `create_new`, `reuse`, `reopen`, and `mark_stale` decisions remain

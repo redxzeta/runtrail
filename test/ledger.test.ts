@@ -277,6 +277,216 @@ describe("ledger routes", () => {
     expect(afterTerminal.conflicts).toEqual([]);
   });
 
+  it("links child and continuation runs in a bounded deterministic workflow", async () => {
+    const app = createTestApp();
+    const workflowId = "workflow-issue-112";
+    const root = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        task: "Plan work",
+        workflowId,
+        startedAt: "2026-07-01T09:00:00.000Z"
+      })
+    ).json()) as {
+      run: { id: string; workflowId: string; parentRunId?: string; continuedFromRunId?: string };
+    };
+    const child = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        task: "Implement work",
+        parentRunId: root.run.id,
+        startedAt: "2026-07-01T10:00:00.000Z"
+      })
+    ).json()) as {
+      run: { id: string; workflowId: string; parentRunId: string };
+    };
+    const continuation = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        task: "Continue work",
+        continuedFromRunId: child.run.id,
+        startedAt: "2026-07-01T11:00:00.000Z"
+      })
+    ).json()) as {
+      run: { id: string; workflowId: string; continuedFromRunId: string };
+    };
+
+    expect(root.run).toEqual(expect.objectContaining({ workflowId }));
+    expect(root.run).not.toHaveProperty("parentRunId");
+    expect(root.run).not.toHaveProperty("continuedFromRunId");
+    expect(child.run).toEqual(expect.objectContaining({ workflowId, parentRunId: root.run.id }));
+    expect(continuation.run).toEqual(
+      expect.objectContaining({ workflowId, continuedFromRunId: child.run.id })
+    );
+
+    const bounded = await app.request(`/workflows/${workflowId}/runs?project=ice-council&limit=2`, {
+      headers: authHeaders()
+    });
+    expect(await bounded.json()).toEqual({
+      workflowId,
+      project: "ice-council",
+      runs: [
+        expect.objectContaining({ id: root.run.id, task: "Plan work" }),
+        expect.objectContaining({
+          id: child.run.id,
+          task: "Implement work",
+          parentRunId: root.run.id
+        })
+      ],
+      truncated: true
+    });
+
+    const complete = (await (
+      await app.request(`/workflows/${workflowId}/runs?project=ice-council`, {
+        headers: authHeaders()
+      })
+    ).json()) as { runs: Array<{ id: string }>; truncated: boolean };
+    expect(complete.runs.map(({ id }) => id)).toEqual([
+      root.run.id,
+      child.run.id,
+      continuation.run.id
+    ]);
+    expect(complete.truncated).toBe(false);
+
+    const manifest = (await (
+      await app.request(`/runs/${continuation.run.id}/manifest`, { headers: authHeaders() })
+    ).json()) as {
+      manifest: { run: { workflowId: string; continuedFromRunId: string } };
+    };
+    const search = (await (
+      await app.request("/search?project=ice-council&text=Continue%20work", {
+        headers: authHeaders()
+      })
+    ).json()) as {
+      results: { runs: Array<{ workflowId: string; continuedFromRunId: string }> };
+    };
+    const context = (await (
+      await app.request("/agent/context?project=ice-council", { headers: authHeaders() })
+    ).json()) as {
+      recent_runs: Array<{ id: string; workflowId?: string }>;
+    };
+    expect(manifest.manifest.run).toEqual(
+      expect.objectContaining({
+        workflowId,
+        continuedFromRunId: child.run.id
+      })
+    );
+    expect(search.results.runs).toEqual([
+      expect.objectContaining({
+        workflowId,
+        continuedFromRunId: child.run.id
+      })
+    ]);
+    expect(context.recent_runs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: root.run.id, workflowId }),
+        expect.objectContaining({ id: child.run.id, workflowId }),
+        expect.objectContaining({ id: continuation.run.id, workflowId })
+      ])
+    );
+  });
+
+  it("rejects invalid run relationships without changing existing runs", async () => {
+    const app = createTestApp();
+    const root = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        workflowId: "workflow-a"
+      })
+    ).json()) as { run: { id: string } };
+    const otherProject = (await (
+      await postJson(app, "/runs", {
+        ...validRunRequest(),
+        project: "other-project",
+        workflowId: "workflow-a"
+      })
+    ).json()) as { run: { id: string } };
+
+    for (const [payload, expected] of [
+      [
+        { parentRunId: "run_missing" },
+        {
+          code: "missing_reference",
+          field: "parentRunId",
+          referenceId: "run_missing"
+        }
+      ],
+      [
+        { parentRunId: otherProject.run.id },
+        {
+          code: "project_mismatch",
+          field: "parentRunId",
+          referenceId: otherProject.run.id
+        }
+      ],
+      [
+        { parentRunId: root.run.id, workflowId: "workflow-b" },
+        {
+          code: "workflow_mismatch",
+          field: "workflowId",
+          referenceId: "workflow-b"
+        }
+      ],
+      [
+        { id: "run_self", parentRunId: "run_self" },
+        {
+          code: "missing_reference",
+          field: "parentRunId",
+          referenceId: "run_self"
+        }
+      ]
+    ] as const) {
+      const response = await postJson(app, "/runs", {
+        ...validRunRequest(),
+        ...payload
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "Invalid run relationship",
+        ...expected
+      });
+    }
+
+    const immutable = await app.request(`/runs/${root.run.id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ expectedVersion: 1, parentRunId: root.run.id })
+    });
+    expect(immutable.status).toBe(400);
+    const fetched = (await (
+      await app.request(`/runs/${root.run.id}`, { headers: authHeaders() })
+    ).json()) as { run: { workflowId: string; parentRunId?: string; version: number } };
+    expect(fetched.run).toEqual(expect.objectContaining({ workflowId: "workflow-a", version: 1 }));
+    expect(fetched.run).not.toHaveProperty("parentRunId");
+  });
+
+  it("keeps unlinked and idempotently replayed runs compatible", async () => {
+    const app = createTestApp();
+    const first = await postJson(app, "/runs", {
+      ...validRunRequest(),
+      clientRunId: "relationship-replay"
+    });
+    const firstBody = (await first.json()) as {
+      run: { id: string; workflowId?: string; parentRunId?: string; continuedFromRunId?: string };
+    };
+    const replay = await postJson(app, "/runs", {
+      ...validRunRequest(),
+      clientRunId: "relationship-replay",
+      parentRunId: "run_missing"
+    });
+    const replayBody = (await replay.json()) as {
+      run: { id: string; workflowId?: string; parentRunId?: string; continuedFromRunId?: string };
+    };
+
+    expect(first.status).toBe(201);
+    expect(replay.status).toBe(200);
+    expect(replayBody.run.id).toBe(firstBody.run.id);
+    expect(replayBody.run).not.toHaveProperty("workflowId");
+    expect(firstBody.run).not.toHaveProperty("workflowId");
+    expect(firstBody.run).not.toHaveProperty("parentRunId");
+    expect(firstBody.run).not.toHaveProperty("continuedFromRunId");
+  });
+
   it("creates exactly one run for concurrent requests with the same client identity", async () => {
     const app = createTestApp();
     const payload = { ...validRunRequest(), clientRunId: "concurrent-session" };

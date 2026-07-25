@@ -13,7 +13,8 @@ import {
   pauseRunRequestSchema,
   runStatusSchema,
   updateOpenLoopRequestSchema,
-  versionedMutationRequestSchema
+  versionedMutationRequestSchema,
+  workflowRunsQuerySchema
 } from "../shared/schemas.js";
 
 const idSchema = z.string().trim().min(1);
@@ -25,6 +26,9 @@ export const mcpToolInputSchemas = {
     project: createRunRequestSchema.shape.project,
     clientRunId: createRunRequestSchema.shape.clientRunId,
     workKey: createRunRequestSchema.shape.workKey,
+    workflowId: createRunRequestSchema.shape.workflowId,
+    parentRunId: createRunRequestSchema.shape.parentRunId,
+    continuedFromRunId: createRunRequestSchema.shape.continuedFromRunId,
     task: createRunRequestSchema.shape.task,
     cwd: createRunRequestSchema.shape.cwd,
     gitRepoPath: createRunRequestSchema.shape.gitRepoPath,
@@ -81,6 +85,11 @@ export const mcpToolInputSchemas = {
     status: listRunsQuerySchema.shape.status,
     category: listRunsQuerySchema.shape.category,
     tag: listRunsQuerySchema.shape.tag,
+    limit: mcpLimitSchema
+  },
+  workflow: {
+    workflowId: idSchema,
+    project: workflowRunsQuerySchema.shape.project,
     limit: mcpLimitSchema
   },
   handoff: {

@@ -43,6 +43,9 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--task <task>", "Task summary")
     .option("--client-run-id <clientRunId>", "Stable client session identifier")
     .option("--work-key <workKey>", "Canonical external work identifier")
+    .option("--workflow-id <workflowId>", "Stable workflow identifier")
+    .option("--parent-run-id <parentRunId>", "Delegating or spawning parent run")
+    .option("--continued-from-run-id <continuedFromRunId>", "Previous run being continued")
     .option("--status <status>", "Initial status")
     .option("--summary <summary>", "Run summary")
     .option("--category <category>", "Run category")
@@ -191,6 +194,9 @@ async function createRun(options: {
   task: string;
   clientRunId?: string;
   workKey?: string;
+  workflowId?: string;
+  parentRunId?: string;
+  continuedFromRunId?: string;
   status?: string;
   summary?: string;
   category?: string;
@@ -204,6 +210,9 @@ async function createRun(options: {
         project: options.project,
         clientRunId: options.clientRunId,
         workKey: options.workKey,
+        workflowId: options.workflowId,
+        parentRunId: options.parentRunId,
+        continuedFromRunId: options.continuedFromRunId,
         task: options.task,
         status: options.status,
         summary: options.summary,
@@ -240,6 +249,9 @@ async function wrapRun(
     source: string;
     project: string;
     task: string;
+    workflowId?: string;
+    parentRunId?: string;
+    continuedFromRunId?: string;
     category?: string;
     tags?: string[];
   }
@@ -265,6 +277,9 @@ async function wrapRun(
       source: options.source,
       project: options.project,
       task: options.task,
+      workflowId: options.workflowId,
+      parentRunId: options.parentRunId,
+      continuedFromRunId: options.continuedFromRunId,
       hostname: hostname(),
       cwd,
       gitRepoPath: gitBefore.repoPath,
@@ -356,6 +371,9 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
     project?: string;
     tag?: string[];
     task?: string;
+    workflowId?: string;
+    parentRunId?: string;
+    continuedFromRunId?: string;
   } = {};
   const command: string[] = [];
   let parsingCommand = false;
@@ -377,7 +395,10 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
       value === "--source" ||
       value === "--project" ||
       value === "--task" ||
-      value === "--category"
+      value === "--category" ||
+      value === "--workflow-id" ||
+      value === "--parent-run-id" ||
+      value === "--continued-from-run-id"
     ) {
       const next = args[index + 1];
 
@@ -391,6 +412,12 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
         options.project = next;
       } else if (value === "--task") {
         options.task = next;
+      } else if (value === "--workflow-id") {
+        options.workflowId = next;
+      } else if (value === "--parent-run-id") {
+        options.parentRunId = next;
+      } else if (value === "--continued-from-run-id") {
+        options.continuedFromRunId = next;
       } else {
         options.category = next;
       }
@@ -419,6 +446,9 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
     project: options.project ?? "",
     task: options.task ?? "",
     category: options.category,
+    workflowId: options.workflowId,
+    parentRunId: options.parentRunId,
+    continuedFromRunId: options.continuedFromRunId,
     tags: optionTags(options.tag)
   });
 }

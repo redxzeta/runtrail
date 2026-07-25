@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type Database from "better-sqlite3";
 import { type Context, Hono } from "hono";
 import type { RuntrailConfig } from "../config.js";
-import { LedgerRepository, VersionConflictError } from "../db/ledger.js";
+import { LedgerRepository, RunRelationshipError, VersionConflictError } from "../db/ledger.js";
 import {
   type AgentEvent,
   type AgentRun,
@@ -26,7 +26,8 @@ import {
   pauseRunRequestSchema,
   updateOpenLoopRequestSchema,
   updateRunRequestSchema,
-  versionedMutationRequestSchema
+  versionedMutationRequestSchema,
+  workflowRunsQuerySchema
 } from "../shared/schemas.js";
 import {
   dashboardSummary,
@@ -138,11 +139,26 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
       return c.json(formatValidationError(parsed.error), 400);
     }
 
-    const result = ledger.createRun(parsed.data);
-    return c.json(
-      { run: result.run, recovery: result.recovery, conflicts: result.conflicts },
-      result.created ? 201 : 200
-    );
+    try {
+      const result = ledger.createRun(parsed.data);
+      return c.json(
+        { run: result.run, recovery: result.recovery, conflicts: result.conflicts },
+        result.created ? 201 : 200
+      );
+    } catch (error) {
+      if (error instanceof RunRelationshipError) {
+        return c.json(
+          {
+            error: "Invalid run relationship",
+            code: error.code,
+            field: error.field,
+            referenceId: error.referenceId
+          },
+          400
+        );
+      }
+      throw error;
+    }
   });
 
   route.post("/runs/close-stale", async (c) => {
@@ -236,6 +252,21 @@ export function createLedgerRoute(options: LedgerRouteOptions): Hono {
     }
 
     return c.json({ manifest });
+  });
+
+  route.get("/workflows/:workflowId/runs", (c) => {
+    const parsed = workflowRunsQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams)
+    );
+    if (!parsed.success) {
+      return c.json(formatValidationError(parsed.error), 400);
+    }
+    const result = ledger.listWorkflowRuns(c.req.param("workflowId"), parsed.data);
+    return c.json({
+      workflowId: c.req.param("workflowId"),
+      project: parsed.data.project,
+      ...result
+    });
   });
 
   route.get("/runs/:id", (c) => {

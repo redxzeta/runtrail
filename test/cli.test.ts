@@ -109,6 +109,12 @@ describe("cli", () => {
       "ship cli",
       "--client-run-id",
       "session-82",
+      "--workflow-id",
+      "workflow-112",
+      "--parent-run-id",
+      "run_parent",
+      "--continued-from-run-id",
+      "run_previous",
       "--category",
       "implementation",
       "--tag",
@@ -227,6 +233,9 @@ describe("cli", () => {
           source: "codex",
           project: "runtrail",
           clientRunId: "session-82",
+          workflowId: "workflow-112",
+          parentRunId: "run_parent",
+          continuedFromRunId: "run_previous",
           task: "ship cli",
           category: "implementation",
           tags: ["cli", "metadata"]
@@ -518,6 +527,10 @@ describe("cli", () => {
       "wrapper success",
       "--category",
       "implementation",
+      "--workflow-id",
+      "workflow-112",
+      "--continued-from-run-id",
+      "run_previous",
       "--tag",
       "codex",
       "--tag",
@@ -545,9 +558,13 @@ describe("cli", () => {
     const createRunBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
       category?: string;
       tags?: string[];
+      workflowId?: string;
+      continuedFromRunId?: string;
     };
     expect(createRunBody.category).toBe("implementation");
     expect(createRunBody.tags).toEqual(["codex", "issue-72"]);
+    expect(createRunBody.workflowId).toBe("workflow-112");
+    expect(createRunBody.continuedFromRunId).toBe("run_previous");
     const eventBodies = fetchMock.mock.calls
       .filter(([url]) => (url as URL).pathname === "/events")
       .map(([, init]) => JSON.parse(String(init?.body)) as Record<string, unknown>);
