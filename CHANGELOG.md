@@ -1,3 +1,10 @@
+# [1.39.0](https://github.com/redxzeta/runtrail/compare/v1.38.0...v1.39.0) (2026-07-25)
+
+
+### Features
+
+* **readiness:** add advisory workflow readiness ([#156](https://github.com/redxzeta/runtrail/issues/156)) ([8653a1c](https://github.com/redxzeta/runtrail/commit/8653a1c44d0f43d6a5ae84a5eaac08c83c8acf86))
+
 # [1.38.0](https://github.com/redxzeta/runtrail/compare/v1.37.0...v1.38.0) (2026-07-25)
 
 
