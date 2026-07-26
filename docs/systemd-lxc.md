@@ -10,7 +10,7 @@ sudo apt-get install -y ca-certificates curl git g++ make python3
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 sudo corepack enable
-sudo corepack prepare pnpm@11.5.2 --activate
+sudo corepack prepare pnpm@11.17.0 --activate
 
 sudo useradd --system --home /opt/runtrail --shell /usr/sbin/nologin runtrail
 sudo mkdir -p /opt/runtrail /etc/runtrail /var/lib/runtrail /var/log/runtrail

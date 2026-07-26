@@ -7,7 +7,7 @@ checkout.
 ## Prerequisites
 
 - Node.js 22.
-- pnpm 11.5.2. Use pnpm only.
+- pnpm 11.17.0. Use pnpm only.
 - Git.
 
 From a clean clone:
