@@ -5,6 +5,7 @@ import {
   getDefaultEnvironment,
   StdioClientTransport
 } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRuntrailMcpBridgeServer, loadBridgeConfig } from "../src/mcp/bridge.js";
 import {
@@ -22,37 +23,24 @@ describe("mcp adapter", () => {
     vi.restoreAllMocks();
   });
 
-  it("constructs the MCP server with the requested tool set", () => {
-    const server = createRuntrailMcpServer(mockClient({ ok: true }));
+  it("keeps direct and bridge registrations aligned with the authoritative tool set", () => {
+    const directNames = registeredToolNames(() =>
+      createRuntrailMcpServer(mockClient({ ok: true }))
+    );
+    const bridgeNames = registeredToolNames(() =>
+      createRuntrailMcpBridgeServer({ callTool: vi.fn() })
+    );
+    const expectedNames = [...runtrailToolNames].sort();
 
-    expect(server).toBeDefined();
-    expect(runtrailToolNames).toEqual([
-      "journal_start_run",
-      "journal_resume_run",
-      "journal_heartbeat_run",
-      "journal_pause_run",
-      "journal_finish_run",
-      "journal_get_context",
-      "journal_prepare_work",
-      "journal_create_event",
-      "journal_record_verification",
-      "journal_create_open_loop",
-      "journal_resolve_open_loop",
-      "journal_record_decision",
-      "journal_list_decisions",
-      "journal_create_handoff",
-      "journal_list_pending_handoffs",
-      "journal_accept_handoff",
-      "journal_decline_handoff",
-      "journal_complete_handoff",
-      "journal_expire_handoff",
-      "journal_get_run_manifest",
-      "journal_get_workflow",
-      "journal_get_workflow_review_packet",
-      "journal_get_capabilities",
-      "journal_search",
-      "journal_search_runs"
-    ]);
+    for (const [surface, names] of [
+      ["direct", directNames],
+      ["bridge", bridgeNames]
+    ] as const) {
+      expect(names.length, `${surface} server registers duplicate tool names`).toBe(
+        new Set(names).size
+      );
+      expect([...names].sort(), `${surface} server registered tool set`).toEqual(expectedNames);
+    }
   });
 
   it("maps explicit lifecycle tools to narrow HTTP endpoints", async () => {
@@ -547,15 +535,6 @@ describe("mcp adapter", () => {
     );
   });
 
-  it("constructs the bridge server with the Runtrail tool set", () => {
-    const server = createRuntrailMcpBridgeServer({
-      callTool: vi.fn()
-    });
-
-    expect(server).toBeDefined();
-    expect(runtrailToolNames).toHaveLength(25);
-  });
-
   it("fails fast when bridge config is missing", () => {
     expect(() => loadBridgeConfig({ RUNTRAIL_TOKEN: "secret-token" })).toThrow(
       "RUNTRAIL_MCP_URL is required"
@@ -643,6 +622,17 @@ function mockClient(result: unknown) {
   return {
     requestJson: vi.fn(async () => result)
   };
+}
+
+function registeredToolNames(createServer: () => unknown): string[] {
+  const registerTool = vi.spyOn(McpServer.prototype, "registerTool");
+  try {
+    createServer();
+    const calls = registerTool.mock.calls as unknown as Array<[string, ...unknown[]]>;
+    return calls.map(([name]) => name);
+  } finally {
+    registerTool.mockRestore();
+  }
 }
 
 async function startRejectingService(): Promise<{ close(): Promise<void>; port: number }> {
