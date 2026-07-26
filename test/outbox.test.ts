@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -131,7 +139,128 @@ describe("local outbox", () => {
       })
     ]);
   });
+
+  it("rejects recursive secret-bearing payloads without echoing values", () => {
+    stateDir = mkdtempSync(path.join(tmpdir(), "runtrail-outbox-"));
+    const env = { RUNTRAIL_STATE_DIR: stateDir };
+    const cases: Array<{ name: string; payload: Record<string, unknown>; message: RegExp }> = [
+      {
+        name: "nested token key",
+        payload: { clientRecordId: "nested-token", metadata: { token: "placeholder-token-value" } },
+        message: /forbidden secret-bearing field/
+      },
+      {
+        name: "nested authorization key",
+        payload: {
+          clientRecordId: "nested-authorization",
+          metadata: { authorization: "placeholder-authorization-value" }
+        },
+        message: /forbidden secret-bearing field/
+      },
+      {
+        name: "nested secret key",
+        payload: {
+          clientRecordId: "nested-secret",
+          metadata: { secret: "placeholder-secret-value" }
+        },
+        message: /forbidden secret-bearing field/
+      },
+      {
+        name: "nested password key",
+        payload: {
+          clientRecordId: "nested-password",
+          metadata: { password: "placeholder-password-value" }
+        },
+        message: /forbidden secret-bearing field/
+      },
+      {
+        name: "nested environment key",
+        payload: {
+          clientRecordId: "nested-environment",
+          metadata: { environment: "placeholder-environment-value" }
+        },
+        message: /forbidden secret-bearing field/
+      },
+      {
+        name: "nested env key inside array",
+        payload: {
+          clientRecordId: "nested-env",
+          metadata: [{ env: "placeholder-env-value" }]
+        },
+        message: /forbidden secret-bearing field/
+      },
+      {
+        name: "bearer string inside safe field",
+        payload: {
+          clientRecordId: "nested-bearer",
+          metadata: { note: "Bearer placeholder-bearer-value" }
+        },
+        message: /authorization material/
+      }
+    ];
+
+    for (const testCase of cases) {
+      expect(() => enqueueEvent(testCase.payload, env), testCase.name).toThrow(testCase.message);
+      try {
+        enqueueEvent(testCase.payload, env);
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).not.toContain("placeholder");
+      }
+    }
+    expect(listPendingNames(env)).toEqual([]);
+  });
+
+  it("accepts near-limit records and rejects oversized records without partial files", () => {
+    stateDir = mkdtempSync(path.join(tmpdir(), "runtrail-outbox-"));
+    const env = { RUNTRAIL_STATE_DIR: stateDir };
+    const nearLimit = enqueueEvent(
+      {
+        clientRecordId: "near-limit",
+        type: "progress",
+        note: "x".repeat(62 * 1024)
+      },
+      env
+    );
+    const pending = readPendingOutbox(env);
+
+    expect(pending.valid.map(({ record }) => record.id)).toEqual([nearLimit.id]);
+    expect(statSync(pending.valid[0]?.file ?? "").size).toBeLessThanOrEqual(64 * 1024);
+    expect(() =>
+      enqueueEvent(
+        {
+          clientRecordId: "oversized",
+          type: "progress",
+          note: "x".repeat(70 * 1024)
+        },
+        env
+      )
+    ).toThrow(/size limit/);
+    expect(readPendingOutbox(env).valid.map(({ record }) => record.id)).toEqual([nearLimit.id]);
+    expect(listPendingNames(env).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+  });
 });
+
+function enqueueEvent(payload: Record<string, unknown>, env: NodeJS.ProcessEnv) {
+  const idempotencyKey = String(payload.clientRecordId ?? "event-safety");
+  return enqueueOutbox(
+    {
+      operation: "create_event",
+      path: "/events",
+      method: "POST",
+      payload,
+      idempotencyKey
+    },
+    env
+  );
+}
+
+function listPendingNames(env: NodeJS.ProcessEnv): string[] {
+  const root = env.RUNTRAIL_STATE_DIR;
+  if (!root) return [];
+  const pendingDir = path.join(root, "outbox", "pending");
+  return existsSync(pendingDir) ? readdirSync(pendingDir).sort() : [];
+}
 
 function record(
   overrides: Pick<OutboxRecord, "id" | "createdAt" | "idempotencyKey">
