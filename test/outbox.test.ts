@@ -237,7 +237,7 @@ describe("local outbox", () => {
       )
     ).toThrow(/size limit/);
     expect(readPendingOutbox(env).valid.map(({ record }) => record.id)).toEqual([nearLimit.id]);
-    expect(listPendingNames(env).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+    expect(listPendingNames(env)).toEqual([`${nearLimit.id}.json`]);
   });
 });
 
