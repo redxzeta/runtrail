@@ -109,14 +109,16 @@ partial results remain visible beside a verification claim.
 | stdio bridge | [`test/mcp.test.ts`](../test/mcp.test.ts) | Bridge capability equivalence in [#144](https://github.com/redxzeta/runtrail/issues/144) | Codex packet [#89](https://github.com/redxzeta/runtrail/issues/89) and OpenClaw packet [#90](https://github.com/redxzeta/runtrail/issues/90) | Implemented and conformance-covered; two clients have verified the bridge, including the unavailable-service diagnostic fixed by [#133](https://github.com/redxzeta/runtrail/issues/133). |
 | Codex | [setup runbook](mcp-client-setup-runbook.md#codex) | The underlying stdio bridge is covered; synthetic conformance is not Codex evidence. | [#89](https://github.com/redxzeta/runtrail/issues/89): Runtrail `v1.29.1`, Codex CLI `0.144.1`, lifecycle/query/restart passed | Verified only for that packet and scope. The packet predates the [#133](https://github.com/redxzeta/runtrail/issues/133) diagnostic fix, and the current full continuation profile has not been rerun in real Codex. |
 | OpenClaw | [setup runbook](mcp-client-setup-runbook.md#openclaw) | The underlying stdio bridge is covered; synthetic conformance is not OpenClaw evidence. | [#90](https://github.com/redxzeta/runtrail/issues/90): Runtrail `v1.41.2` at `f630c96`, OpenClaw `2026.7.1-2`, stdio context/search/writes/manifest/restart/diagnostic passed | Real-client verified for that release, transport, and bounded operation set. Older OpenClaw `2026.1.29` lacks the required `mcp` command. |
-| Claude Code | [setup runbook](mcp-client-setup-runbook.md#claude-code) | The underlying HTTP/MCP contract is covered; synthetic conformance is not Claude Code evidence. | [#91](https://github.com/redxzeta/runtrail/issues/91) is open | Documented, not yet real-client verified. |
+| Claude Code | [setup runbook](mcp-client-setup-runbook.md#claude-code) | The underlying HTTP/MCP contract is covered; synthetic conformance is not Claude Code evidence. | [#91](https://github.com/redxzeta/runtrail/issues/91): Runtrail `v1.41.2` at `a90eeee`, Claude Code `2.1.12`, authenticated HTTP context/search/writes/manifest/restart passed | Real-client verified for that release, transport, and bounded operation set. On Claude Code `2.1.12`, use `mcp list`, not `mcp get`, because the latter prints expanded bearer headers. |
 | OpenCode | [setup runbook](mcp-client-setup-runbook.md#opencode) | The underlying HTTP/MCP contract is covered; synthetic conformance is not OpenCode evidence. | [#92](https://github.com/redxzeta/runtrail/issues/92) is open | Documented, not yet real-client verified. |
 
 At commit `dbb9b48`, Runtrail advertises all 11 stable feature identifiers and the complete
 `agent-continuation-v1` profile passed with `19 passed, 0 failed, 0 not supported` in
 [PR #159](https://github.com/redxzeta/runtrail/pull/159). That supports the reference protocol
-claim. It does not promote Claude Code, OpenCode, or the newer Codex continuation workflow to
-real-client verified; OpenClaw's separate scoped claim is backed by [#90](https://github.com/redxzeta/runtrail/issues/90).
+claim. It does not promote OpenCode or the newer Codex continuation workflow to real-client
+verified; OpenClaw and Claude Code have separate scoped claims backed by
+[#90](https://github.com/redxzeta/runtrail/issues/90) and
+[#91](https://github.com/redxzeta/runtrail/issues/91).
 
 ## Maintaining the matrix
 

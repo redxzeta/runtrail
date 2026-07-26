@@ -333,10 +333,19 @@ opencode can use the hosted remote endpoint directly:
 Claude Code can use HTTP transport:
 
 ```sh
-claude mcp add --transport http runtrail http://<runtrail-host>:8787/mcp
+claude mcp add --transport http \
+  --header='Authorization: Bearer ${RUNTRAIL_TOKEN}' \
+  runtrail http://<runtrail-host>:8787/mcp
 ```
 
-Keep the bearer token in the client-supported local secret mechanism. Do not paste real tokens into repo files.
+The single quotes preserve `${RUNTRAIL_TOKEN}` for Claude's runtime environment expansion instead
+of putting the value in shell history or MCP configuration. Use `--scope local` when the server
+should remain private to the current user/project, or a project `.mcp.json` with the same
+placeholder when the non-secret definition should be shared. Never commit the expanded value.
+
+Use `claude mcp list` for a redacted connection check. Claude Code `2.1.12` expands and prints
+static header values in `claude mcp get`, including bearer headers, so do not run `mcp get` for an
+authenticated server on that version. If it happens, treat the token as exposed and rotate it.
 
 ## Verification
 
