@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.21.1-bookworm-slim AS build
+FROM node:22.23.1-bookworm-slim AS build
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends g++ make python3 \
   && rm -rf /var/lib/apt/lists/* \
   && corepack enable \
-  && corepack prepare pnpm@11.5.2 --activate
+  && corepack prepare pnpm@11.17.0 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -17,7 +17,7 @@ COPY . .
 RUN pnpm build \
   && pnpm prune --prod
 
-FROM node:22.21.1-bookworm-slim AS runtime
+FROM node:22.23.1-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
   RUNTRAIL_CONFIG=/app/config/runtrail.example.yaml \

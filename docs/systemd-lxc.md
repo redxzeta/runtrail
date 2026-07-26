@@ -6,11 +6,11 @@ This is the simple Ubuntu/Debian LXC path. Run the service as a non-root user an
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y ca-certificates curl git
+sudo apt-get install -y ca-certificates curl git g++ make python3
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 sudo corepack enable
-sudo corepack prepare pnpm@11.5.2 --activate
+sudo corepack prepare pnpm@11.17.0 --activate
 
 sudo useradd --system --home /opt/runtrail --shell /usr/sbin/nologin runtrail
 sudo mkdir -p /opt/runtrail /etc/runtrail /var/lib/runtrail /var/log/runtrail
@@ -21,6 +21,9 @@ cd /opt/runtrail
 sudo -H -u runtrail corepack pnpm install --frozen-lockfile
 sudo -H -u runtrail corepack pnpm build
 ```
+
+The compiler toolchain is required when native Node dependencies do not have a usable prebuilt
+binary. Keep it installed for dependency upgrades and clean rebuilds.
 
 ## Configure
 
