@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   enqueueOutbox,
   listOutbox,
+  type OutboxRecord,
   quarantineOutbox,
   readPendingOutbox,
   removeOutboxRecord
@@ -60,4 +61,92 @@ describe("local outbox", () => {
     removeOutboxRecord(pending.valid[0]?.file ?? "");
     expect(listOutbox(env)).toEqual([]);
   });
+
+  it("orders pending records by creation time with an id tie-breaker", () => {
+    stateDir = mkdtempSync(path.join(tmpdir(), "runtrail-outbox-"));
+    const env = { RUNTRAIL_STATE_DIR: stateDir };
+    const pendingDir = path.join(stateDir, "outbox", "pending");
+    mkdirSync(pendingDir, { recursive: true });
+    const later = record({
+      id: "00000000-0000-4000-8000-000000000000",
+      createdAt: "2026-07-26T02:00:00.000Z",
+      idempotencyKey: "event-later"
+    });
+    const mixedPrecisionLater = record({
+      id: "44444444-4444-4444-8444-444444444444",
+      createdAt: "2026-07-26T01:00:00.100Z",
+      idempotencyKey: "event-mixed-precision-later"
+    });
+    const mixedPrecisionEarlier = record({
+      id: "55555555-5555-4555-8555-555555555555",
+      createdAt: "2026-07-26T01:00:00Z",
+      idempotencyKey: "event-mixed-precision-earlier"
+    });
+    const earlier = record({
+      id: "22222222-2222-4222-8222-222222222222",
+      createdAt: "2026-07-26T00:00:00.000Z",
+      idempotencyKey: "event-earlier"
+    });
+    const equalHigherId = record({
+      id: "33333333-3333-4333-8333-333333333333",
+      createdAt: "2026-07-26T01:30:00.000Z",
+      idempotencyKey: "event-equal-high"
+    });
+    const equalLowerId = record({
+      id: "11111111-1111-4111-8111-111111111111",
+      createdAt: "2026-07-26T01:30:00.000Z",
+      idempotencyKey: "event-equal-low"
+    });
+
+    writeRecord(path.join(pendingDir, "a-later.json"), later);
+    writeFileSync(path.join(pendingDir, "b-malformed.json"), "{", { mode: 0o600 });
+    writeRecord(path.join(pendingDir, "c-equal-high.json"), equalHigherId);
+    writeRecord(path.join(pendingDir, "d-earlier.json"), earlier);
+    writeRecord(path.join(pendingDir, "e-equal-low.json"), equalLowerId);
+    writeRecord(path.join(pendingDir, "f-mixed-precision-later.json"), mixedPrecisionLater);
+    writeRecord(path.join(pendingDir, "g-mixed-precision-earlier.json"), mixedPrecisionEarlier);
+
+    const pending = readPendingOutbox(env);
+
+    expect(pending.valid.map(({ record }) => record.id)).toEqual([
+      earlier.id,
+      mixedPrecisionEarlier.id,
+      mixedPrecisionLater.id,
+      equalLowerId.id,
+      equalHigherId.id,
+      later.id
+    ]);
+    expect(listOutbox(env).map(({ id }) => id)).toEqual([
+      earlier.id,
+      mixedPrecisionEarlier.id,
+      mixedPrecisionLater.id,
+      equalLowerId.id,
+      equalHigherId.id,
+      later.id
+    ]);
+    expect(pending.malformed).toEqual([
+      expect.objectContaining({
+        file: path.join(pendingDir, "b-malformed.json"),
+        error: "malformed or unsafe outbox record"
+      })
+    ]);
+  });
 });
+
+function record(
+  overrides: Pick<OutboxRecord, "id" | "createdAt" | "idempotencyKey">
+): OutboxRecord {
+  return {
+    version: 1,
+    operation: "create_event",
+    path: "/events",
+    method: "POST",
+    payload: { runId: "run_1", clientRecordId: overrides.idempotencyKey, type: "progress" },
+    retryCount: 0,
+    ...overrides
+  };
+}
+
+function writeRecord(file: string, record: OutboxRecord): void {
+  writeFileSync(file, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+}

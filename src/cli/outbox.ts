@@ -121,7 +121,17 @@ function readRecords(kind: "pending", env: NodeJS.ProcessEnv) {
       malformed.push({ file, error: "malformed or unsafe outbox record" });
     }
   }
+  valid.sort(comparePendingRecords);
   return { valid, malformed };
+}
+
+function comparePendingRecords(
+  left: { record: OutboxRecord },
+  right: { record: OutboxRecord }
+): number {
+  const createdAtOrder = Date.parse(left.record.createdAt) - Date.parse(right.record.createdAt);
+  if (createdAtOrder !== 0) return createdAtOrder;
+  return left.record.id.localeCompare(right.record.id);
 }
 
 function ensureDirectory(directory: string): string {
