@@ -291,8 +291,13 @@ Example remote MCP configuration for OpenCode:
 Claude Code can use the same `/mcp` URL with HTTP transport:
 
 ```sh
-claude mcp add --transport http runtrail http://127.0.0.1:8787/mcp
+claude mcp add --transport http \
+  --header='Authorization: Bearer ${RUNTRAIL_TOKEN}' \
+  runtrail http://127.0.0.1:8787/mcp
 ```
+
+Claude expands the environment variable when it connects, so the token is not written into the
+MCP configuration. Use `claude mcp list` for a redacted connection check.
 
 Stdio-only agents such as Codex or OpenClaw should use the bridge. The bridge
 starts locally and forwards tool calls to the hosted `/mcp` endpoint:
