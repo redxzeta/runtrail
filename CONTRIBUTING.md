@@ -6,9 +6,10 @@ checkout.
 
 ## Prerequisites
 
-- Node.js 22.
+- Node.js 22.22.2 or newer within the 22.x line, or Node.js 24.15 or newer.
 - pnpm 11.17.0. Use pnpm only.
 - Git.
+- Python 3, `make`, and a C++ compiler for native Node dependencies.
 
 From a clean clone:
 
