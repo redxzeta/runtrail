@@ -279,14 +279,19 @@ Example remote MCP configuration for OpenCode:
     "runtrail": {
       "type": "remote",
       "url": "http://127.0.0.1:8787/mcp",
+      "oauth": false,
       "headers": {
-        "Authorization": "Bearer ${RUNTRAIL_TOKEN}"
+        "Authorization": "Bearer {env:RUNTRAIL_TOKEN}"
       },
       "enabled": true
     }
   }
 }
 ```
+
+OpenCode uses `{env:VARIABLE_NAME}` for environment substitution. `oauth: false` keeps a static
+bearer-token server from entering OAuth discovery. Keep the token in the local environment, not in
+the configuration file.
 
 Claude Code can use the same `/mcp` URL with HTTP transport:
 

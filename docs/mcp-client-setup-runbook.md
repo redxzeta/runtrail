@@ -319,14 +319,31 @@ opencode can use the hosted remote endpoint directly:
     "runtrail": {
       "type": "remote",
       "url": "http://<runtrail-host>:8787/mcp",
+      "oauth": false,
       "headers": {
-        "Authorization": "Bearer ${RUNTRAIL_TOKEN}"
+        "Authorization": "Bearer {env:RUNTRAIL_TOKEN}"
       },
       "enabled": true
     }
   }
 }
 ```
+
+OpenCode substitutes `{env:RUNTRAIL_TOKEN}` at runtime; `${RUNTRAIL_TOKEN}` is not its configuration
+syntax. `oauth: false` disables OAuth discovery for this static bearer-token endpoint. Keep the
+non-secret definition in project or local OpenCode configuration and supply the token only through
+the local environment.
+
+Check the rendered connection status without printing the bearer header:
+
+```sh
+opencode mcp list
+```
+
+With OpenCode `1.18.5`, the status is `connected` when initialization succeeds, reports HTTP `401`
+for a missing or invalid token, and reports an unable-to-connect diagnostic while Runtrail is
+offline. The command exits zero for those failed statuses, so automation must not treat its exit
+code alone as proof of connectivity; make one bounded MCP read before claiming success.
 
 ## Claude Code
 
