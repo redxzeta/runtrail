@@ -1,3 +1,10 @@
+## [1.41.3](https://github.com/redxzeta/runtrail/compare/v1.41.2...v1.41.3) (2026-07-26)
+
+
+### Bug Fixes
+
+* **cli:** order outbox records chronologically ([#196](https://github.com/redxzeta/runtrail/issues/196)) ([cd4042a](https://github.com/redxzeta/runtrail/commit/cd4042add14b8dec8cb2be56c92a77b6f877ce18))
+
 ## [1.41.2](https://github.com/redxzeta/runtrail/compare/v1.41.1...v1.41.2) (2026-07-25)
 
 
