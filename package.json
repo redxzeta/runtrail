@@ -27,8 +27,8 @@
     "runtrail-mcp-bridge": "dist/mcp/bridge.js"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.11",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@hono/node-server": "^2.0.12",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "^13.0.1",
     "commander": "^15.0.0",
     "hono": "^4.12.32",
@@ -45,7 +45,7 @@
     "@semantic-release/npm": "^13.1.5",
     "@semantic-release/release-notes-generator": "^14.1.1",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "knip": "^6.29.0",
     "semantic-release": "^25.0.8",
     "tsx": "^4.23.1",
