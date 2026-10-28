@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildBrief, formatBrief } from "../src/cli/brief.js";
+import { parseWorkImport, planWorkImport } from "../src/integrations/workImport.js";
 import type {
   AgentContext,
   AgentRun,
+  Handoff,
   PrepareWorkResponse,
   PrepareWorkRunSummary,
   RunFreshness
@@ -176,6 +178,106 @@ function fixture(): { prepared: PrepareWorkResponse; context: AgentContext } {
 }
 
 describe("daily work brief", () => {
+  it("joins only matched safe imported handoffs, disclosing missing, mismatched and bounded provenance", () => {
+    const { prepared, context } = fixture();
+    const envelope = parseWorkImport(
+      JSON.stringify({
+        schemaVersion: "1",
+        source: {
+          kind: "generic",
+          system: "shell",
+          threadId: "job",
+          runId: "attempt",
+          ref: "urn:shell:job:attempt",
+          observedAt: time,
+          reportedStatus: "completed"
+        },
+        project: "runtrail",
+        workflowId: "issue-215",
+        workKey: "github:redxzeta/runtrail#215",
+        task: "Review exact candidate",
+        summary: "Blockers: independent review pending. Checks unverified.",
+        nextAction: "Inspect source and verify check applicability; no merge authorization.",
+        handoff: {},
+        evidence: [1, 2, 3].map((n) => ({
+          kind: "check",
+          ref: `urn:check:${n}`,
+          summary: "NOT_RUN; unknown revision linkage",
+          observedAt: time,
+          provenance: "client_reported",
+          outcome: "not_run"
+        }))
+      })
+    );
+    const plan = planWorkImport(envelope);
+    const detail: Handoff = {
+      ...context.pending_handoffs[0],
+      clientRecordId: plan.handoffKey,
+      fromSource: plan.source,
+      summary: `[Client-reported; unverified] ${envelope.summary}`,
+      nextAction: envelope.nextAction,
+      context: {
+        schemaVersion: "1",
+        semantics: "client_reported_unverified",
+        payloadHash: plan.payloadHash,
+        envelope
+      }
+    };
+    context.pending_handoffs = [detail];
+    const joined = buildBrief(prepared, context, 1, [detail]);
+    expect(joined.pendingHandoffs[0].clientReport).toMatchObject({
+      status: "available",
+      report: {
+        source: envelope.source,
+        task: envelope.task,
+        nextAction: envelope.nextAction,
+        assurance: "unverified",
+        evidenceApplicability: "unknown",
+        evidence: [{ outcome: "not_run", evidenceApplicability: "unknown" }]
+      }
+    });
+    expect(joined.coverage.projection["importHandoffs.handoff1.evidence"]).toMatchObject({
+      omitted: 2
+    });
+    expect(joined.coverage.importProvenance).toMatchObject({
+      mayHaveMore: true,
+      sourceTruncated: null
+    });
+    for (const [details, expected] of [
+      [[], "missing"],
+      [[{ ...detail, id: "another" }], "missing"],
+      [[{ ...detail, version: 3 }], "version_mismatch"],
+      [[{ ...detail, project: "other" }], "project_mismatch"],
+      [[{ ...detail, context: undefined }], "unavailable"],
+      [
+        [
+          {
+            ...detail,
+            context: {
+              schemaVersion: "1",
+              semantics: "client_reported_unverified",
+              envelope: { ...envelope, summary: "db_password=unsafe-value" }
+            }
+          }
+        ],
+        "invalid"
+      ],
+      [[{ ...detail, summary: "Changed between reads" }], "invalid"]
+    ] as const) {
+      const report = buildBrief(prepared, context, 1, [...details]);
+      expect(report.pendingHandoffs[0].clientReport).toEqual({ status: expected, report: null });
+      expect(JSON.stringify(report)).not.toContain("unsafe-value");
+    }
+    context.pending_handoffs[0].version = 3;
+    expect(
+      buildBrief(prepared, context, 1, [detail]).pendingHandoffs[0].clientReport?.report
+    ).toBeNull();
+    context.project = "elsewhere";
+    expect(buildBrief(prepared, context, 1, [detail]).pendingHandoffs[0].clientReport?.status).toBe(
+      "project_mismatch"
+    );
+  });
+
   it("shows bounded relevant work by default without inventing a selected run", () => {
     const { prepared, context } = fixture();
     prepared.relevantRuns.push(summary("failed1"));

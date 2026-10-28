@@ -14,12 +14,19 @@ Runtrail is a local-first, tool-neutral work and evidence ledger for humans, scr
 
 ## Daily work and handoff
 
-Use `pnpm cli doctor` for read-only access/state diagnosis. Before editing, use
-`prepare-work` with the canonical work key. Capture commands with `pnpm cli run`
-and keep its actual exit code and capture limitations. Use `brief --project ...`
-(`--json` for schema v1) to continue, then create an explicit handoff with the
-confirmed source run ID and next action. Review with `workflow packet --format
-markdown`; JSON remains the portable packet default. See README's daily loop.
+Runtrail use is opt-in for useful cross-tool handoffs; skip it when the current
+thread or a plain handoff is simpler. Run `pnpm cli doctor` during setup or when
+access fails. For an explicit terminal-source handoff, use `workflow capture`
+with selected metadata and authored summary/next action, then continue with
+`brief --project ... --work-key ... --import-provenance` (add `--json` for schema
+v1). Keep the saved envelope unchanged and use `workflow capture --retry` after
+uncertain delivery. See the [capture guide](docs/workflow-capture.md).
+
+Use `prepare-work` when its advisory working set helps; it is not a mandatory
+pre-edit ritual. For commands worth recording, `pnpm cli run` preserves the actual
+exit code and capture limitations. An explicit handoff needs a confirmed source
+run ID and authored next action. Review with `workflow packet --format markdown`
+when a review packet is useful; JSON remains the portable packet default.
 
 Completed runs are not verification. A recorded hash is a reference, not proof.
 Verification applicability is unknown when revision/dirty-state linkage is

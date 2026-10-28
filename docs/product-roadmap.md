@@ -69,9 +69,13 @@ Reopen or propose a bounded extraction when one of those triggers is demonstrate
 | T3 summary import | Explicit gateway read → sanitized export → CLI import → fresh MCP continuation exercised against #211 | Native hooks and configured clients NOT_RUN. Source claims remain unverified. |
 | Tracing | No compatibility claim | Links/export are future possibilities only. |
 
-For the minimum workflow, start with `doctor` and `prepare-work`, capture an actual
-command with `run`, read `brief`, create a handoff using a confirmed source run ID,
-and review `workflow packet`. See the executable [walkthrough](../README.md#daily-work-loop).
+Use Runtrail only when portable cross-tool continuation is worth its overhead.
+For a selected terminal source, the [explicit capture recipe](workflow-capture.md)
+saves and imports one authored handoff, followed by one read-only `brief`. Source
+selection and authoring still cost work; this is not a token/time savings claim.
+Use `doctor` for setup/errors, and choose `prepare-work`, command `run` capture or
+a review packet when useful rather than as a mandatory every-task ritual. See
+the [walkthrough](../README.md#daily-work-loop).
 An unavailable recorder can leave capture incomplete; preserve the actual exit code
 and do not fabricate a source ID. Check freshness, bounded coverage, failures,
 not-run checks and revision applicability before relying on a report.
