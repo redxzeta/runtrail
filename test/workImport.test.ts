@@ -168,6 +168,10 @@ describe("bounded work import", () => {
     for (const summary of [
       "Bearer unsafe-credential",
       "password=unsafe-credential",
+      "db_password=unsafe-credential",
+      "access_token=unsafe-credential",
+      "client_secret=unsafe-credential",
+      "service_api_key=unsafe-credential",
       "RUNTRAIL_TOKEN=unsafe-credential",
       "ghp_0123456789abcdef",
       "Saved at /home/private/report",

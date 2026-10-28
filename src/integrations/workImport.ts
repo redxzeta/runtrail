@@ -16,7 +16,7 @@ function safeText(value: string): boolean {
       );
     }) &&
     value.split("\n").length <= 12 &&
-    !/(?:bearer\s+\S+|(?:gh[pousr]_|github_pat_|sk-(?:proj-)?)[a-z0-9_-]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY|\b(?:token|password|secret|api[_-]?key|authorization)\s*[=:]\s*\S+)/i.test(
+    !/(?:bearer\s+\S+|(?:gh[pousr]_|github_pat_|sk-(?:proj-)?)[a-z0-9_-]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY|(?:token|password|secret|api[_-]?key|authorization)\s*[=:]\s*\S+)/i.test(
       value
     ) &&
     !/\b[A-Z][A-Z0-9_]{2,}\s*=\s*\S+/.test(value) &&
