@@ -1,3 +1,10 @@
+## [1.44.1](https://github.com/redxzeta/runtrail/compare/v1.44.0...v1.44.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **mcp:** dispose bridge sessions and use portable entrypoint guards ([#220](https://github.com/redxzeta/runtrail/issues/220)) ([70ee90d](https://github.com/redxzeta/runtrail/commit/70ee90d99f9480f82b9c582f487f685bf68d7d17))
+
 # [1.44.0](https://github.com/redxzeta/runtrail/compare/v1.43.2...v1.44.0) (2026-10-28)
 
 
