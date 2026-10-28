@@ -214,6 +214,19 @@ describe("bounded work import", () => {
       plan: { source: "work-import:t3:t3-code" }
     });
     expect(second.plan).toEqual(first.plan);
+    for (const source of [
+      { ...input.source, runId: `${input.source.runId}:ordinal:garbage` },
+      {
+        ...input.source,
+        threadId: `mcp:${"-".repeat(36)}`,
+        runId: `run:thread:mcp%3A${"-".repeat(36)}:ordinal:2`,
+        ref: `t3-thread://v1/mcp:${"-".repeat(36)}`
+      }
+    ]) {
+      expect((await importWork(JSON.stringify({ ...input, source }), request)).status).toBe(
+        "invalid"
+      );
+    }
     expect(
       (
         await importWork(

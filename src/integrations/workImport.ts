@@ -105,11 +105,12 @@ export const workImportSchema = z
     }
     if (value.source.kind === "t3") {
       const { system, threadId, runId, ref } = value.source;
+      const runPrefix = `run:thread:${encodeURIComponent(threadId)}:ordinal:`;
       if (
         system !== "t3-code" ||
-        !/^mcp:[a-f0-9-]{36}$/i.test(threadId) ||
-        !runId.startsWith(`run:thread:${encodeURIComponent(threadId)}:ordinal:`) ||
-        !/^[1-9]\d*$/.test(runId.split(":ordinal:")[1] ?? "") ||
+        !/^mcp:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(threadId) ||
+        !runId.startsWith(runPrefix) ||
+        !/^[1-9]\d*$/.test(runId.slice(runPrefix.length)) ||
         ref !== `t3-thread://v1/${threadId}`
       ) {
         context.addIssue({ code: "custom", message: "T3 source identity/reference mismatch" });
