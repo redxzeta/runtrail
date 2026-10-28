@@ -1,3 +1,10 @@
+## [1.43.1](https://github.com/redxzeta/runtrail/compare/v1.43.0...v1.43.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **import:** reject prefixed credential assignments ([61aabe6](https://github.com/redxzeta/runtrail/commit/61aabe60382c2295ea2743f10dfc83ca4a07bcbe))
+
 # [1.43.0](https://github.com/redxzeta/runtrail/compare/v1.42.0...v1.43.0) (2026-10-28)
 
 
