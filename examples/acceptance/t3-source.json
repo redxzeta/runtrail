@@ -1,0 +1,10 @@
+{
+  "thread": { "threadId": "mcp:177db0af-e762-41bc-8d06-48fa322362e5" },
+  "recentRuns": [
+    {
+      "runId": "run:thread:mcp%3A177db0af-e762-41bc-8d06-48fa322362e5:ordinal:2",
+      "status": "completed",
+      "completedAt": "2026-10-28T04:14:22.162Z"
+    }
+  ]
+}
