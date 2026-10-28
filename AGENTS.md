@@ -1,6 +1,6 @@
 # Runtrail Agent Instructions
 
-Runtrail is an agent-first activity ledger. Keep changes small, structured, and validated.
+Runtrail is a local-first, tool-neutral work and evidence ledger for humans, scripts, and agents. Keep changes small, structured, and validated; see [product direction](docs/product-roadmap.md).
 
 ## Rules
 

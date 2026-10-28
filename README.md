@@ -1,8 +1,18 @@
 # Runtrail
 
-Runtrail is a self-hosted, LAN/VPN-accessible activity ledger for coding agents and scripts. It stores structured activity in SQLite and exposes it through an HTTP API and CLI.
+Runtrail is a small local-first, tool-neutral work and evidence ledger for developers,
+scripts and agents. It stores structured facts in SQLite and verbose logs as files,
+and provides a CLI, HTTP API and MCP surfaces for compact briefs and handoffs.
+T3 Code owns its execution and conversations; Git and GitHub own code and PR
+state. Runtrail records attributed observations that help another client continue
+or review work. A shell user does not need an AI model. Command capture is designed
+to let the command proceed when the recorder is unavailable, while reporting limits.
 
-The MVP is agent-first: structured runs, events, open loops, decisions, and compact context retrieval. Human-readable UI and deployment automation come later.
+Use it when a durable cross-tool handoff or a concise evidence review saves work.
+Do not use it merely to duplicate a T3 thread or GitHub PR, as an orchestration or
+scheduling service, as proof that a check ran against a particular revision, or as
+a deployment/approval gate. See the [product direction](docs/product-roadmap.md)
+and [issue audit](docs/results/issue-audit-2026-10-27.md).
 
 ## Set Up with a Coding Agent
 
