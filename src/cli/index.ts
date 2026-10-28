@@ -18,6 +18,7 @@ import {
   type AgentContext,
   type AgentEvent,
   createRunRequestSchema,
+  type Handoff,
   healthResponseSchema,
   type PrepareWorkResponse,
   prepareWorkQuerySchema,
@@ -36,6 +37,7 @@ import {
   updateOutboxRetry
 } from "./outbox.js";
 import { formatReviewReport } from "./reviewReport.js";
+import { registerWorkflowCapture } from "./workflowCapture.js";
 
 export async function runCli(argv = process.argv): Promise<void> {
   if (argv[2] === "run" && argv[3] !== "create") {
@@ -92,6 +94,11 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--run-id <runId>", "Existing run to continue")
     .option("--limit <limit>", "Maximum items per section (1-20)", parseInteger, 5)
     .option("--json", "Print versioned machine-readable JSON", false)
+    .option(
+      "--import-provenance",
+      "Join bounded unverified import provenance (one extra read)",
+      false
+    )
     .action(brief);
   program
     .command("prepare-work")
@@ -136,6 +143,7 @@ export async function runCli(argv = process.argv): Promise<void> {
     .action(closeStaleRuns);
 
   const workflow = program.command("workflow").description("Inspect workflow state");
+  registerWorkflowCapture(workflow, (path, body) => requestJson(path, { method: "POST", body }));
   workflow
     .command("readiness")
     .description("Fetch deterministic advisory workflow readiness")
@@ -439,6 +447,7 @@ async function brief(options: {
   runId?: string;
   limit: number;
   json: boolean;
+  importProvenance?: boolean;
 }): Promise<void> {
   const parsed = prepareWorkQuerySchema.parse(options);
   const query = new URLSearchParams({ project: parsed.project, limit: String(parsed.limit) });
@@ -453,7 +462,24 @@ async function brief(options: {
     requestJson(`/agent/prepare-work?${query.toString()}`),
     requestJson(`/agent/context?${contextQuery.toString()}`)
   ]);
-  const report = buildBrief(prepared as PrepareWorkResponse, context as AgentContext, parsed.limit);
+  let importHandoffs: Handoff[] | undefined;
+  if (options.importProvenance) {
+    const response = (await requestJson(
+      `/handoffs?${new URLSearchParams({
+        project: parsed.project,
+        status: "pending",
+        limit: String(parsed.limit)
+      })}`
+    )) as { handoffs: Handoff[] };
+    if (!Array.isArray(response.handoffs)) throw new Error("Invalid handoff observation");
+    importHandoffs = response.handoffs;
+  }
+  const report = buildBrief(
+    prepared as PrepareWorkResponse,
+    context as AgentContext,
+    parsed.limit,
+    importHandoffs
+  );
   if (options.json) printJson(report);
   else console.log(formatBrief(report));
 }

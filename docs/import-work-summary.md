@@ -21,6 +21,11 @@ conflicts or authenticate the claimed source. Keep the saved envelope unchanged
 for delivery and retries. CLI argument syntax errors use the existing Commander
 error behavior; envelope/read/delivery results are JSON, with exit code 1 on failure.
 
+For the shorter interactive CLI/agent path, use [workflow capture](workflow-capture.md)
+with selected metadata plus authored flags. It reuses this exact v1 contract,
+exclusively saves an owner-only envelope before delivery and retries saved bytes.
+The older helper below remains compatible for explicit authored JSON exports.
+
 ## Exact envelope
 
 `src/integrations/workImport.ts` exports the authoritative Zod schema. Only the

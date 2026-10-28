@@ -1,4 +1,5 @@
-import type { AgentContext, PrepareWorkResponse } from "../shared/schemas.js";
+import { parseWorkImport, planWorkImport } from "../integrations/workImport.js";
+import type { AgentContext, Handoff, PrepareWorkResponse } from "../shared/schemas.js";
 
 const MAX_TEXT = 320;
 const SECTION_NAMES = [
@@ -20,7 +21,12 @@ type ProjectionCoverage = {
 };
 
 /** A bounded allowlist projection. Context and prepare-work are separate observations. */
-export function buildBrief(prepared: PrepareWorkResponse, context: AgentContext, limit: number) {
+export function buildBrief(
+  prepared: PrepareWorkResponse,
+  context: AgentContext,
+  limit: number,
+  importHandoffs?: Handoff[]
+) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
     throw new RangeError("Brief limit must be an integer from 1 to 20");
   }
@@ -159,6 +165,72 @@ export function buildBrief(prepared: PrepareWorkResponse, context: AgentContext,
     }
   );
   const handoffs = sameProject ? [...context.pending_handoffs, ...context.recent_handoffs] : [];
+  const provenanceHandoffs = take("importHandoffs", importHandoffs ?? [], null);
+  const clientReport = (handoff: PrepareWorkResponse["pendingHandoffs"][number]) => {
+    if (!importHandoffs) return { status: "not_requested" as const, report: null };
+    if (!sameProject) return { status: "project_mismatch" as const, report: null };
+    const found = provenanceHandoffs.find((item) => item.id === handoff.id);
+    if (!found) return { status: "missing" as const, report: null };
+    if (found.project !== prepared.project)
+      return { status: "project_mismatch" as const, report: null };
+    if (found.version !== handoff.version || found.status !== "pending")
+      return { status: "version_mismatch" as const, report: null };
+    if (!handoffs.some((item) => item.id === handoff.id && item.version === handoff.version))
+      return { status: "missing" as const, report: null };
+    try {
+      const provenance = found.context as Record<string, unknown> | undefined;
+      if (
+        provenance?.schemaVersion !== "1" ||
+        provenance.semantics !== "client_reported_unverified"
+      )
+        return { status: "unavailable" as const, report: null };
+      if (
+        Object.keys(provenance).some(
+          (key) => !["schemaVersion", "semantics", "payloadHash", "envelope"].includes(key)
+        )
+      )
+        throw new Error("Unexpected provenance");
+      const envelope = parseWorkImport(
+        JSON.stringify(provenance.envelope),
+        process.env.RUNTRAIL_TOKEN
+      );
+      const plan = planWorkImport(envelope);
+      if (
+        envelope.project !== prepared.project ||
+        !envelope.handoff ||
+        plan.payloadHash !== provenance.payloadHash ||
+        plan.handoffKey !== found.clientRecordId ||
+        plan.source !== found.fromSource ||
+        found.summary !== `[Client-reported; unverified] ${envelope.summary}` ||
+        found.nextAction !== envelope.nextAction
+      )
+        throw new Error("Mismatched provenance");
+      return {
+        status: "available" as const,
+        report: {
+          provenance: "client_reported" as const,
+          assurance: "unverified" as const,
+          evidenceApplicability: "unknown" as const,
+          source: { ...envelope.source },
+          workflowId: text(envelope.workflowId),
+          workKey: text(envelope.workKey, 500),
+          task: text(envelope.task, 1000),
+          summary: text(envelope.summary, 1800),
+          nextAction: text(envelope.nextAction ?? "unknown", 1000),
+          evidence: take(`importHandoffs.${handoff.id}.evidence`, envelope.evidence).map(
+            (item) => ({
+              ...item,
+              summary: text(item.summary),
+              outcome: item.outcome ?? "unknown",
+              evidenceApplicability: "unknown" as const
+            })
+          )
+        }
+      };
+    } catch {
+      return { status: "invalid" as const, report: null };
+    }
+  };
   const pendingHandoffs = take(
     "pendingHandoffs",
     prepared.pendingHandoffs,
@@ -178,7 +250,8 @@ export function buildBrief(prepared: PrepareWorkResponse, context: AgentContext,
       nextAction: detail?.nextAction ? text(detail.nextAction) : null,
       detailStatus: sourceStatus(found, handoff.version),
       updatedAt: text(handoff.updatedAt),
-      sourceRef: ref({ type: "handoff", id: handoff.id, version: handoff.version })
+      sourceRef: ref({ type: "handoff", id: handoff.id, version: handoff.version }),
+      ...(importHandoffs ? { clientReport: clientReport(handoff) } : {})
     };
   });
   const conflicts = take(
@@ -258,6 +331,19 @@ export function buildBrief(prepared: PrepareWorkResponse, context: AgentContext,
       },
       preparedMode: prepared.mode,
       nestedArraysBoundedBy: limit,
+      ...(importHandoffs
+        ? {
+            importProvenance: {
+              requests: 1,
+              limit,
+              returned: Math.min(importHandoffs.length, limit),
+              sourceTruncated: null,
+              mayHaveMore: importHandoffs.length >= limit,
+              atomic: false,
+              scope: "project_pending_handoffs"
+            }
+          }
+        : {}),
       prepared: Object.fromEntries(
         SECTION_NAMES.map((name) => {
           const section = prepared.sections[name];
@@ -360,6 +446,31 @@ export function formatBrief(report: BriefReport): string {
         `${ref(conflict.sourceRef)}; ${s(conflict.status)}; ${s(conflict.conflictCode)}; freshness ${s(conflict.freshness.state)} (${s(conflict.freshness.reasonCode)}) as of ${s(conflict.freshness.asOf)}; updated ${s(conflict.updatedAt)}`
     )
   );
+  if (report.coverage.importProvenance) {
+    section(
+      "Imported client reports (unverified)",
+      report.pendingHandoffs.flatMap((handoff) => {
+        const client = handoff.clientReport;
+        const detail = client?.report;
+        if (!detail)
+          return [
+            `${ref(handoff.sourceRef)}: provenance ${client?.status ?? "unavailable"}; applicability unknown.`
+          ];
+        const source = detail.source;
+        return [
+          `${ref(handoff.sourceRef)}: client reported, unverified; applicability unknown. Source ${escapeMarkdown(source.system)}; thread ${escapeMarkdown(source.threadId)}; run ${escapeMarkdown(source.runId)}; ref ${escapeMarkdown(source.ref)}; reported status ${s(source.reportedStatus)}; observed/exported ${s(source.observedAt)} (not execution completion).`,
+          `Task: ${s(detail.task)}; summary: ${s(detail.summary)}; next action: ${s(detail.nextAction)}.`,
+          ...detail.evidence.map(
+            (item) =>
+              `${escapeMarkdown(item.ref)}: ${s(item.summary)}; outcome ${s(item.outcome)}; client reported at ${s(item.observedAt)}; applicability unknown.`
+          )
+        ];
+      })
+    );
+    lines.push(
+      `Provenance coverage: one separate bounded project query; ${report.coverage.importProvenance.returned} returned, limit ${report.coverage.importProvenance.limit}; may have more: ${report.coverage.importProvenance.mayHaveMore ? "yes" : "unknown"}; source truncation unknown. Missing or mismatched records are omitted; observations are not atomic.`
+    );
+  }
   lines.push(
     "",
     "## Readiness and evidence gaps",
@@ -416,7 +527,11 @@ function cleanText(value: string): string {
 }
 
 function markdown(value: string): string {
-  return cleanText(value)
+  return escapeMarkdown(cleanText(value));
+}
+
+function escapeMarkdown(value: string): string {
+  return value
     .replace(/[\\`*_{}[\]()#+.!|:~=-]/g, "\\$&")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

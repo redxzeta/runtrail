@@ -1,3 +1,17 @@
+# [1.44.0](https://github.com/redxzeta/runtrail/compare/v1.43.2...v1.44.0) (2026-10-28)
+
+
+### Features
+
+* **workflow:** capture explicit handoffs with saved retries ([#219](https://github.com/redxzeta/runtrail/issues/219)) ([d50ab55](https://github.com/redxzeta/runtrail/commit/d50ab5597ae1c847be57cee3098b50f43ee2adac))
+
+## [1.43.2](https://github.com/redxzeta/runtrail/compare/v1.43.1...v1.43.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* **deps:** update vulnerable production dependencies ([#216](https://github.com/redxzeta/runtrail/issues/216)) ([0c9a352](https://github.com/redxzeta/runtrail/commit/0c9a35224efbbe5ffc56715e97ecf68054b3b9fe))
+
 ## [1.43.1](https://github.com/redxzeta/runtrail/compare/v1.43.0...v1.43.1) (2026-10-28)
 
 
