@@ -6,6 +6,7 @@ point-in-time record, not a claim of adoption, statistical savings or deployment
 | Case | Prospective status | Observation |
 | --- | --- | --- |
 | #210 repair to independent reviewer | Three-arm comparison blocked | The real review request identifies PR #216 head `6257537c78b21493659d7acd23337134eea56e6b`, asks for diff, advisory evidence, current CI and base review, and notes that bridge validation must use the merged SDK. The selected T3 message belongs to a running source run with no completion time. |
+| #201/#167 repair to independent reviewer | No three-arm comparison | PR #220 review request named head `aafcd012dadd1a37283f0bc0a8986c62fc8dce93`; the selected producer run was running at observation. The authored request was 3,937 UTF-8 bytes, not a full-path saving measurement. |
 
 On baseline `6fe085c4f951f7bacb890a53d1c998e02cf05142`, the existing export
 helper rejected a bounded projection of that running source (exit 1, zero stdout
@@ -53,12 +54,13 @@ paraphrase. Different presentation and concurrent order remain confounders.
 | --- | --- | --- |
 | T3 + GitHub | Identified candidate `6257537`, merge `0c9a352` and lifecycle validation, with historical checks, inventory and missing source ID limits. | One supported T3 read, one `gh pr view`, plus tool discovery. Bytes and total provider usage unmeasured. |
 | Markdown | Identified the same revisions, action and limits; also inferred restoring `prepare-work` as a first prerequisite, which was not established by the handoff. | Zero reader tool calls; authoring and original message bytes were not measured. |
-| Runtrail | Pending candidate and independent reader. | Not measured. |
+| Runtrail | Identified the same revisions and lifecycle action as client-reported, unverified facts. Noted unknown applicability and bounded coverage; suggested rereading/accepting but stated that this is not authorization. | One provenance brief CLI invocation, exit 0, 8,594 stdout bytes, 1.249 seconds subprocess elapsed; provider usage unmeasured. |
 
 The GitHub command's reported elapsed time was 0.330 seconds, not whole-path
 time. No per-arm total elapsed time or provider usage is available. The case is
 not scored or counted until equivalent Runtrail information and its reader
-outcome are assessed.
+outcome are assessed. The Runtrail reader ran after the other two readers;
+the arm order was not counterbalanced.
 
 Candidate `c3605db8df4053568844c44db064727861f9ef7e` was independently reviewed
 against `d3120d3` and tested after frozen install in a disposable checkout:
@@ -69,9 +71,16 @@ completed security-producer source was captured in an authenticated disposable
 loopback ledger: source metadata 219 bytes, authored summary 613 bytes, CLI
 output 959 bytes, and three POST request bodies of 1105, 2766 and 2890 bytes
 (responses 1548, 2883 and 3004 bytes). Setup, original authoring, and historical
-send costs are not fully measured. The independent Runtrail reader is pending.
+send costs are not fully measured. The independent Runtrail reader completed.
 
 The Runtrail summary omitted the Markdown arm's historical one-message and
 unmeasured-bytes detail and its pointer to installed paths, advisories and
 rollback. Equivalent information has therefore not been established. Preserve
 this as an incomplete comparison unless a fresh comparable read resolves it.
+
+Independent review of #220 found a separate startup failure: if initialization
+times out while SDK close stalls, the failure path awaits close outside the
+bounded shutdown and does not deliver an initialization error while stdin stays
+open. A disposable injected-stall regression failed after 2.5 seconds; this is
+not a claim that a natural SDK close stall was observed. The finding was sent to
+the lifecycle owner and integrator for correction.
