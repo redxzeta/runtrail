@@ -84,3 +84,8 @@ bounded shutdown and does not deliver an initialization error while stdin stays
 open. A disposable injected-stall regression failed after 2.5 seconds; this is
 not a claim that a natural SDK close stall was observed. The finding was sent to
 the lifecycle owner and integrator for correction.
+The separate local combination of #219 `c3605db` and #220 `aafcd012` passed
+61 focused tests, lint, typecheck, 266 full tests, build and 19 conformance
+checks; its tree was `6421998d48f8686d146b7a68c6b060a71f6e467c`. These passing
+checks do not cover the failing injected-stall regression or establish the final
+integration revision. Native Windows remains NOT_RUN.
