@@ -91,9 +91,11 @@ upstream sockets closed and EOF reached bounded cleanup. The exact-head
 bridge, entrypoint and workflow focused suite passed 62 tests; a separate full
 run passed 267 tests, lint, typecheck, build and 19 conformance checks. The
 integrator reported another full run on the same head with 266 passes and one
-timeout in the new test. Its test-only follow-up `2497c14` changes the deadline
-anchor; production bytes are unchanged. Its final validation was pending at
-this observation. The production verdict remains scoped to `8348c2a`.
+timeout in the new test. The integrator then reported lint, typecheck, 267
+tests, build, 19 conformance checks with cleanup, audit and diff-check passing at
+test-only follow-up `2497c14eae5db43509ebb5e62531417ea3b74588`. It changes the
+deadline anchor, not its duration; production bytes are unchanged. The independent
+production verdict remains scoped to `8348c2a`.
 The separate local combination of #219 `c3605db` and #220 `aafcd012` passed
 61 focused tests, lint, typecheck, 266 full tests, build and 19 conformance
 checks; its tree was `6421998d48f8686d146b7a68c6b060a71f6e467c`. These passing
