@@ -77,6 +77,7 @@ A fresh paginated open-issue enumeration found **10**: #167, #169, #172, #174,
 acceptance decision. [#211](https://github.com/redxzeta/runtrail/pull/211)
 merged at `b9cb5e60c504a1a7e5212313c17a1a37d71a6098`; its explicit summary
 import was exercised through a real gateway-derived export and fresh MCP protocol
-client. The companion helper and acceptance report remain pending separate review.
-#207 remains open pending integration consolidation. Native automatic hooks and
+client. The companion [helper](../../examples/acceptance/t3-export.mjs) and
+[acceptance report](cross-client-acceptance.md) document the exercised path.
+#207 remained open pending integration consolidation at this checkpoint. Native automatic hooks and
 configured T3 client integration were not tested.

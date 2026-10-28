@@ -20,9 +20,19 @@ useful Runtrail goal. The [M1/M2 dogfood](results/207-daily-workflow.md) measure
 one manual brief read instead of two, but still two HTTP requests; its synthetic
 protocol client is not a native T3 integration. It does not establish universal
 savings. The M3 acceptance used a gateway-derived summary and a fresh MCP client;
-the companion helper and results are pending separate delivery. In that measured
-example, authored continuation facts were 370 bytes in both paths; the import
-envelope was 1,729 bytes and the brief 6,326 bytes. Export and import add initial
+the companion [helper](../examples/acceptance/t3-export.mjs) and [acceptance report](results/cross-client-acceptance.md) document the example. In that measured
+example, identical authored continuation facts were 370 bytes in both paths. The
+safe source projection was 219 bytes, authored work 1,207, saved envelope 1,729,
+import result 789, brief 6,326, and five MCP tool results 15,143 bytes. Import,
+brief and MCP results totaled 22,258 bytes and 10 Runtrail HTTP calls. Including
+source reads and helper output, the forward flow produced 27,538 serialized result
+bytes across 12 API calls (10 Runtrail and two source reads). A separate live T3
+final-item and GitHub CLI baseline was 3,551 bytes in those two source reads using
+known source coordinates. Counts are UTF-8 serialized payloads: CLI stdout includes
+indentation and newline, MCP uses JSON-stringified tool results, and T3 uses
+JSON-stringified structured content. They are not wire bytes, token counts or total
+model input/output. These outputs contain different information and provenance;
+this is not a compression comparison. Export and import add initial
 work. Portability is an opt-in benefit for a cross-client handoff, not a measured
 whole-path saving; T3 plus GitHub may be simpler for a single-client continuation.
 If repeated use does not justify that cost, narrow the product rather than add
@@ -43,8 +53,8 @@ Reopen or propose a bounded extraction when one of those triggers is demonstrate
 - **Now:** cross-tool coding handoffs, concise review evidence, ordinary command
   capture, a useful shell flow, and [explicit versioned T3/generic summary import](import-work-summary.md).
   Preserve unknown, stale and claimed evidence as such; do not run or fetch
-  imported content. The gateway-to-import-to-MCP path was exercised; the companion
-  helper and report are pending separate delivery.
+  imported content. The gateway-to-import-to-MCP path was exercised; see the
+  [recipe](../examples/acceptance/README.md) and [results](results/cross-client-acceptance.md).
 - **Next:** Only proven bounded examples for CI/local builds, harmless
   homelab job outcomes and evaluations should reuse runs, events and artifacts.
 - **Later:** optional trace links/export if a real need appears.
@@ -56,7 +66,7 @@ Reopen or propose a bounded extraction when one of those triggers is demonstrate
 | --- | --- | --- |
 | Shell CLI and HTTP | Existing capture, doctor, brief, handoff and packet; see [daily loop](../README.md#daily-work-loop) | Capture may be degraded; no remote ID should be invented. |
 | MCP | Existing generic direct and bridge surfaces; [client support](protocol-compatibility.md) | Synthetic protocol continuation is not native T3 acceptance. |
-| T3 summary import | Explicit gateway read → sanitized export → CLI import → fresh MCP continuation exercised against #211 | Companion helper/report pending; native hooks and configured clients NOT_RUN. Source claims remain unverified. |
+| T3 summary import | Explicit gateway read → sanitized export → CLI import → fresh MCP continuation exercised against #211 | Native hooks and configured clients NOT_RUN. Source claims remain unverified. |
 | Tracing | No compatibility claim | Links/export are future possibilities only. |
 
 For the minimum workflow, start with `doctor` and `prepare-work`, capture an actual

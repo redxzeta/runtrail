@@ -181,8 +181,9 @@ in the [issue-207 results report](docs/results/207-daily-workflow.md).
 For portable handoffs, the [work-summary import contract](docs/import-work-summary.md)
 accepts an explicit versioned, allowlisted T3 or generic summary. The tested T3
 path reads a supported gateway, prepares a sanitized summary, imports it through
-the CLI, and continues from a fresh MCP protocol client. The companion export
-helper and acceptance report are pending their separate delivery. Native automatic
+the CLI, and continues from a fresh MCP protocol client. The companion [export helper](examples/acceptance/t3-export.mjs),
+[recipe](examples/acceptance/README.md) and [acceptance report](docs/results/cross-client-acceptance.md)
+document that path and its limits. Native automatic
 T3 hooks and configured-client integration were not tested. Imported claims remain
 unverified; unknown and stale evidence must remain visible. This opt-in path adds
 initial export/import work and is useful when a portable cross-client handoff is
