@@ -10,8 +10,8 @@ Source reviewed: `cd04a8544c96d52eddb96de15fafd1f997601d6e` (#211), followed by
 `61aabe60382c2295ea2743f10dfc83ca4a07bcbe` (#213). Original fresh base was
 `010c5d8`; final dependencies came from #206 at `b3853f6`. #198 and #209 were
 integrated through `a1b40f1`; #211 merged at `b9cb5e6`, followed by v1.43.0
-release commit `443bb26`. Production source/package/lock bytes in the acceptance
-checkout match the final reviewed source candidate; companion changes are confined
+release commit `443bb26`. Production source and dependency-lock bytes in the acceptance
+checkout match the final reviewed source candidate; version-only release commits are separate. Companion changes are confined
 to the example, acceptance test and this report. No production patch belongs to
 the companion PR. Node 24.18.1; pnpm 11.17.0; SDK 1.30.0; Vitest 5.0.1.
 
@@ -167,10 +167,11 @@ changes, and the existing HTTP, SQLite uniqueness and projection seams.
 | Finding | Reproduction and disposition |
 | --- | --- |
 | P2: malformed T3 identity accepted | Integration found extra `:ordinal:garbage` and malformed UUID grouping. Independent actual helper regression failed on `52115c9`; exact fix in `cd04a854` and helper mismatch cases passed. |
-| P2: lowercase prefixed secret assignment accepted | Integration found `db_password=...` bypassed the word boundary. Independent real CLI acceptance regression failed on pre-fix release source; reviewed `443bb26..61aabe6` removes that boundary and adds four focused cases. |
+| P2: lowercase prefixed secret assignment accepted | Integration found `db_password=...` bypassed the word boundary. Independent real CLI acceptance regression failed on pre-fix release source; reviewed `443bb26..61aabe6` removes that boundary and adds four focused cases. The corrected actual CLI unsafe/retry scenario and focused unsafe-input test passed. |
 
 No other concrete P1/P2 was found in the reviewed import ranges. The original
-source verdict and checks are durable in [PR #211's independent review](https://github.com/redxzeta/runtrail/pull/211#pullrequestreview-5678081741).
+source verdict and checks are durable in [PR #211's independent review](https://github.com/redxzeta/runtrail/pull/211#pullrequestreview-5678081741)
+and [PR #213's independent review](https://github.com/redxzeta/runtrail/pull/213#pullrequestreview-5678127278).
 The companion's implementation requires independent integration-owner review;
 this report is not self-approval. Hosted CI, review, merge, release and deployment
 are separate evidence states.
@@ -190,9 +191,11 @@ are separate evidence states.
 Repository validation passed on reviewed import source plus the isolated harness:
 `pnpm lint`, `pnpm typecheck`, `pnpm test` (23 files, 223 tests), `pnpm build`,
 `pnpm conformance` (19 passed, cleanup passed), and `git diff --check`. Lint retains
-the existing informational Biome schema-version notice. Final source-fix and
-companion evidence is reported separately in their exact-head PR review/checks;
-earlier green results do not cover later changed bytes automatically.
+the existing informational Biome schema-version notice. The complete combined run
+also passed with final source-fix `61aabe6` and the added actual-CLI negative case.
+Later report-only changes do not alter the tested source, dependency lock or harness.
+Hosted exact-head PR checks remain separate evidence; earlier green results do not
+cover later changed bytes automatically.
 
 Rollback: revert the companion example/test/report commits. There is no migration,
 dependency addition, deployed service or client configuration to undo. Import
