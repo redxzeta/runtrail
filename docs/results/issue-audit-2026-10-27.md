@@ -61,3 +61,7 @@ head `fc9fd06c6552dde3e2231a873ae143b544ede997` retains the audited lock blob
 was filed. This is neither a current-main clearance nor proof of exploitability.
 #210 requires an exact-main re-audit after #206 is merged or otherwise disposed,
 compatible minimal repairs and evidence for residual findings.
+
+Subsequently #206 merged at [`b3853f6517ea5bb894d714e330a786af117485f3`](https://github.com/redxzeta/runtrail/commit/b3853f6517ea5bb894d714e330a786af117485f3).
+The candidate audit remains a reported observation, not a fresh audit or security
+clearance of current main. #210 tracks the remaining work.
