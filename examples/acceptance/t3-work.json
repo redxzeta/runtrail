@@ -1,0 +1,27 @@
+{
+  "project": "runtrail-acceptance",
+  "workflowId": "issue-207-acceptance",
+  "workKey": "github:redxzeta/runtrail#207",
+  "task": "Continue bounded Runtrail import acceptance",
+  "summary": "Selected T3 final summary: M1/M2 delivered in PR208; M3 import and native-client acceptance remained open. GitHub now reports PR208 merged. Source completion is not independent verification.",
+  "evidence": [
+    {
+      "kind": "other",
+      "ref": "urn:t3:item:turn-item:provider:codex:native-item:msg_0d0166f850c715c9016ae1769aa658819aa1c33b8773d6d3e0",
+      "summary": "Attributed agent final summary at position170, updated 2026-10-28T04:14:22.064Z; selected run completedAt 2026-10-28T04:14:22.162Z. Paraphrased, not a transcript.",
+      "observedAt": "2026-10-28T05:04:41.585Z",
+      "provenance": "client_reported"
+    },
+    {
+      "kind": "pull_request",
+      "ref": "https://github.com/redxzeta/runtrail/pull/208",
+      "summary": "GitHub read: mergedAt 2026-10-28T04:59:48Z; merge bdd11e1c445a8f5f8c3a01fe9f39017359eb8ba4; head 3dc11e2f1240f8d6d34a52f663e3878512de7e78.",
+      "observedAt": "2026-10-28T05:04:41.585Z",
+      "provenance": "client_reported"
+    }
+  ],
+  "nextAction": "Review the import candidate at its exact SHA; retain native configured-client startup as NOT_RUN.",
+  "handoff": {
+    "toSource": "acceptance-mcp"
+  }
+}
