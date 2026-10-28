@@ -14,6 +14,7 @@ import { migrate } from "./db/migrate.js";
 import { createApp } from "./index.js";
 import { createRuntrailMcpBridgeServer } from "./mcp/bridge.js";
 import { callRuntrailTool, type RuntrailHttpClient } from "./mcp/index.js";
+import { isMainModule } from "./shared/entrypoint.js";
 import type {
   CapabilitiesManifest,
   ConformanceResult,
@@ -818,7 +819,7 @@ function parseArgs(argv: string[]): ConformanceOptions {
   return options;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   runConformance(parseArgs(process.argv.slice(2)))
     .then((result) => {
       if (result.summary.failed > 0 || result.cleanup.status !== "passed") process.exitCode = 1;

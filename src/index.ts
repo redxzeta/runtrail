@@ -6,6 +6,7 @@ import { openDatabase } from "./db/index.js";
 import { createHealthRoute } from "./routes/health.js";
 import { createLedgerRoute } from "./routes/ledger.js";
 import { createMcpRoute } from "./routes/mcp.js";
+import { isMainModule } from "./shared/entrypoint.js";
 
 type CreateAppOptions = {
   config?: RuntrailConfig;
@@ -55,6 +56,6 @@ export function startServer(): void {
   process.once("SIGTERM", shutdown);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   startServer();
 }
