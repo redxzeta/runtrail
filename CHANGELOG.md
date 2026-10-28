@@ -1,3 +1,15 @@
+# [1.43.0](https://github.com/redxzeta/runtrail/compare/v1.42.0...v1.43.0) (2026-10-28)
+
+
+### Bug Fixes
+
+* **import:** match exact T3 run identities and UUIDs ([cd04a85](https://github.com/redxzeta/runtrail/commit/cd04a8544c96d52eddb96de15fafd1f997601d6e))
+
+
+### Features
+
+* **import:** add bounded attributed work summary delivery ([52115c9](https://github.com/redxzeta/runtrail/commit/52115c9e708f00b7ea7b3a06f59c316662dbd09d))
+
 # [1.42.0](https://github.com/redxzeta/runtrail/compare/v1.41.3...v1.42.0) (2026-10-28)
 
 
