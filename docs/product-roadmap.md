@@ -27,6 +27,11 @@ points to a separate maintained repository. Traces answer observability question
 Runtrail's handoff is an attributed work summary. Optional links or export may be
 considered only for a demonstrated need. No telemetry standard compatibility is claimed.
 
+Maintenance is justified by a concrete defect, compatibility commitment, accepted
+feature, or measured review/performance problem. Do the smallest necessary change;
+do not pursue a prescribed multi-issue extraction simply because a file is large.
+Reopen or propose a bounded extraction when one of those triggers is demonstrated.
+
 ## Priorities and support
 
 - **Now:** cross-tool coding handoffs, concise review evidence, ordinary command
