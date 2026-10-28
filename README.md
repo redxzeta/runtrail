@@ -141,20 +141,45 @@ pnpm cli prepare-work --project runtrail --source codex --work-key github:redxze
 
 ## Daily work loop
 
-Use an already configured local service and token. Diagnose access, start or
-recover work, capture real commands, then hand off with evidence limitations:
+Runtrail is optional. For same-thread or one-off work, direct T3/GitHub reads
+or a plain Markdown handoff may be simpler. Configure the service/token once;
+use `pnpm cli doctor` at setup or on access errors.
+
+For a cross-tool handoff from an explicitly selected **terminal** source run:
 
 ```sh
-pnpm cli doctor
-pnpm cli prepare-work --project runtrail --work-key github:redxzeta/runtrail#207 --limit 5
-pnpm cli run --source developer --project runtrail --task "check daily workflow" \
-  --work-key github:redxzeta/runtrail#207 --workflow-id issue-207 -- pnpm test
-pnpm cli brief --project runtrail --work-key github:redxzeta/runtrail#207 --limit 5
-pnpm cli brief --project runtrail --run-id "$RUN_ID" --json
+pnpm --silent cli workflow capture --source-file selected-metadata.json \
+  --project runtrail --work-key github:redxzeta/runtrail#215 \
+  --task "Review workflow capture" \
+  --summary "Blockers: independent review pending. Evidence limits: checks unverified." \
+  --next-action "Review the exact candidate and check revision applicability" \
+  --save data/handoff-215.json
+pnpm --silent cli brief --project runtrail --work-key github:redxzeta/runtrail#215 \
+  --import-provenance
+# After a failed or uncertain capture, reuse the saved observation:
+pnpm --silent cli workflow capture --retry data/handoff-215.json
+```
+
+The [short workflow guide](docs/workflow-capture.md) defines selected metadata,
+multiple-run selection, generic callers, safety, dry-run and retry behavior.
+This combines envelope construction, safe save and import into one capture
+operation; it does not remove the supported source read, bounded metadata
+projection or authored summary/action work. Capture makes three existing POSTs;
+this provenance read makes three existing GETs. Default `brief` still makes two
+GETs. Reads never accept a handoff or start a receiving run. A running T3 source
+is unsupported; do not invent completion or relabel it as a generic observation.
+Native T3 hooks and automatic source fetching are not provided.
+
+For commands worth recording and explicit lifecycle work, existing commands remain:
+
+```sh
+pnpm cli prepare-work --project runtrail --work-key github:redxzeta/runtrail#215
+pnpm cli run --source developer --project runtrail --task "check workflow" \
+  --work-key github:redxzeta/runtrail#215 --workflow-id issue-215 -- pnpm test
 pnpm cli handoff create --source-run-id "$RUN_ID" --from-source developer \
   --to-source reviewer --project runtrail --summary "Capture changes ready for review" \
   --next-action "Inspect failed checks and revision applicability before continuing"
-pnpm cli workflow packet --project runtrail --workflow-id issue-207 \
+pnpm cli workflow packet --project runtrail --workflow-id issue-215 \
   --format markdown --output review.md
 ```
 
@@ -179,9 +204,11 @@ catalog or scheduler is needed. CLI and protocol-client coverage are recorded
 in the [issue-207 results report](docs/results/207-daily-workflow.md).
 
 For portable handoffs, the [work-summary import contract](docs/import-work-summary.md)
-accepts an explicit versioned, allowlisted T3 or generic summary. The tested T3
+accepts an explicit versioned, allowlisted T3 or generic summary. The historical tested T3
 path reads a supported gateway, prepares a sanitized summary, imports it through
-the CLI, and continues from a fresh MCP protocol client. The companion [export helper](examples/acceptance/t3-export.mjs),
+the CLI, and continues from a fresh MCP protocol client. The new capture command
+is the shorter shell/agent recipe; its functional tests are separate from
+prospective usefulness evaluation. The companion [export helper](examples/acceptance/t3-export.mjs),
 [recipe](examples/acceptance/README.md) and [acceptance report](docs/results/cross-client-acceptance.md)
 document that path and its limits. Native automatic
 T3 hooks and configured-client integration were not tested. Imported claims remain

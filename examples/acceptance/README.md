@@ -108,3 +108,14 @@ The useful cross-tool case is a fresh generic client receiving a bounded next
 action and confirmed source linkage after someone explicitly captures the work.
 See [measured results](../../docs/results/cross-client-acceptance.md) for overhead
 and coverage limits. No production ROI, token/cost or elapsed-time saving is claimed.
+
+## Shorter interactive capture
+
+This historical helper/fixture recipe remains reproducible. For new explicit
+cross-tool handoffs, prefer [workflow capture](../../docs/workflow-capture.md):
+pass the selected metadata file and authored summary/action flags directly, save
+once and import in the same operation. No separate authored work JSON or helper
+invocation is required. Use the saved envelope with `--retry`; rerunning this
+older export helper regenerates its observation timestamp and is not a retry.
+The new provenance brief uses three GETs; the historical measurements above
+remain measurements of the earlier path.
