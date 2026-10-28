@@ -22,3 +22,16 @@ export/import plus brief operations and twelve for fresh MCP acceptance. Those
 historical observations are neither measurements of the new workflow nor new
 prospective cases. A same-thread, one-off review with its context already in
 hand is a reason to skip capture, but has not yet been counted as a pilot case.
+
+The approved proposed workflow combines capture into one CLI invocation, but
+still requires source selection, metadata projection and authored content, then
+three import POSTs. Its provenance-bearing brief is a second CLI invocation and
+three GETs; ordinary brief uses two GETs. These are contract counts pending
+candidate measurement, not an observed improvement. Payload sizes, elapsed time
+and provider usage for this prospective case were not measured.
+
+Current recommendation: **limit** Runtrail to explicit cross-client handoffs
+where a portable, attributed ledger is useful and the source is eligible. Use
+direct T3/GitHub for the active #210 review request, and skip capture for simple
+same-thread work. There is no demonstrated whole-path saving for the new
+workflow yet. The bounded remaining pilot is tracked in [#218](https://github.com/redxzeta/runtrail/issues/218).
