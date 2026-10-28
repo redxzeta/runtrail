@@ -73,6 +73,8 @@ Check health:
 ```sh
 curl http://127.0.0.1:8787/health
 pnpm cli health
+pnpm cli doctor
+pnpm cli doctor --json
 ```
 
 Discover optional protocol support before feature-specific calls:
@@ -81,6 +83,11 @@ Discover optional protocol support before feature-specific calls:
 curl -H "authorization: Bearer $RUNTRAIL_TOKEN" http://127.0.0.1:8787/meta/capabilities
 pnpm cli capabilities --json
 ```
+
+`doctor` only reads service health, authenticated capabilities, local path access
+and outbox state. It never opens/migrates SQLite, creates directories, replays
+writes or reconfigures the host. Missing local storage can be expected when the
+service is remote. Diagnostics omit tokens, service URLs and local paths.
 
 The versioned manifest advertises stable feature identifiers, schema versions, MCP transports and
 tools, and actual default/maximum list limits. Unknown feature identifiers are additive and safe to
@@ -256,6 +263,23 @@ Wrap a command and journal its result:
 pnpm cli run --source codex --project runtrail --task "fix retry logic" -- pnpm test
 pnpm cli run --source codex --project runtrail --task "fix retry logic" --category implementation --tag codex --tag issue-123 -- pnpm test
 ```
+
+The command runs once even if recorder setup, authentication, connectivity or
+local log capture fails. Invalid wrapper arguments still fail before execution.
+Telemetry has a 1.5-second budget before the command and another 1.5 seconds
+after it (a smaller `RUNTRAIL_REQUEST_TIMEOUT_MS` is respected). The wrapper
+does not drain the outbox; choose `pnpm cli sync` explicitly. Exit codes are
+preserved; signal exits use `128 + signal number` and include the signal in the
+result. SIGINT/SIGTERM received by the wrapper are forwarded to its direct child.
+
+The final result distinguishes `capture: stored` from `capture: degraded`.
+Without a confirmed server run ID, `runId` is null and only a safe keyed run
+create may be queued. Sync cannot reconstruct that command's result,
+verification or completion; a recovered run may need explicit reconciliation.
+With an ID, safe failed POSTs may be queued, but completion PATCH is never
+replayed. Logs stay local, use private file permissions and are marked
+unavailable if writing fails or storage cannot keep up. Raw log content is never
+uploaded. `stored` describes successful recording, not independent verification.
 
 ## Codex Hooks
 

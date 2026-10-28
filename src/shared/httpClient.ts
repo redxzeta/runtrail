@@ -61,13 +61,13 @@ export async function fetchWithTimeout(
   }, timeoutMs);
   timer.unref?.();
 
-  const onExternalAbort = () => controller.abort();
-  externalSignal?.addEventListener("abort", onExternalAbort);
-
   try {
     return await fetch(url, {
       ...init,
-      signal: controller.signal
+      // Keep the caller's signal attached through response-body consumption.
+      signal: externalSignal
+        ? AbortSignal.any([controller.signal, externalSignal])
+        : controller.signal
     });
   } catch (error) {
     if (timedOut) {
@@ -81,7 +81,6 @@ export async function fetchWithTimeout(
     throw error;
   } finally {
     clearTimeout(timer);
-    externalSignal?.removeEventListener("abort", onExternalAbort);
   }
 }
 

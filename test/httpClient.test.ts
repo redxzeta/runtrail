@@ -1,3 +1,4 @@
+import { getEventListeners } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createHttpClient } from "../src/mcp/index.js";
 import {
@@ -115,13 +116,13 @@ describe("shared httpClient", () => {
     expect((settled as Error).message).toBe("request aborted by caller");
   });
 
-  it("removes the external abort listener after a successful request", async () => {
+  it("does not retain external abort listeners after successful requests", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("{}", { status: 200 }))
     );
     const externalController = new AbortController();
-    const removeSpy = vi.spyOn(externalController.signal, "removeEventListener");
+    const listenersBefore = getEventListeners(externalController.signal, "abort").length;
 
     const response = await fetchWithTimeout(
       "http://runtrail.test/health",
@@ -129,7 +130,7 @@ describe("shared httpClient", () => {
       5_000
     );
     expect(response.status).toBe(200);
-    expect(removeSpy).toHaveBeenCalledWith("abort", expect.any(Function));
+    expect(getEventListeners(externalController.signal, "abort").length).toBe(listenersBefore);
   });
 
   it("clears the abort timer when the fetch resolves before the timeout", async () => {

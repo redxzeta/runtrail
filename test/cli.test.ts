@@ -912,6 +912,53 @@ describe("cli", () => {
     );
   });
 
+  it.each(["offline", "unauthorized", "invalid response"])(
+    "executes exactly once when initial run creation fails: %s",
+    async (failure) => {
+      tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-startup-"));
+      vi.stubEnv("RUNTRAIL_STATE_DIR", tempDir);
+      vi.stubEnv("RUNTRAIL_LOG_DIR", path.join(tempDir, "logs"));
+      vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");
+      vi.stubEnv("RUNTRAIL_TOKEN", "");
+      const fetchMock = vi.fn(async () => {
+        if (failure === "offline") throw new Error("offline");
+        return new Response("{}", { status: failure === "unauthorized" ? 401 : 201 });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const output = captureOutput();
+      const marker = path.join(tempDir, "executions");
+
+      await runCli([
+        "node",
+        "rt",
+        "run",
+        "--source",
+        "developer",
+        "--project",
+        "runtrail",
+        "--task",
+        "outage regression",
+        "--",
+        process.execPath,
+        "-e",
+        `require('node:fs').appendFileSync(${JSON.stringify(marker)}, 'once\\n'); process.exit(7)`
+      ]);
+
+      expect(readFileSync(marker, "utf8")).toBe("once\n");
+      expect(process.exitCode).toBe(7);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(output.at(-1) ?? "{}")).toEqual(
+        expect.objectContaining({
+          runId: null,
+          exitCode: 7,
+          capture: "degraded"
+        })
+      );
+      expect(readPendingOutbox().valid.every(({ record }) => record.path === "/runs")).toBe(true);
+    }
+  );
+
   it("wraps a failed command in a failed run and preserves exit code", async () => {
     const fetchMock = mockRunWrapperFetch();
     vi.stubEnv("RUNTRAIL_LOG_DIR", "./data/test-cli-logs");
