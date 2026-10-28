@@ -35,3 +35,27 @@ where a portable, attributed ledger is useful and the source is eligible. Use
 direct T3/GitHub for the active #210 review request, and skip capture for simple
 same-thread work. There is no demonstrated whole-path saving for the new
 workflow yet. The bounded remaining pilot is tracked in [#218](https://github.com/redxzeta/runtrail/issues/218).
+
+## Post-merge dependency verification (incomplete comparison)
+
+The security producer's distinct source run 1 subsequently completed at
+2026-10-28T14:11:58.532Z; its final item was position 62. This is a separate
+eligible source from the active integration-thread message above. The genuine
+continuation is lifecycle validation against the merged dependency revision.
+Two fresh readers ran concurrently with Sol/high, without producer memory; a
+third Runtrail reader and candidate acceptance are pending. They are arms of one
+case, not additional cases. Both received the task and the same selected
+producer facts plus the GitHub merge observation; the direct arm could inspect
+the source item and selected GitHub fields, while the Markdown arm received a
+paraphrase. Different presentation and concurrent order remain confounders.
+
+| Arm | Observed result | Cost observed |
+| --- | --- | --- |
+| T3 + GitHub | Identified candidate `6257537`, merge `0c9a352` and lifecycle validation, with historical checks, inventory and missing source ID limits. | One supported T3 read, one `gh pr view`, plus tool discovery. Bytes and total provider usage unmeasured. |
+| Markdown | Identified the same revisions, action and limits; also inferred restoring `prepare-work` as a first prerequisite, which was not established by the handoff. | Zero reader tool calls; authoring and original message bytes were not measured. |
+| Runtrail | Pending candidate and independent reader. | Not measured. |
+
+The GitHub command's reported elapsed time was 0.330 seconds, not whole-path
+time. No per-arm total elapsed time or provider usage is available. The case is
+not scored or counted until equivalent Runtrail information and its reader
+outcome are assessed.
