@@ -26,6 +26,7 @@ import {
 import { buildBrief, formatBrief } from "./brief.js";
 import { captureCommand } from "./commandCapture.js";
 import { doctorReport, formatDoctor } from "./doctor.js";
+import { registerImportWork } from "./importWork.js";
 import {
   enqueueOutbox,
   listOutbox,
@@ -45,6 +46,8 @@ export async function runCli(argv = process.argv): Promise<void> {
   const program = new Command();
 
   program.name("rt").description("Runtrail CLI").showHelpAfterError().exitOverride();
+
+  registerImportWork(program, (path, body) => requestJson(path, { method: "POST", body }));
 
   program.command("health").description("Check Runtrail service health").action(health);
   program
