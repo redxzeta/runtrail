@@ -150,7 +150,20 @@ describe("disposable cross-client acceptance", () => {
         { ...source, recentRuns: [...source.recentRuns, ...source.recentRuns] },
         { ...source, items: [{ text: "raw timeline forbidden" }] },
         { ...source, recentRuns: [{ ...source.recentRuns[0], status: "running" }] },
-        { ...source, recentRuns: [{ ...source.recentRuns[0], completedAt: null }] }
+        { ...source, recentRuns: [{ ...source.recentRuns[0], completedAt: null }] },
+        { ...source, thread: { threadId: "mcp:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" } },
+        {
+          ...source,
+          recentRuns: [
+            { ...source.recentRuns[0], runId: `${source.recentRuns[0].runId}:ordinal:garbage` }
+          ]
+        },
+        {
+          thread: { threadId: `mcp:${"-".repeat(36)}` },
+          recentRuns: [
+            { ...source.recentRuns[0], runId: `run:thread:mcp%3A${"-".repeat(36)}:ordinal:2` }
+          ]
+        }
       ]) {
         writeFileSync(badSource, JSON.stringify(invalid));
         const rejected = await execute(
@@ -178,9 +191,12 @@ describe("disposable cross-client acceptance", () => {
         Date.parse(source.recentRuns[0].completedAt)
       );
       const raw = exported.stdout; // preserve this observation, do not re-export on retry
+      const captureStart = fixture.requests.length;
       const imported = await fixture.cli(["import-work", "--file", "-"], raw);
+      const captureRequests = fixture.requests.length - captureStart;
       expect(imported.code).toBe(0);
       expect(imported.json.status).toBe("complete");
+      expect(captureRequests).toBe(3);
       const ids = imported.json.confirmed as { stage: string; id: string }[];
       const runId = ids.find((item) => item.stage === "run")?.id;
       const handoffId = ids.find((item) => item.stage === "handoff")?.id;
@@ -215,8 +231,13 @@ describe("disposable cross-client acceptance", () => {
       const [left, right] = InMemoryTransport.createLinkedPair();
       await mcp.connect(right);
       await client.connect(left);
+      const mcpReadStart = fixture.requests.length;
+      let mcpCalls = 0;
+      let mcpResultBytes = 0;
       const call = async (name: string, args: Record<string, unknown>) => {
         const result = await client.callTool({ name, arguments: args });
+        mcpCalls += 1;
+        mcpResultBytes += Buffer.byteLength(JSON.stringify(result));
         expect(result.isError).not.toBe(true);
         const block = (result.content as { type: string; text?: string }[]).find(
           (item) => item.type === "text"
@@ -251,6 +272,9 @@ describe("disposable cross-client acceptance", () => {
       });
       expect(accepted.handoff.sourceRunId).toBe(runId);
       expect(accepted.handoff.targetRunId).toBe(receiving.run.id);
+      const mcpRequests = fixture.requests.length - mcpReadStart;
+      expect(mcpCalls).toBe(5);
+      expect(mcpRequests).toBe(5);
       // Explicitly old liveness in disposable SQLite; no elapsed-time or dead-process claim.
       fixture.db
         .prepare("UPDATE agent_runs SET last_liveness_at = ? WHERE id = ?")
@@ -281,9 +305,13 @@ describe("disposable cross-client acceptance", () => {
         authoredWorkBytes: Buffer.byteLength(JSON.stringify(work)),
         briefOutputBytes: Buffer.byteLength(brief.stdout),
         briefManualCommands: 1,
-        briefHttpRequests: 2,
-        firstCaptureHttpRequests: 3,
-        helperValidationHttpRequests: 0,
+        briefHttpRequests: fixture.requests.slice(readStart, readStart + 2).length,
+        firstCaptureHttpRequests: captureRequests,
+        captureResultBytes: Buffer.byteLength(imported.stdout),
+        mcpCalls, mcpHttpRequests: mcpRequests, mcpSerializedResultBytes: mcpResultBytes,
+        happyPathRuntrailHttpRequests: captureRequests + 2 + mcpRequests,
+        captureBriefMcpResultBytes: Buffer.byteLength(imported.stdout) + Buffer.byteLength(brief.stdout) + mcpResultBytes,
+        helperValidationHttpRequests: captureStart,
         nativeConfiguredClient: "NOT_RUN"
       });
     } finally {
