@@ -1,3 +1,10 @@
+## [1.43.2](https://github.com/redxzeta/runtrail/compare/v1.43.1...v1.43.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* **deps:** update vulnerable production dependencies ([#216](https://github.com/redxzeta/runtrail/issues/216)) ([0c9a352](https://github.com/redxzeta/runtrail/commit/0c9a35224efbbe5ffc56715e97ecf68054b3b9fe))
+
 ## [1.43.1](https://github.com/redxzeta/runtrail/compare/v1.43.0...v1.43.1) (2026-10-28)
 
 
