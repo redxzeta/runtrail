@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolResultSchema, InitializeRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { isMainModule } from "../shared/entrypoint.js";
 import {
-  fetchWithTimeout,
   formatClientFailure,
   readRequestTimeoutMs,
   redactSecrets,
   safePath
 } from "../shared/httpClient.js";
+import { boundedBridgeFetch } from "./bridgeFetch.js";
+import { bridgeLifecycle } from "./bridgeLifecycle.js";
 import type { runtrailToolNames } from "./index.js";
 import { mcpToolInputSchemas } from "./toolSchemas.js";
 
@@ -253,7 +253,10 @@ async function forwardTool(
 ) {
   const result = await client.callTool({
     name,
-    arguments: args
+    arguments:
+      name === "journal_search" || name === "journal_search_runs"
+        ? { ...args, limit: args.limit ?? 20 }
+        : args
   });
 
   return CallToolResultSchema.parse(result);
@@ -262,14 +265,24 @@ async function forwardTool(
 async function start(): Promise<void> {
   const { token, url } = loadBridgeConfig();
   const timeoutMs = readRequestTimeoutMs();
+  const remoteUrl = new URL(url);
+  const lifecycle = bridgeLifecycle();
   let startupPending = true;
-  const remoteTransport = new StreamableHTTPClientTransport(new URL(url), {
-    fetch: (input: string | URL, init: RequestInit = {}) =>
-      bridgeFetch(
-        input,
-        init,
-        startupPending ? Math.min(timeoutMs, BRIDGE_STARTUP_TIMEOUT_MS) : timeoutMs
-      ),
+  const remoteTransport = new StreamableHTTPClientTransport(remoteUrl, {
+    fetch: async (input: string | URL, init: RequestInit = {}) => {
+      const deadline = startupPending ? Math.min(timeoutMs, BRIDGE_STARTUP_TIMEOUT_MS) : timeoutMs;
+      try {
+        return await boundedBridgeFetch(input, init, lifecycle.signal, deadline, {
+          startup: startupPending
+        });
+      } catch (error) {
+        throw formatClientFailure(error, deadline, {
+          method: init.method ?? "GET",
+          path: safePath(input),
+          token
+        });
+      }
+    },
     requestInit: {
       headers: {
         accept: "application/json, text/event-stream",
@@ -277,44 +290,58 @@ async function start(): Promise<void> {
       }
     }
   });
-  const client = new Client({
-    name: "runtrail-mcp-bridge",
-    version: "1.0.0"
+  const client = new Client({ name: "runtrail-mcp-bridge", version: "1.0.0" });
+  const stdio = new StdioServerTransport();
+  lifecycle.own(async () => {
+    await client.close();
   });
-
+  // Also cover a transport whose connection failed before Protocol attached it.
+  lifecycle.own(async () => {
+    await remoteTransport.close();
+  });
+  lifecycle.own(async () => {
+    await stdio.close();
+  });
+  let server: McpServer | undefined;
+  lifecycle.own(async () => {
+    await server?.close();
+  });
   try {
-    await client.connect(remoteTransport);
-  } catch (error) {
+    try {
+      // The SDK handles SSE in the background: a body error alone does not
+      // reject its initialize request. Bound that request as well as fetch.
+      await client.connect(remoteTransport, {
+        timeout: Math.min(timeoutMs, BRIDGE_STARTUP_TIMEOUT_MS) + 100
+      });
+      if (lifecycle.stopped) return;
+      server = createRuntrailMcpBridgeServer(client);
+      client.onclose = () => {
+        void lifecycle.shutdown();
+      };
+    } catch (error) {
+      if (lifecycle.stopped) return;
+      // Dispose a partially initialized upstream while keeping the established
+      // actionable initialization-error contract for the local MCP client.
+      await client.close();
+      await remoteTransport.close();
+      server = new McpServer({ name: "runtrail-mcp-bridge", version: "1.0.0" });
+      const detail = error instanceof Error ? error.message : String(error);
+      const diagnostic = `${redactSecrets(detail, token)}. Check Runtrail service health and RUNTRAIL_MCP_URL.`;
+      server.server.setRequestHandler(InitializeRequestSchema, () => {
+        throw new Error(diagnostic);
+      });
+    }
     startupPending = false;
-    const failureServer = new McpServer({
-      name: "runtrail-mcp-bridge",
-      version: "1.0.0"
-    });
-    const detail = error instanceof Error ? error.message : String(error);
-    const diagnostic = `${redactSecrets(detail, token)}. Check Runtrail service health and RUNTRAIL_MCP_URL.`;
-    failureServer.server.setRequestHandler(InitializeRequestSchema, () => {
-      throw new Error(diagnostic);
-    });
-    await failureServer.connect(new StdioServerTransport());
-    return;
-  }
-  startupPending = false;
-  const server = createRuntrailMcpBridgeServer(client);
-  await server.connect(new StdioServerTransport());
-}
-
-async function bridgeFetch(
-  url: string | URL,
-  init: RequestInit,
-  timeoutMs: number
-): Promise<Response> {
-  try {
-    return await fetchWithTimeout(url, init, timeoutMs);
+    if (lifecycle.stopped) return;
+    server.server.onclose = () => {
+      void lifecycle.shutdown();
+    };
+    lifecycle.releaseInput();
+    await server.connect(stdio);
+    if (!lifecycle.stopped) process.stdin.resume();
   } catch (error) {
-    throw formatClientFailure(error, timeoutMs, {
-      method: init.method ?? "GET",
-      path: safePath(url)
-    });
+    await lifecycle.shutdown(1);
+    throw new Error(redactSecrets(error instanceof Error ? error.message : String(error), token));
   }
 }
 
@@ -340,10 +367,10 @@ function requiredEnv(
   return value;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (isMainModule(import.meta.url)) {
   start().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

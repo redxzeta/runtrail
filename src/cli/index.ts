@@ -6,6 +6,7 @@ import { hostname } from "node:os";
 import path from "node:path";
 import { Command } from "commander";
 import { loadConfig } from "../config.js";
+import { isMainModule } from "../shared/entrypoint.js";
 import {
   fetchWithTimeout,
   formatClientFailure,
@@ -1716,7 +1717,7 @@ function readGitValue(cwd: string, args: string[]): string | undefined {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   runCli().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
