@@ -21,15 +21,17 @@ usage is inferred. Prospective scored comparisons: **0/10** at this checkpoint.
 The earlier acceptance report measured two known-coordinate direct reads, seven
 export/import plus brief operations and twelve for fresh MCP acceptance. Those
 historical observations are neither measurements of the new workflow nor new
-prospective cases. A same-thread, one-off review with its context already in
-hand is a reason to skip capture, but has not yet been counted as a pilot case.
+prospective cases. For a same-thread integration review, the reviewer already
+had source context and used the direct diff and GitHub instead of duplicating
+capture. This is an observed skip decision, not a scored three-arm case.
 
 The approved proposed workflow combines capture into one CLI invocation, but
 still requires source selection, metadata projection and authored content, then
 three import POSTs. Its provenance-bearing brief is a second CLI invocation and
-three GETs; ordinary brief uses two GETs. These are contract counts pending
-candidate measurement, not an observed improvement. Payload sizes, elapsed time
-and provider usage for this prospective case were not measured.
+three GETs; ordinary brief uses two GETs. The focused tests observed these
+request counts, and one real-source capture measured the POST bodies below;
+this does not establish whole-path savings. Original #210 request payload size,
+total elapsed time and provider usage were not measured.
 
 Current recommendation: **limit** Runtrail to explicit cross-client handoffs
 where a portable, attributed ledger is useful and the source is eligible. Use
@@ -43,12 +45,12 @@ The security producer's distinct source run 1 subsequently completed at
 2026-10-28T14:11:58.532Z; its final item was position 62. This is a separate
 eligible source from the active integration-thread message above. The genuine
 continuation is lifecycle validation against the merged dependency revision.
-Two fresh readers ran concurrently with Sol/high, without producer memory; a
-third Runtrail reader and candidate acceptance are pending. They are arms of one
-case, not additional cases. Both received the task and the same selected
-producer facts plus the GitHub merge observation; the direct arm could inspect
-the source item and selected GitHub fields, while the Markdown arm received a
-paraphrase. Different presentation and concurrent order remain confounders.
+Two fresh readers ran concurrently with Sol/high without producer memory; the
+Runtrail reader used the same model and effort afterward. These are arms of one
+case, not additional cases. The direct arm could inspect the source item and
+selected GitHub fields; the Markdown and Runtrail arms received authored
+selections with the differences described below. Presentation and order remain
+confounders.
 
 | Arm | Observed result | Cost observed |
 | --- | --- | --- |
@@ -57,10 +59,9 @@ paraphrase. Different presentation and concurrent order remain confounders.
 | Runtrail | Identified the same revisions and lifecycle action as client-reported, unverified facts. Noted unknown applicability and bounded coverage; suggested rereading/accepting but stated that this is not authorization. | One provenance brief CLI invocation, exit 0, 8,594 stdout bytes, 1.249 seconds subprocess elapsed; provider usage unmeasured. |
 
 The GitHub command's reported elapsed time was 0.330 seconds, not whole-path
-time. No per-arm total elapsed time or provider usage is available. The case is
-not scored or counted until equivalent Runtrail information and its reader
-outcome are assessed. The Runtrail reader ran after the other two readers;
-the arm order was not counterbalanced.
+time. No per-arm total elapsed time or provider usage is available. All three
+reader outcomes are reported, but the case is not scored or counted because the
+information supplied was unequal. The arm order was not counterbalanced.
 
 Candidate `c3605db8df4053568844c44db064727861f9ef7e` was independently reviewed
 against `d3120d3` and tested after frozen install in a disposable checkout:
@@ -75,15 +76,19 @@ send costs are not fully measured. The independent Runtrail reader completed.
 
 The Runtrail summary omitted the Markdown arm's historical one-message and
 unmeasured-bytes detail and its pointer to installed paths, advisories and
-rollback. Equivalent information has therefore not been established. Preserve
-this as an incomplete comparison unless a fresh comparable read resolves it.
+rollback. Equivalent information was not established, so this comparison remains
+incomplete and does not demonstrate an advantage.
 
 Independent review of #220 found a separate startup failure: if initialization
 times out while SDK close stalls, the failure path awaits close outside the
 bounded shutdown and does not deliver an initialization error while stdin stays
 open. A disposable injected-stall regression failed after 2.5 seconds; this is
 not a claim that a natural SDK close stall was observed. The finding was sent to
-the lifecycle owner and integrator for correction.
+the lifecycle owner and integrator. On revised head
+`8348c2a2865efef8a81961b8210ece980a383744`, an independent reproduction of the
+same injected stall passed: the diagnostic arrived while stdin was open,
+upstream sockets closed and EOF reached bounded cleanup. The exact-head
+bridge, entrypoint and workflow focused suite passed 62 tests.
 The separate local combination of #219 `c3605db` and #220 `aafcd012` passed
 61 focused tests, lint, typecheck, 266 full tests, build and 19 conformance
 checks; its tree was `6421998d48f8686d146b7a68c6b060a71f6e467c`. These passing
