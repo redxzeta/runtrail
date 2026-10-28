@@ -59,3 +59,19 @@ The GitHub command's reported elapsed time was 0.330 seconds, not whole-path
 time. No per-arm total elapsed time or provider usage is available. The case is
 not scored or counted until equivalent Runtrail information and its reader
 outcome are assessed.
+
+Candidate `c3605db8df4053568844c44db064727861f9ef7e` was independently reviewed
+against `d3120d3` and tested after frozen install in a disposable checkout:
+25 focused tests passed across workflow capture, brief and the existing
+cross-client acceptance suite. These are functional regression evidence, not
+reader usefulness or configured native-client startup evidence. The actual
+completed security-producer source was captured in an authenticated disposable
+loopback ledger: source metadata 219 bytes, authored summary 613 bytes, CLI
+output 959 bytes, and three POST request bodies of 1105, 2766 and 2890 bytes
+(responses 1548, 2883 and 3004 bytes). Setup, original authoring, and historical
+send costs are not fully measured. The independent Runtrail reader is pending.
+
+The Runtrail summary omitted the Markdown arm's historical one-message and
+unmeasured-bytes detail and its pointer to installed paths, advisories and
+rollback. Equivalent information has therefore not been established. Preserve
+this as an incomplete comparison unless a fresh comparable read resolves it.
