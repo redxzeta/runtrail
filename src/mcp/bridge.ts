@@ -18,6 +18,7 @@ import { mcpToolInputSchemas } from "./toolSchemas.js";
 
 type RemoteRuntrailClient = Pick<Client, "callTool">;
 const BRIDGE_STARTUP_TIMEOUT_MS = 5_000;
+const FAILED_UPSTREAM_CLOSE_TIMEOUT_MS = 1_000;
 
 export function createRuntrailMcpBridgeServer(client: RemoteRuntrailClient): McpServer {
   const server = new McpServer({
@@ -267,12 +268,14 @@ async function start(): Promise<void> {
   const timeoutMs = readRequestTimeoutMs();
   const remoteUrl = new URL(url);
   const lifecycle = bridgeLifecycle();
+  const upstream = new AbortController();
+  const upstreamSignal = AbortSignal.any([lifecycle.signal, upstream.signal]);
   let startupPending = true;
   const remoteTransport = new StreamableHTTPClientTransport(remoteUrl, {
     fetch: async (input: string | URL, init: RequestInit = {}) => {
       const deadline = startupPending ? Math.min(timeoutMs, BRIDGE_STARTUP_TIMEOUT_MS) : timeoutMs;
       try {
-        return await boundedBridgeFetch(input, init, lifecycle.signal, deadline, {
+        return await boundedBridgeFetch(input, init, upstreamSignal, deadline, {
           startup: startupPending
         });
       } catch (error) {
@@ -320,10 +323,23 @@ async function start(): Promise<void> {
       };
     } catch (error) {
       if (lifecycle.stopped) return;
-      // Dispose a partially initialized upstream while keeping the established
-      // actionable initialization-error contract for the local MCP client.
-      await client.close();
-      await remoteTransport.close();
+      // Release sockets even if an SDK closer stalls. Keep stdin/local transport
+      // alive so the waiting client receives its initialization diagnostic.
+      upstream.abort();
+      let closeTimer: NodeJS.Timeout | undefined;
+      try {
+        await Promise.race([
+          Promise.allSettled([
+            Promise.resolve().then(() => client.close()),
+            Promise.resolve().then(() => remoteTransport.close())
+          ]),
+          new Promise<void>((resolve) => {
+            closeTimer = setTimeout(resolve, FAILED_UPSTREAM_CLOSE_TIMEOUT_MS);
+          })
+        ]);
+      } finally {
+        clearTimeout(closeTimer);
+      }
       server = new McpServer({ name: "runtrail-mcp-bridge", version: "1.0.0" });
       const detail = error instanceof Error ? error.message : String(error);
       const diagnostic = `${redactSecrets(detail, token)}. Check Runtrail service health and RUNTRAIL_MCP_URL.`;

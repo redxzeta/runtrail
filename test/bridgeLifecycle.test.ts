@@ -295,6 +295,27 @@ it("aborts actual remote sockets before bounded fallback on an injected stalled 
   }
 });
 
+it("reports failed startup despite a stalled upstream closer, then owns EOF cleanup", async () => {
+  const service = await upstream("headers");
+  try {
+    const run = bridge(service.url, true);
+    run.child.stdin.write(`${JSON.stringify(INITIALIZE)}\n`);
+    // Keep stdin open: failure diagnostics must not depend on EOF or a signal.
+    await until(() => run.stdout.includes('"id":1'), 2500);
+    const result = JSON.parse(run.stdout.trim());
+    expect(result.error.message).toContain("Check Runtrail service health");
+    expect(result.error.message).not.toContain("synthetic-lifecycle-token");
+    await until(() => service.sockets.size === 0);
+    expect(run.child.exitCode).toBeNull();
+    expect(run.stderr).toBe("");
+    run.child.stdin.end();
+    expect(await promptly(run.exited)).toEqual([1, null]);
+    expect(run.stderr).toContain("shutdown exceeded its deadline");
+  } finally {
+    await service.close();
+  }
+});
+
 describe("bounded cleanup", () => {
   it("aborts immediately and closes all owned resources once across repeated shutdown requests", async () => {
     const input = new PassThrough();
