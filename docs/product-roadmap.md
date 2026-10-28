@@ -19,8 +19,14 @@ claim about every installation or an export guarantee. Recreating them is not a
 useful Runtrail goal. The [M1/M2 dogfood](results/207-daily-workflow.md) measured
 one manual brief read instead of two, but still two HTTP requests; its synthetic
 protocol client is not a native T3 integration. It does not establish universal
-savings. A cross-client continuation must demonstrate value against T3 plus GitHub
-alone. If it does not, narrow the product rather than add infrastructure.
+savings. The M3 acceptance used a gateway-derived summary and a fresh MCP client;
+the companion helper and results are pending separate delivery. In that measured
+example, authored continuation facts were 370 bytes in both paths; the import
+envelope was 1,729 bytes and the brief 6,326 bytes. Export and import add initial
+work. Portability is an opt-in benefit for a cross-client handoff, not a measured
+whole-path saving; T3 plus GitHub may be simpler for a single-client continuation.
+If repeated use does not justify that cost, narrow the product rather than add
+infrastructure.
 
 [OpenTelemetry's GenAI conventions page](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
 points to a separate maintained repository. Traces answer observability questions;
@@ -35,11 +41,11 @@ Reopen or propose a bounded extraction when one of those triggers is demonstrate
 ## Priorities and support
 
 - **Now:** cross-tool coding handoffs, concise review evidence, ordinary command
-  capture, and a useful shell flow. Existing surfaces are maintained in scope.
-- **Next:** M3 explicit, versioned, allowlisted T3/generic work-summary import;
-  preserve unknown, stale and claimed evidence as such. Contract and real-source
-  acceptance are pending in the import and acceptance lanes. Do not run or fetch
-  imported content. Only proven bounded examples for CI/local builds, harmless
+  capture, a useful shell flow, and [explicit versioned T3/generic summary import](import-work-summary.md).
+  Preserve unknown, stale and claimed evidence as such; do not run or fetch
+  imported content. The gateway-to-import-to-MCP path was exercised; the companion
+  helper and report are pending separate delivery.
+- **Next:** Only proven bounded examples for CI/local builds, harmless
   homelab job outcomes and evaluations should reuse runs, events and artifacts.
 - **Later:** optional trace links/export if a real need appears.
 - **Not now:** agent chat or orchestration UI, scheduler, vector memory/RAG,
@@ -50,7 +56,7 @@ Reopen or propose a bounded extraction when one of those triggers is demonstrate
 | --- | --- | --- |
 | Shell CLI and HTTP | Existing capture, doctor, brief, handoff and packet; see [daily loop](../README.md#daily-work-loop) | Capture may be degraded; no remote ID should be invented. |
 | MCP | Existing generic direct and bridge surfaces; [client support](protocol-compatibility.md) | Synthetic protocol continuation is not native T3 acceptance. |
-| T3 summary import | M3 in progress | Pending implemented contract and real-source cross-client acceptance; no import command advertised. |
+| T3 summary import | Explicit gateway read → sanitized export → CLI import → fresh MCP continuation exercised against #211 | Companion helper/report pending; native hooks and configured clients NOT_RUN. Source claims remain unverified. |
 | Tracing | No compatibility claim | Links/export are future possibilities only. |
 
 For the minimum workflow, start with `doctor` and `prepare-work`, capture an actual

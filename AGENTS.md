@@ -25,8 +25,9 @@ Completed runs are not verification. A recorded hash is a reference, not proof.
 Verification applicability is unknown when revision/dirty-state linkage is
 missing. Check bounded coverage, freshness, failed/not-run checks and source
 IDs before acting. Sync is explicit; never replay shell commands or infer
-permission to approve, merge, deploy or schedule. T3 native import is not yet
-implemented; existing generic CLI/HTTP/MCP paths remain available.
+permission to approve, merge, deploy or schedule. Explicit T3/generic summary
+import is available through the [versioned CLI contract](docs/import-work-summary.md);
+native automatic T3 hooks and configured-client integration have not been tested.
 
 ## Validation
 

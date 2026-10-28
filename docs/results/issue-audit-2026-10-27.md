@@ -65,3 +65,18 @@ compatible minimal repairs and evidence for residual findings.
 Subsequently #206 merged at [`b3853f6517ea5bb894d714e330a786af117485f3`](https://github.com/redxzeta/runtrail/commit/b3853f6517ea5bb894d714e330a786af117485f3).
 The candidate audit remains a reported observation, not a fresh audit or security
 clearance of current main. #210 tracks the remaining work.
+
+## Subsequent state — 2026-10-28 05:16:35 UTC
+
+The historical classifications above describe the original snapshot. [#198](https://github.com/redxzeta/runtrail/pull/198)
+merged at [`a1b40f1`](https://github.com/redxzeta/runtrail/commit/a1b40f1) and
+[#171](https://github.com/redxzeta/runtrail/issues/171) closed as completed;
+the public name assertion and actual direct/bridge parity tests are retained.
+A fresh paginated open-issue enumeration found **10**: #167, #169, #172, #174,
+#175, #176, #181, #201, #207 and #210. This is a time-bound count, not a final
+acceptance decision. [#211](https://github.com/redxzeta/runtrail/pull/211)
+merged at `b9cb5e60c504a1a7e5212313c17a1a37d71a6098`; its explicit summary
+import was exercised through a real gateway-derived export and fresh MCP protocol
+client. The companion helper and acceptance report remain pending separate review.
+#207 remains open pending integration consolidation. Native automatic hooks and
+configured T3 client integration were not tested.
