@@ -103,7 +103,7 @@ async function upstream(mode: "ready" | "sse" | "sse-headers" | "headers" | "par
     }
   };
 }
-function bridge(url: string, stalledClose = false) {
+function bridge(url: string, stalledClose: boolean | "recoverable" = false) {
   const bridgeUrl = pathToFileURL(path.resolve("src/mcp/bridge.ts")).href;
   const args = stalledClose
     ? [
@@ -113,22 +113,34 @@ function bridge(url: string, stalledClose = false) {
         "-e",
         `
     import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-    StreamableHTTPClientTransport.prototype.close = () => new Promise(() => {});
-    setInterval(() => {}, 1000);
+    const originalClose = StreamableHTTPClientTransport.prototype.close;
+    const pending = [];
+    StreamableHTTPClientTransport.prototype.close = function () {
+      return new Promise(resolve => pending.push(() => originalClose.call(this).then(resolve)));
+    };
+    if (${JSON.stringify(stalledClose)} === 'recoverable') {
+      process.once('message', () => {
+        StreamableHTTPClientTransport.prototype.close = originalClose;
+        for (const release of pending) release();
+        process.disconnect();
+      });
+    } else setInterval(() => {}, 1000);
     process.argv[1] = ${JSON.stringify(path.resolve("src/mcp/bridge.ts"))};
     await import(${JSON.stringify(bridgeUrl)});
   `
       ]
     : ["--import", "tsx", "src/mcp/bridge.ts"];
-  const child = spawn(process.execPath, args, {
+  const spawned = spawn(process.execPath, args, {
     env: {
       ...process.env,
       RUNTRAIL_TOKEN: "synthetic-lifecycle-token",
       RUNTRAIL_MCP_URL: url,
       RUNTRAIL_REQUEST_TIMEOUT_MS: "300"
     },
-    stdio: "pipe"
+    stdio: ["pipe", "pipe", "pipe", stalledClose === "recoverable" ? "ipc" : "ignore"]
   });
+  if (!spawned.stdin || !spawned.stdout || !spawned.stderr) throw new Error("Missing child pipes");
+  const child = spawned as ChildProcessWithoutNullStreams;
   owned.push(child);
   let stdout = "";
   let stderr = "";
@@ -295,10 +307,10 @@ it("aborts actual remote sockets before bounded fallback on an injected stalled 
   }
 });
 
-it("reports failed startup despite a stalled upstream closer, then owns EOF cleanup", async () => {
+it("reports failed startup despite a stalled upstream closer, then recovers for graceful EOF", async () => {
   const service = await upstream("headers");
   try {
-    const run = bridge(service.url, true);
+    const run = bridge(service.url, "recoverable");
     run.child.stdin.write(`${JSON.stringify(INITIALIZE)}\n`);
     // Start the diagnostic deadline at the observed request, excluding child
     // startup/transpilation under full-suite load.
@@ -313,9 +325,12 @@ it("reports failed startup despite a stalled upstream closer, then owns EOF clea
     await until(() => service.sockets.size === 0);
     expect(run.child.exitCode).toBeNull();
     expect(run.stderr).toBe("");
+    // The permanently stalled EOF/fallback case is covered above. Here recover
+    // the injected closer only after observing the diagnostic and socket abort.
+    run.child.send("release closer");
     run.child.stdin.end();
-    expect(await promptly(run.exited)).toEqual([1, null]);
-    expect(run.stderr).toContain("shutdown exceeded its deadline");
+    expect(await promptly(run.exited)).toEqual([0, null]);
+    expect(run.stderr).toBe("");
   } finally {
     await service.close();
   }
