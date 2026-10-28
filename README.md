@@ -129,6 +129,46 @@ Prepare a deterministic working set before editing:
 pnpm cli prepare-work --project runtrail --source codex --work-key github:redxzeta/runtrail#114 --limit 10
 ```
 
+## Daily work loop
+
+Use an already configured local service and token. Diagnose access, start or
+recover work, capture real commands, then hand off with evidence limitations:
+
+```sh
+pnpm cli doctor
+pnpm cli prepare-work --project runtrail --work-key github:redxzeta/runtrail#207 --limit 5
+pnpm cli run --source developer --project runtrail --task "check daily workflow" \
+  --work-key github:redxzeta/runtrail#207 --workflow-id issue-207 -- pnpm test
+pnpm cli brief --project runtrail --work-key github:redxzeta/runtrail#207 --limit 5
+pnpm cli brief --project runtrail --run-id "$RUN_ID" --json
+pnpm cli handoff create --source-run-id "$RUN_ID" --from-source developer \
+  --to-source reviewer --project runtrail --summary "Capture changes ready for review" \
+  --next-action "Inspect failed checks and revision applicability before continuing"
+pnpm cli workflow packet --project runtrail --workflow-id issue-207 \
+  --format markdown --output review.md
+```
+
+Set `RUN_ID` to the confirmed ID in the capture result. If it is null, treat the
+work as locally captured with incomplete remote metadata. Reread a run/handoff's
+version before an explicit accept, resume or finish; use `--continued-from-run-id`
+to connect later captured commands. A brief is a bounded observation, with
+timestamps, source IDs, incomplete coverage and evidence gaps. Its default is
+readable Markdown; `--json` returns schema version `1`. It uses two existing
+read requests (prepare-work and context), which are separate observations.
+
+Packet JSON remains the default; `--format markdown` renders the same packet.
+Neither completion nor a receipt/hash proves verification or deployment.
+Revision references identify recorded code; verification applicability remains
+unknown because verification records do not bind a revision and dirty-worktree
+state. Packet exports omit verbose task, handoff and blocker text by design;
+inspect linked source records for details.
+
+MCP clients can use the existing `journal_prepare_work`, `journal_get_context`,
+handoff lifecycle and `journal_get_workflow_review_packet` tools. No new tool
+catalog or scheduler is needed. CLI and protocol-client coverage are recorded
+in the issue-207 results report. Native T3 completion import is a remaining
+milestone; this walkthrough does not claim a tested T3 client integration.
+
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before starting work. It documents the

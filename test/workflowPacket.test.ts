@@ -41,6 +41,7 @@ describe("workflow review packet", () => {
       "stale_candidate",
       "unknown"
     ]);
+    expect(packet.verifications.every((check) => check.applicability === "unknown")).toBe(true);
     expect(packet.runs[0]).toEqual(
       expect.objectContaining({
         version: 4,
@@ -188,7 +189,9 @@ function packetInput(): WorkflowReviewPacketInput {
           workKey: "github:redxzeta/runtrail#142",
           task: "private prompt",
           summary: "private transcript",
-          version: 4
+          version: 4,
+          gitCommit: "0123456789abcdef",
+          gitBranch: "feat/packet"
         })
       ],
       hasMore: false

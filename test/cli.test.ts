@@ -59,6 +59,54 @@ describe("cli", () => {
     });
   });
 
+  it("prints doctor JSON and fails diagnosis without changing state when auth is rejected", async () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-doctor-cli-"));
+    vi.stubEnv("RUNTRAIL_STATE_DIR", tempDir);
+    vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");
+    vi.stubEnv("RUNTRAIL_TOKEN", "private-placeholder");
+    const fetchMock = vi.fn(
+      async (url: URL) =>
+        new Response(
+          url.pathname === "/health" ? JSON.stringify({ ok: true, service: "runtrail" }) : "{}",
+          { status: url.pathname === "/health" ? 200 : 401 }
+        )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const output = captureOutput();
+    await runCli(["node", "rt", "doctor", "--json"]);
+    const report = JSON.parse(output[0] ?? "{}");
+    expect(report).toMatchObject({
+      schemaVersion: "1",
+      ok: false,
+      checks: { health: { status: "ok" }, authentication: { code: "authentication" } }
+    });
+    expect(process.exitCode).toBe(1);
+    expect(output.join("\n")).not.toContain("private-placeholder");
+    expect(vi.mocked(fetch).mock.calls.every(([, init]) => init?.method === "GET")).toBe(true);
+  });
+
+  it("rejects invalid brief limits and report formats before making requests", async () => {
+    const fetchMock = mockFetch({});
+    await expect(
+      runCli(["node", "rt", "brief", "--project", "runtrail", "--limit", "21"])
+    ).rejects.toThrow();
+    await expect(
+      runCli([
+        "node",
+        "rt",
+        "workflow",
+        "packet",
+        "--project",
+        "runtrail",
+        "--workflow-id",
+        "wf",
+        "--format",
+        "html"
+      ])
+    ).rejects.toThrow("Expected --format");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("prints equivalent capability facts as JSON and human-readable text", async () => {
     const manifest = {
       schemaVersion: "1",

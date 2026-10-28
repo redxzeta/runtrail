@@ -15,10 +15,15 @@ import {
 } from "../shared/httpClient.js";
 import { verifyEventChain } from "../shared/receipts.js";
 import {
+  type AgentContext,
   type AgentEvent,
   createRunRequestSchema,
-  healthResponseSchema
+  healthResponseSchema,
+  type PrepareWorkResponse,
+  prepareWorkQuerySchema,
+  workflowReviewPacketSchema
 } from "../shared/schemas.js";
+import { buildBrief, formatBrief } from "./brief.js";
 import { captureCommand } from "./commandCapture.js";
 import { doctorReport, formatDoctor } from "./doctor.js";
 import {
@@ -29,6 +34,7 @@ import {
   removeOutboxRecord,
   updateOutboxRetry
 } from "./outbox.js";
+import { formatReviewReport } from "./reviewReport.js";
 
 export async function runCli(argv = process.argv): Promise<void> {
   if (argv[2] === "run" && argv[3] !== "create") {
@@ -74,6 +80,16 @@ export async function runCli(argv = process.argv): Promise<void> {
     .option("--min-importance <importance>", "Minimum event importance", parseInteger)
     .option("--cursor <cursor>", "Opaque cursor from the previous response")
     .action(context);
+  program
+    .command("brief")
+    .description("Read a bounded work brief with sources and evidence limitations")
+    .requiredOption("--project <project>", "Project name")
+    .option("--source <source>", "Agent or integration source")
+    .option("--work-key <workKey>", "Canonical external work identifier")
+    .option("--run-id <runId>", "Existing run to continue")
+    .option("--limit <limit>", "Maximum items per section (1-20)", parseInteger, 5)
+    .option("--json", "Print versioned machine-readable JSON", false)
+    .action(brief);
   program
     .command("prepare-work")
     .description("Fetch deterministic continuation guidance before editing")
@@ -129,7 +145,8 @@ export async function runCli(argv = process.argv): Promise<void> {
     .requiredOption("--workflow-id <workflowId>", "Workflow identifier")
     .requiredOption("--project <project>", "Project name")
     .option("--limit <limit>", "Maximum items per section", parseInteger)
-    .option("--output <path>", "Write packet JSON to a file")
+    .option("--format <format>", "json or markdown", "json")
+    .option("--output <path>", "Write the packet or report to a file")
     .option("--force", "Overwrite an existing output file", false)
     .action(readWorkflowPacket);
 
@@ -412,6 +429,32 @@ async function prepareWork(options: {
   printJson(await requestJson(`/agent/prepare-work?${query.toString()}`));
 }
 
+async function brief(options: {
+  project: string;
+  source?: string;
+  workKey?: string;
+  runId?: string;
+  limit: number;
+  json: boolean;
+}): Promise<void> {
+  const parsed = prepareWorkQuerySchema.parse(options);
+  const query = new URLSearchParams({ project: parsed.project, limit: String(parsed.limit) });
+  appendQuery(query, "source", parsed.source);
+  appendQuery(query, "workKey", parsed.workKey);
+  appendQuery(query, "runId", parsed.runId);
+  const contextQuery = new URLSearchParams({
+    project: parsed.project,
+    limit: String(parsed.limit)
+  });
+  const [prepared, context] = await Promise.all([
+    requestJson(`/agent/prepare-work?${query.toString()}`),
+    requestJson(`/agent/context?${contextQuery.toString()}`)
+  ]);
+  const report = buildBrief(prepared as PrepareWorkResponse, context as AgentContext, parsed.limit);
+  if (options.json) printJson(report);
+  else console.log(formatBrief(report));
+}
+
 async function createRun(options: {
   source: string;
   project: string;
@@ -494,8 +537,11 @@ async function readWorkflowPacket(options: {
   project: string;
   limit?: number;
   output?: string;
+  format: string;
   force: boolean;
 }): Promise<void> {
+  if (!["json", "markdown"].includes(options.format))
+    throw new Error("Expected --format json or markdown");
   if (options.output && existsSync(options.output) && !options.force) {
     throw new Error(`Refusing to overwrite ${options.output}; pass --force to replace it`);
   }
@@ -504,8 +550,15 @@ async function readWorkflowPacket(options: {
   const packet = await requestJson(
     `/workflows/${encodeURIComponent(options.workflowId)}/review-packet?${query.toString()}`
   );
-  if (!options.output) return printJson(packet);
-  writeFileSync(options.output, `${JSON.stringify(packet, null, 2)}\n`, {
+  const rendered =
+    options.format === "markdown"
+      ? formatReviewReport(workflowReviewPacketSchema.parse(packet))
+      : JSON.stringify(packet, null, 2);
+  if (!options.output) {
+    console.log(rendered);
+    return;
+  }
+  writeFileSync(options.output, `${rendered.trimEnd()}\n`, {
     flag: options.force ? "w" : "wx"
   });
   console.log(`Wrote ${options.output}`);
@@ -520,6 +573,7 @@ async function wrapRun(
     agentName?: string;
     agentModel?: string;
     workflowId?: string;
+    workKey?: string;
     parentRunId?: string;
     continuedFromRunId?: string;
     category?: string;
@@ -584,6 +638,7 @@ async function wrapRun(
           clientRunId: `wrapper-${wrapperKey}`,
           task: options.task,
           workflowId: options.workflowId,
+          workKey: options.workKey,
           parentRunId: options.parentRunId,
           continuedFromRunId: options.continuedFromRunId,
           hostname: hostname(),
@@ -788,6 +843,7 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
     agentName?: string;
     agentModel?: string;
     workflowId?: string;
+    workKey?: string;
     parentRunId?: string;
     continuedFromRunId?: string;
   } = {};
@@ -815,6 +871,7 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
       value === "--agent-model" ||
       value === "--category" ||
       value === "--workflow-id" ||
+      value === "--work-key" ||
       value === "--parent-run-id" ||
       value === "--continued-from-run-id"
     ) {
@@ -834,6 +891,8 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
         options.agentName = next;
       } else if (value === "--agent-model") {
         options.agentModel = next;
+      } else if (value === "--work-key") {
+        options.workKey = next;
       } else if (value === "--workflow-id") {
         options.workflowId = next;
       } else if (value === "--parent-run-id") {
@@ -871,6 +930,7 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
     agentModel: options.agentModel,
     category: options.category,
     workflowId: options.workflowId,
+    workKey: options.workKey,
     parentRunId: options.parentRunId,
     continuedFromRunId: options.continuedFromRunId,
     tags: optionTags(options.tag)

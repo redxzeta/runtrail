@@ -58,6 +58,8 @@ export function assembleWorkflowReviewPacket(
       version: run.version,
       startedAt: run.startedAt,
       updatedAt: run.updatedAt,
+      gitCommit: run.gitCommit,
+      gitBranch: run.gitBranch,
       freshness: classifyRunFreshness(run, input.asOf, input.staleAfterSeconds),
       declaredAgent:
         run.agentName || run.agentModel
@@ -169,6 +171,7 @@ export function assembleWorkflowReviewPacket(
         name: verification.name,
         support: verification.support,
         completedAt: verification.completedAt,
+        applicability: "unknown",
         origin: "client_reported",
         assurance: verificationAssurance(verification),
         sourceRef: { type: "verification", id: verification.id }

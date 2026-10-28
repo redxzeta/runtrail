@@ -12,6 +12,22 @@ Runtrail is an agent-first activity ledger. Keep changes small, structured, and 
 - Do not store secrets in YAML or source files.
 - Prefer boring TypeScript, Zod validation, and focused tests.
 
+## Daily work and handoff
+
+Use `pnpm cli doctor` for read-only access/state diagnosis. Before editing, use
+`prepare-work` with the canonical work key. Capture commands with `pnpm cli run`
+and keep its actual exit code and capture limitations. Use `brief --project ...`
+(`--json` for schema v1) to continue, then create an explicit handoff with the
+confirmed source run ID and next action. Review with `workflow packet --format
+markdown`; JSON remains the portable packet default. See README's daily loop.
+
+Completed runs are not verification. A recorded hash is a reference, not proof.
+Verification applicability is unknown when revision/dirty-state linkage is
+missing. Check bounded coverage, freshness, failed/not-run checks and source
+IDs before acting. Sync is explicit; never replay shell commands or infer
+permission to approve, merge, deploy or schedule. T3 native import is not yet
+implemented; existing generic CLI/HTTP/MCP paths remain available.
+
 ## Validation
 
 Before claiming completion, run:

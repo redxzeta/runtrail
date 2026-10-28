@@ -575,6 +575,8 @@ const packetRunSchema = z.object({
   version: z.number().int().positive(),
   startedAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+  gitCommit: z.string().max(80).optional(),
+  gitBranch: z.string().max(255).optional(),
   freshness: z.object({
     state: z.enum(["fresh", "stale_candidate", "unknown", "not_applicable"]),
     lastLivenessAt: z.string().datetime().optional(),
@@ -615,6 +617,7 @@ const packetVerificationSchema = z.object({
   name: z.string(),
   support: verificationSupportSchema,
   completedAt: z.string().datetime(),
+  applicability: z.literal("unknown").optional(),
   origin: z.literal("client_reported"),
   assurance: provenanceAssuranceSchema,
   sourceRef: packetSourceRefSchema
