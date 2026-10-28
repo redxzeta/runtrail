@@ -308,9 +308,12 @@ describe("disposable cross-client acceptance", () => {
         briefHttpRequests: fixture.requests.slice(readStart, readStart + 2).length,
         firstCaptureHttpRequests: captureRequests,
         captureResultBytes: Buffer.byteLength(imported.stdout),
-        mcpCalls, mcpHttpRequests: mcpRequests, mcpSerializedResultBytes: mcpResultBytes,
+        mcpCalls,
+        mcpHttpRequests: mcpRequests,
+        mcpSerializedResultBytes: mcpResultBytes,
         happyPathRuntrailHttpRequests: captureRequests + 2 + mcpRequests,
-        captureBriefMcpResultBytes: Buffer.byteLength(imported.stdout) + Buffer.byteLength(brief.stdout) + mcpResultBytes,
+        captureBriefMcpResultBytes:
+          Buffer.byteLength(imported.stdout) + Buffer.byteLength(brief.stdout) + mcpResultBytes,
         helperValidationHttpRequests: captureStart,
         nativeConfiguredClient: "NOT_RUN"
       });
@@ -341,6 +344,7 @@ describe("disposable cross-client acceptance", () => {
       };
       for (const invalid of [
         { ...envelope, transcript: "forbidden unknown field" },
+        { ...envelope, summary: "db_password=acceptance-dummy-value" },
         { ...envelope, summary: "assistant: transcript material" },
         { ...envelope, summary: "private location /private/acceptance/example" },
         { ...envelope, summary: fixture.token },
@@ -424,7 +428,7 @@ describe("disposable cross-client acceptance", () => {
       ).toBe("complete");
       expect(existsSync("acceptance-should-not-exist")).toBe(false);
       report("input-and-retry", {
-        invalidInputs: 6,
+        invalidInputs: 7,
         validationHttpRequests: 0,
         uncertainSummaryConfirmedIds: partial.json.confirmed.length,
         recoveredIdentical: true,
