@@ -1,0 +1,56 @@
+{
+  "fixture": "disposable authenticated loopback service; no T3 native client",
+  "base": "6ceada9abdebfd8d14baa72573d36785c26ad1ff",
+  "candidate": "87006359f036131c908fdc516ddc6afcd4450e74",
+  "regression": {
+    "before": {
+      "tests": 3,
+      "failed": 3,
+      "exitCode": 1
+    },
+    "after": {
+      "tests": 3,
+      "passed": 3,
+      "exitCode": 0
+    },
+    "runIds": ["run_s5PM0wViLnvnzEn3", "run_XdURL1sfLizUtMHM"],
+    "commandExecutions": 2
+  },
+  "continuation": {
+    "transport": "registered MCP over in-memory protocol pair to authenticated HTTP",
+    "duplicateHandoffSameId": true,
+    "acceptedBySecondClient": true,
+    "nativeT3": "NOT_RUN"
+  },
+  "measurement": {
+    "limit": 5,
+    "baseline": {
+      "manualCommands": 2,
+      "httpRequests": 2,
+      "serializedBytes": 8808
+    },
+    "brief": {
+      "manualCommands": 1,
+      "httpRequests": 2,
+      "compactJsonBytes": 5595,
+      "prettyJsonBytes": 8081,
+      "markdownBytes": 4598
+    },
+    "comparison": "same two baseline observations projected locally; CLI request count measured separately; no token or timing claim"
+  },
+  "evidence": {
+    "failedPassedNotRunRetained": true,
+    "applicability": "unknown",
+    "stale": "controlled-clock fixture advanced 2h; not elapsed wall time",
+    "markdownReport": "passed",
+    "liveGitRevision": "baseline capture includes temporary untracked sources; candidate regression runs after their removal; verification revision/dirty-state linkage remains unknown"
+  },
+  "offline": {
+    "exitCode": 7,
+    "runId": null,
+    "capture": "degraded",
+    "commandExecutions": 1,
+    "autoReplay": false
+  },
+  "cleanup": "completed in finally; temporary ledger, logs, outbox, generated baseline sources removed"
+}

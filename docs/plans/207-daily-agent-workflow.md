@@ -56,3 +56,13 @@ dependency campaign, UI project, model/GPU requirement, scheduler, live client
 configuration, host service mutation, merge or deployment. Disposable dogfood
 is not runtime activation. Roll back by reverting the scoped commits; no schema
 migration is planned.
+
+## Delivery checkpoint
+
+M1 is committed in `5bd6a99`; M2 in `8700635`. The candidate passes 208 tests,
+lint, typecheck, build and 19 conformance checks. Disposable dogfood demonstrates
+the original failure, corrected capture, second protocol-client continuation,
+duplicates, offline capture and unknown/stale evidence. See the
+[measured results and limits](../results/207-daily-workflow.md). Independent
+review is required before final handoff. M3 native T3 import remains a separate
+phase; issue 207 stays open.

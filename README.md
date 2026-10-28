@@ -166,7 +166,7 @@ inspect linked source records for details.
 MCP clients can use the existing `journal_prepare_work`, `journal_get_context`,
 handoff lifecycle and `journal_get_workflow_review_packet` tools. No new tool
 catalog or scheduler is needed. CLI and protocol-client coverage are recorded
-in the issue-207 results report. Native T3 completion import is a remaining
+in the [issue-207 results report](docs/results/207-daily-workflow.md). Native T3 completion import is a remaining
 milestone; this walkthrough does not claim a tested T3 client integration.
 
 ## Contributing
