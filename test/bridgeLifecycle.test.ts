@@ -300,8 +300,13 @@ it("reports failed startup despite a stalled upstream closer, then owns EOF clea
   try {
     const run = bridge(service.url, true);
     run.child.stdin.write(`${JSON.stringify(INITIALIZE)}\n`);
+    // Start the diagnostic deadline at the observed request, excluding child
+    // startup/transpilation under full-suite load.
+    await until(() => service.posts === 1);
     // Keep stdin open: failure diagnostics must not depend on EOF or a signal.
-    await until(() => run.stdout.includes('"id":1'), 2500);
+    await until(() => run.stdout.includes('"id":1'), 2500).catch((error) => {
+      throw new Error(`${error.message}: stdout=${run.stdout}, stderr=${run.stderr}`);
+    });
     const result = JSON.parse(run.stdout.trim());
     expect(result.error.message).toContain("Check Runtrail service health");
     expect(result.error.message).not.toContain("synthetic-lifecycle-token");
