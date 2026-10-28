@@ -103,9 +103,14 @@ pnpm conformance                  # 19 passed; cleanup passed
 git diff --check
 ```
 
-Independent review is tracked on the PR; its results and any corrective commit
-must be included in the final handoff. A later docs-only commit does not change
-the tested code. Hosted CI status is separate from these local results.
+Independent read-only review inspected the complete base-to-candidate range and
+reported no concrete P1/P2 findings. It independently passed 123 critical tests
+across eight files, typecheck and range whitespace checks. Later docs-only commit
+`3d7eb25` was confirmed byte-identical under `src` and `test` to the reviewed code.
+The independent reviewer did not rerun the full suite, lint, build, conformance,
+hosted CI or native T3 integration; the full local results above are the owner's
+validation. Documentation updates do not change the tested code. Hosted CI status
+is separate from these local results.
 
 ## Remaining work and rollback
 
