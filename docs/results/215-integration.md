@@ -50,6 +50,15 @@ combined validation receipt is recorded in
 [#217](https://github.com/redxzeta/runtrail/pull/217). Frozen install uses the
 reviewed dependency lock. The existing Biome schema notice is informational.
 
+Report candidate `e72700c` passed all local checks but failed hosted tests:
+the combined failed-startup diagnostic plus forced-cleanup scenario exceeded the
+outer five-second test budget. The fixture now releases its injected closer only
+after observing the diagnostic and upstream socket abort, then checks graceful
+EOF recovery. The separate permanent-stall fallback test remains. Diagnostic
+(2.5 seconds), exit (two seconds) and outer test deadlines are unchanged; no
+production behavior changed. The adjusted regression also fails against the
+unfixed startup path. Final refreshed checks are recorded in the PR receipt.
+
 Failures remain evidence: the original failed-startup/injected-close regression
 failed before correction. One integration full run at `8348c2a` had 266 passes
 and a new-test timeout including child startup; a separate independent run
