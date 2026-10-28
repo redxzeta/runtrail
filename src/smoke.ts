@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { isMainModule } from "./shared/entrypoint.js";
 
 const startupTimeoutMs = 10_000;
 const shutdownTimeoutMs = 5_000;
@@ -394,7 +395,7 @@ function assertIncludes(values: unknown[], key: string | undefined, expected: un
   if (!found) throw new Error(`expected lifecycle fact was not present`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   runLifecycleSmoke().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : "Smoke lifecycle failed");
     process.exitCode = 1;

@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig, type RuntrailConfig } from "../config.js";
 import { RUNTRAIL_TOOL_NAMES } from "../shared/capabilities.js";
+import { isMainModule } from "../shared/entrypoint.js";
 import {
   fetchWithTimeout,
   formatClientFailure,
@@ -602,7 +603,7 @@ function emptyToUndefined(value: string | undefined): string | undefined {
   return value && value.trim().length > 0 ? value : undefined;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   start().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
