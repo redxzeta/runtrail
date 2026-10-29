@@ -1,3 +1,10 @@
+## [1.44.3](https://github.com/redxzeta/runtrail/compare/v1.44.2...v1.44.3) (2026-10-29)
+
+
+### Bug Fixes
+
+* support canonical delegated T3 capture sources ([#224](https://github.com/redxzeta/runtrail/issues/224)) ([ea5e5eb](https://github.com/redxzeta/runtrail/commit/ea5e5eb04ced9bf69dfecde0328c5ef4d49d676c))
+
 ## [1.44.2](https://github.com/redxzeta/runtrail/compare/v1.44.1...v1.44.2) (2026-10-29)
 
 
