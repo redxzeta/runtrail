@@ -1,0 +1,628 @@
+{
+  "beforeCounts": {
+    "agent_event_tags": 2,
+    "agent_events": 2,
+    "agent_run_tags": 1,
+    "agent_runs": 1,
+    "artifacts": 0,
+    "decisions": 0,
+    "handoff_tags": 0,
+    "handoffs": 1,
+    "ledger_changes": 6,
+    "open_loops": 0,
+    "recovery_receipts": 2,
+    "schema_migrations": 11,
+    "sqlite_sequence": 1,
+    "verification_evidence": 0
+  },
+  "afterCounts": {
+    "agent_event_tags": 2,
+    "agent_events": 2,
+    "agent_run_tags": 1,
+    "agent_runs": 1,
+    "artifacts": 0,
+    "decisions": 0,
+    "handoff_tags": 0,
+    "handoffs": 1,
+    "ledger_changes": 6,
+    "open_loops": 0,
+    "recovery_receipts": 2,
+    "schema_migrations": 11,
+    "sqlite_sequence": 1,
+    "verification_evidence": 0
+  },
+  "label": "TOP_LEVEL_POSITIVE_CONTROL",
+  "scored": false,
+  "project": "positive-control",
+  "separateFromReaders": true,
+  "build": "7942389f8d9368b18f52c37d3df99e3b4f0ac278",
+  "source": {
+    "thread": {
+      "threadId": "mcp:273b1e5d-9103-499f-968f-bd38b0f85e07"
+    },
+    "recentRuns": [
+      {
+        "runId": "run:thread:mcp%3A273b1e5d-9103-499f-968f-bd38b0f85e07:ordinal:2",
+        "status": "completed",
+        "completedAt": "2026-10-29T04:54:59.442Z"
+      }
+    ]
+  },
+  "selectedItem": "turn-item:provider:codex:native-item:msg_08e6dc26121d60c0016ae2d19feab081988fa6157f81f3ffb7",
+  "initialAttempt": {
+    "captureExit": 0,
+    "freshBriefExit": 0,
+    "harnessAssertionFailed": "Raw authored multiline summary differs from whitespace-normalized saved envelope after brief projection; capture itself preserved multiline text. A repeat assertion against saved raw text also failed. A resume script first failed module resolution from tmp, then ran via stdin. Initial stdout IDs/elapsed not retained; no product rejection.",
+    "originalSummary": "Both producers completed actual tests. Two useful findings are preserved:\n\n- `rt run --help` rejects required wrapper options; the probe observed zero spawn/fetch calls.\n- Actual capture rejects both legitimate terminal delegated T3 source IDs. No IDs were substituted.\n\nInputs are frozen at `4327be4`, with test bytes pinned at `136fdd2`. Terra preflight is running before readers. Blocked Runtrail arms will count as product failures, separately from valid comparison attempts and successful handoffs.",
+    "savedSummary": "Both producers completed actual tests. Two useful findings are preserved:\n\n- `rt run --help` rejects required wrapper options; the probe observed zero spawn/fetch calls.\n- Actual capture rejects both legitimate terminal delegated T3 source IDs. No IDs were substituted.\n\nInputs are frozen at `4327be4`, with test bytes pinned at `136fdd2`. Terra preflight is running before readers. Blocked Runtrail arms will count as product failures, separately from valid comparison attempts and successful handoffs."
+  },
+  "calls": [
+    {
+      "command": [
+        "brief",
+        "--project",
+        "positive-control",
+        "--work-key",
+        "github:redxzeta/runtrail#218:positive",
+        "--import-provenance",
+        "--json"
+      ],
+      "exit": 0,
+      "elapsedMs": 521.399243,
+      "stdoutBytes": 8097,
+      "result": {
+        "schemaVersion": "1",
+        "project": "positive-control",
+        "asOf": "2026-10-29T04:59:26.247Z",
+        "selectedRun": null,
+        "relevantRuns": [
+          {
+            "id": "run_dfEcrA9u6XjXCZM0",
+            "source": "work-import:t3:t3-code",
+            "status": "completed",
+            "version": 1,
+            "startedAt": "2026-10-29T04:56:26.605Z",
+            "updatedAt": "2026-10-29T04:56:26.605Z",
+            "task": "TOP_LEVEL_POSITIVE_CONTROL",
+            "summary": "[Client-reported; unverified] Both producers completed actual tests. Two useful findings are preserved: - `rt run --help` rejects required wrapper options; the probe observed zero spawn/fetch calls. - Actual capture rejects both legitimate terminal delegated T3 source IDs. No IDs were substituted. Inputs are  [clipped]",
+            "detailStatus": "matched",
+            "freshness": {
+              "state": "not_applicable",
+              "lastLivenessAt": null,
+              "staleAfterSeconds": 3600,
+              "asOf": "2026-10-29T04:59:26.247Z",
+              "reasonCode": "terminal_status"
+            },
+            "evidenceApplicability": "unknown",
+            "sourceRef": {
+              "type": "run",
+              "id": "run_dfEcrA9u6XjXCZM0",
+              "version": 1
+            }
+          }
+        ],
+        "recentEvents": [
+          {
+            "id": "evt_UTEAyR1iteD29UJp",
+            "runId": "run_dfEcrA9u6XjXCZM0",
+            "type": "recovery_outcome",
+            "importance": 4,
+            "message": "Authoritative session run selected",
+            "createdAt": "2026-10-29T04:56:26.729Z",
+            "sourceRef": {
+              "type": "event",
+              "id": "evt_UTEAyR1iteD29UJp"
+            }
+          }
+        ],
+        "effectiveDecisions": [],
+        "blockers": [],
+        "pendingHandoffs": [
+          {
+            "id": "handoff_D3NDFLnKpx9ACiw5",
+            "status": "pending",
+            "version": 1,
+            "fromSource": "work-import:t3:t3-code",
+            "toSource": null,
+            "summary": "[Client-reported; unverified] Both producers completed actual tests. Two useful findings are preserved: - `rt run --help` rejects required wrapper options; the probe observed zero spawn/fetch calls. - Actual capture rejects both legitimate terminal delegated T3 source IDs. No IDs were substituted. Inputs are  [clipped]",
+            "nextAction": "Finish baseline readers and report both delegated-source failures; no production changes.",
+            "detailStatus": "matched",
+            "updatedAt": "2026-10-29T04:56:26.605Z",
+            "sourceRef": {
+              "type": "handoff",
+              "id": "handoff_D3NDFLnKpx9ACiw5",
+              "version": 1
+            },
+            "clientReport": {
+              "status": "available",
+              "report": {
+                "provenance": "client_reported",
+                "assurance": "unverified",
+                "evidenceApplicability": "unknown",
+                "source": {
+                  "kind": "t3",
+                  "system": "t3-code",
+                  "threadId": "mcp:273b1e5d-9103-499f-968f-bd38b0f85e07",
+                  "runId": "run:thread:mcp%3A273b1e5d-9103-499f-968f-bd38b0f85e07:ordinal:2",
+                  "ref": "t3-thread://v1/mcp:273b1e5d-9103-499f-968f-bd38b0f85e07",
+                  "observedAt": "2026-10-29T04:56:26.605Z",
+                  "reportedStatus": "completed"
+                },
+                "workflowId": "github:redxzeta/runtrail#218:positive",
+                "workKey": "github:redxzeta/runtrail#218:positive",
+                "task": "TOP_LEVEL_POSITIVE_CONTROL",
+                "summary": "Both producers completed actual tests. Two useful findings are preserved: - `rt run --help` rejects required wrapper options; the probe observed zero spawn/fetch calls. - Actual capture rejects both legitimate terminal delegated T3 source IDs. No IDs were substituted. Inputs are frozen at `4327be4`, with test bytes pinned at `136fdd2`. Terra preflight is running before readers. Blocked Runtrail arms will count as product failures, separately from valid comparison attempts and successful handoffs.",
+                "nextAction": "Finish baseline readers and report both delegated-source failures; no production changes.",
+                "evidence": [
+                  {
+                    "kind": "other",
+                    "ref": "t3-thread://v1/mcp:273b1e5d-9103-499f-968f-bd38b0f85e07",
+                    "summary": "Source-reported completion: 2026-10-29T04:54:59.442Z; not independent verification.",
+                    "observedAt": "2026-10-29T04:56:26.605Z",
+                    "provenance": "client_reported",
+                    "outcome": "unknown",
+                    "evidenceApplicability": "unknown"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "conflicts": [],
+        "readiness": {
+          "status": "unknown",
+          "asOf": null,
+          "reasonCodes": [],
+          "findings": [],
+          "nextActions": []
+        },
+        "recommendations": [
+          {
+            "actionCode": "accept_handoff",
+            "reasonCodes": ["pending_targeted_handoff"],
+            "targetRefs": [
+              {
+                "type": "handoff",
+                "id": "handoff_D3NDFLnKpx9ACiw5",
+                "version": 1
+              }
+            ],
+            "requiresReread": true,
+            "asOf": "2026-10-29T04:59:26.247Z"
+          }
+        ],
+        "warnings": [],
+        "evidenceApplicability": "unknown",
+        "coverage": {
+          "limit": 5,
+          "atomic": false,
+          "context": {
+            "mode": "full",
+            "coverage": "unknown",
+            "scope": "project",
+            "projectMatches": true
+          },
+          "preparedMode": "full",
+          "nestedArraysBoundedBy": 5,
+          "importProvenance": {
+            "requests": 1,
+            "limit": 5,
+            "returned": 1,
+            "sourceTruncated": null,
+            "mayHaveMore": false,
+            "atomic": false,
+            "scope": "project_pending_handoffs"
+          },
+          "prepared": {
+            "relevantRuns": {
+              "limit": 5,
+              "count": 1,
+              "truncated": false
+            },
+            "workflowRuns": {
+              "limit": 5,
+              "count": 0,
+              "truncated": false
+            },
+            "conflicts": {
+              "limit": 5,
+              "count": 0,
+              "truncated": false
+            },
+            "pendingHandoffs": {
+              "limit": 5,
+              "count": 1,
+              "truncated": false
+            },
+            "openLoops": {
+              "limit": 5,
+              "count": 0,
+              "truncated": false
+            },
+            "effectiveDecisions": {
+              "limit": 5,
+              "count": 0,
+              "truncated": false
+            },
+            "recommendations": {
+              "limit": 5,
+              "count": 1,
+              "truncated": false
+            },
+            "warnings": {
+              "limit": 5,
+              "count": 0,
+              "truncated": false
+            }
+          },
+          "projection": {
+            "relevantRuns": {
+              "available": 1,
+              "returned": 1,
+              "omitted": 0,
+              "sourceTruncated": false
+            },
+            "recentEvents": {
+              "available": 1,
+              "returned": 1,
+              "omitted": 0,
+              "sourceTruncated": null
+            },
+            "effectiveDecisions": {
+              "available": 0,
+              "returned": 0,
+              "omitted": 0,
+              "sourceTruncated": false
+            },
+            "blockers": {
+              "available": 0,
+              "returned": 0,
+              "omitted": 0,
+              "sourceTruncated": false
+            },
+            "importHandoffs": {
+              "available": 1,
+              "returned": 1,
+              "omitted": 0,
+              "sourceTruncated": null
+            },
+            "pendingHandoffs": {
+              "available": 1,
+              "returned": 1,
+              "omitted": 0,
+              "sourceTruncated": false
+            },
+            "conflicts": {
+              "available": 0,
+              "returned": 0,
+              "omitted": 0,
+              "sourceTruncated": false
+            },
+            "recommendations": {
+              "available": 1,
+              "returned": 1,
+              "omitted": 0,
+              "sourceTruncated": false
+            },
+            "warnings": {
+              "available": 0,
+              "returned": 0,
+              "omitted": 0,
+              "sourceTruncated": false
+            }
+          }
+        },
+        "textClipped": true,
+        "unsafeSourceIdsOmitted": false,
+        "advisories": [
+          "Advisory observations only; reread source records before acting.",
+          "Prepare-work and context are separate bounded queries with different scopes, not an atomic snapshot.",
+          "Context has no full coverage metadata; omitted or empty history is not proof of idle work.",
+          "Completed run status does not establish verification or current applicability.",
+          "Evidence applicability is unknown: verification records do not bind revision or dirty worktree state.",
+          "Text is clipped when marked; machine paths and command details are omitted."
+        ]
+      }
+    },
+    {
+      "command": ["workflow", "capture", "--retry", "<private>/positive-envelope.json"],
+      "exit": 0,
+      "elapsedMs": 499.544855,
+      "stdoutBytes": 959,
+      "result": {
+        "schemaVersion": "1",
+        "status": "complete",
+        "confirmed": [
+          {
+            "stage": "run",
+            "id": "run_dfEcrA9u6XjXCZM0"
+          },
+          {
+            "stage": "summary",
+            "id": "evt_EF-qat5jmP955WUz"
+          },
+          {
+            "stage": "handoff",
+            "id": "handoff_D3NDFLnKpx9ACiw5"
+          }
+        ],
+        "resume": "none",
+        "semantics": "client_reported_unverified",
+        "plan": {
+          "clientRunId": "wi1:0fd4e9998b823f5ed292f41ce533d7f12fc72f80c61d5323e56189fc56994cbe",
+          "summaryKey": "wi1:0fd4e9998b823f5ed292f41ce533d7f12fc72f80c61d5323e56189fc56994cbe:summary",
+          "handoffKey": "wi1:0fd4e9998b823f5ed292f41ce533d7f12fc72f80c61d5323e56189fc56994cbe:handoff",
+          "payloadHash": "4a69993b92f5d50696b12bfd333afb5fb8d1294cff41831d921ed600c43f82c2",
+          "source": "work-import:t3:t3-code"
+        },
+        "envelopeSaved": false,
+        "retryEnvelope": true,
+        "captureNote": "Retain the original saved envelope. Retry with --retry; do not recapture after uncertain delivery."
+      }
+    },
+    {
+      "command": ["workflow", "capture", "--retry", "<private>/positive-envelope.json"],
+      "exit": 0,
+      "elapsedMs": 486.74615700000004,
+      "stdoutBytes": 959,
+      "result": {
+        "schemaVersion": "1",
+        "status": "complete",
+        "confirmed": [
+          {
+            "stage": "run",
+            "id": "run_dfEcrA9u6XjXCZM0"
+          },
+          {
+            "stage": "summary",
+            "id": "evt_EF-qat5jmP955WUz"
+          },
+          {
+            "stage": "handoff",
+            "id": "handoff_D3NDFLnKpx9ACiw5"
+          }
+        ],
+        "resume": "none",
+        "semantics": "client_reported_unverified",
+        "plan": {
+          "clientRunId": "wi1:0fd4e9998b823f5ed292f41ce533d7f12fc72f80c61d5323e56189fc56994cbe",
+          "summaryKey": "wi1:0fd4e9998b823f5ed292f41ce533d7f12fc72f80c61d5323e56189fc56994cbe:summary",
+          "handoffKey": "wi1:0fd4e9998b823f5ed292f41ce533d7f12fc72f80c61d5323e56189fc56994cbe:handoff",
+          "payloadHash": "4a69993b92f5d50696b12bfd333afb5fb8d1294cff41831d921ed600c43f82c2",
+          "source": "work-import:t3:t3-code"
+        },
+        "envelopeSaved": false,
+        "retryEnvelope": true,
+        "captureNote": "Retain the original saved envelope. Retry with --retry; do not recapture after uncertain delivery."
+      }
+    }
+  ],
+  "assertions": {
+    "freshCliEqualsWhitespaceNormalizedSavedSummary": true,
+    "rawSummaryByteEqual": false,
+    "priorRetryWholeRowAssertionFailed": true,
+    "readOnlyLedgerRowsEqual": true,
+    "twoIdenticalRetryIds": true,
+    "retryWholeRowsEqual": true,
+    "retryNoAdditionalRows": "see counts",
+    "envelopeBytesUnchanged": true
+  },
+  "http": [
+    {
+      "method": "POST",
+      "path": "/runs",
+      "requestBytes": 1017,
+      "responseBytes": 1467,
+      "status": 201,
+      "elapsedMs": 76.99646200000001
+    },
+    {
+      "method": "POST",
+      "path": "/events",
+      "requestBytes": 2344,
+      "responseBytes": 2461,
+      "status": 201,
+      "elapsedMs": 11.38078200000001
+    },
+    {
+      "method": "POST",
+      "path": "/handoffs",
+      "requestBytes": 2482,
+      "responseBytes": 2596,
+      "status": 201,
+      "elapsedMs": 25.990268000000015
+    },
+    {
+      "method": "GET",
+      "path": "/agent/prepare-work",
+      "requestBytes": 0,
+      "responseBytes": 1989,
+      "status": 200,
+      "elapsedMs": 63.745723
+    },
+    {
+      "method": "GET",
+      "path": "/agent/context",
+      "requestBytes": 0,
+      "responseBytes": 3862,
+      "status": 200,
+      "elapsedMs": 53.650360999999975
+    },
+    {
+      "method": "GET",
+      "path": "/handoffs",
+      "requestBytes": 0,
+      "responseBytes": 2599,
+      "status": 200,
+      "elapsedMs": 15.48483299999998
+    },
+    {
+      "method": "GET",
+      "path": "/agent/prepare-work",
+      "requestBytes": 0,
+      "responseBytes": 1989,
+      "status": 200,
+      "elapsedMs": 45.36895599999997
+    },
+    {
+      "method": "GET",
+      "path": "/agent/context",
+      "requestBytes": 0,
+      "responseBytes": 3862,
+      "status": 200,
+      "elapsedMs": 38.035815000000014
+    },
+    {
+      "method": "GET",
+      "path": "/handoffs",
+      "requestBytes": 0,
+      "responseBytes": 2599,
+      "status": 200,
+      "elapsedMs": 7.447467999999958
+    },
+    {
+      "method": "GET",
+      "path": "/agent/prepare-work",
+      "requestBytes": 0,
+      "responseBytes": 1989,
+      "status": 200,
+      "elapsedMs": 34.732815999999985
+    },
+    {
+      "method": "GET",
+      "path": "/agent/context",
+      "requestBytes": 0,
+      "responseBytes": 3862,
+      "status": 200,
+      "elapsedMs": 26.821537000000035
+    },
+    {
+      "method": "GET",
+      "path": "/handoffs",
+      "requestBytes": 0,
+      "responseBytes": 2599,
+      "status": 200,
+      "elapsedMs": 3.310335000000009
+    },
+    {
+      "method": "POST",
+      "path": "/runs",
+      "requestBytes": 1017,
+      "responseBytes": 1463,
+      "status": 200,
+      "elapsedMs": 34.83592299999998
+    },
+    {
+      "method": "POST",
+      "path": "/events",
+      "requestBytes": 2344,
+      "responseBytes": 2461,
+      "status": 200,
+      "elapsedMs": 5.383703000000025
+    },
+    {
+      "method": "POST",
+      "path": "/handoffs",
+      "requestBytes": 2482,
+      "responseBytes": 2596,
+      "status": 201,
+      "elapsedMs": 5.80183199999999
+    },
+    {
+      "method": "POST",
+      "path": "/runs",
+      "requestBytes": 1017,
+      "responseBytes": 1463,
+      "status": 200,
+      "elapsedMs": 39.00974500000001
+    },
+    {
+      "method": "POST",
+      "path": "/events",
+      "requestBytes": 2344,
+      "responseBytes": 2461,
+      "status": 200,
+      "elapsedMs": 5.810706999999979
+    },
+    {
+      "method": "POST",
+      "path": "/handoffs",
+      "requestBytes": 2482,
+      "responseBytes": 2596,
+      "status": 201,
+      "elapsedMs": 5.227257000000009
+    },
+    {
+      "method": "GET",
+      "path": "/agent/prepare-work",
+      "requestBytes": 0,
+      "responseBytes": 1989,
+      "status": 200,
+      "elapsedMs": 58.218992000000014
+    },
+    {
+      "method": "GET",
+      "path": "/agent/context",
+      "requestBytes": 0,
+      "responseBytes": 3862,
+      "status": 200,
+      "elapsedMs": 50.71281700000003
+    },
+    {
+      "method": "GET",
+      "path": "/handoffs",
+      "requestBytes": 0,
+      "responseBytes": 2599,
+      "status": 200,
+      "elapsedMs": 7.850501000000008
+    },
+    {
+      "method": "POST",
+      "path": "/runs",
+      "requestBytes": 1017,
+      "responseBytes": 1463,
+      "status": 200,
+      "elapsedMs": 65.41391399999998
+    },
+    {
+      "method": "POST",
+      "path": "/events",
+      "requestBytes": 2344,
+      "responseBytes": 2461,
+      "status": 200,
+      "elapsedMs": 5.821479000000011
+    },
+    {
+      "method": "POST",
+      "path": "/handoffs",
+      "requestBytes": 2482,
+      "responseBytes": 2596,
+      "status": 201,
+      "elapsedMs": 8.734449999999981
+    },
+    {
+      "method": "POST",
+      "path": "/runs",
+      "requestBytes": 1017,
+      "responseBytes": 1463,
+      "status": 200,
+      "elapsedMs": 57.72121199999998
+    },
+    {
+      "method": "POST",
+      "path": "/events",
+      "requestBytes": 2344,
+      "responseBytes": 2461,
+      "status": 200,
+      "elapsedMs": 5.979743999999982
+    },
+    {
+      "method": "POST",
+      "path": "/handoffs",
+      "requestBytes": 2482,
+      "responseBytes": 2596,
+      "status": 201,
+      "elapsedMs": 8.97423699999996
+    }
+  ]
+}
