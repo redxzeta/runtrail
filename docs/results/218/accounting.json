@@ -1,0 +1,301 @@
+{
+  "equivalence": [
+    {
+      "case": "A",
+      "fields": [
+        {
+          "field": "revision",
+          "value": "7942389f8d9368b18f52c37d3df99e3b4f0ac278",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "within terminal summary / patch prefix",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "patch",
+          "value": "136fdd2b740137e886d09362dea28354241b24d7",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "within terminal summary / patch prefix",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "task",
+          "value": "Review bounded #172 outbox regression",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "task",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "nextAction",
+          "value": "Inspect pinned outbox patch; independently verify CLI transient/permanent response handling and payload-free diagnostics before full #172 acceptance.",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "nextAction",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "blockers",
+          "value": "Producer broader checks failed on concurrent CLI test changes.",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "within terminal summary / patch prefix",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "limits",
+          "value": "Full #172 acceptance, HTTP retry classification, complete diagnostic redaction, other platforms, exact-head CI and activation NOT verified.",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "within terminal summary / patch prefix",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "reference",
+          "value": "https://github.com/redxzeta/runtrail/issues/172",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "evidence-ref",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        }
+      ],
+      "source": {
+        "thread": {
+          "threadId": "thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3A51d36b14-3d6d-4c9d-be86-b7fbd36344bf"
+        },
+        "recentRuns": [
+          {
+            "runId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A68d4cd88-b7f3-4a27-9453-23ced2453e10%253Adelegate-task%253A51d36b14-3d6d-4c9d-be86-b7fbd36344bf:ordinal:1",
+            "status": "completed",
+            "completedAt": "2026-10-29T04:53:09.428Z"
+          }
+        ],
+        "selectedItem": "turn-item:provider:codex:native-item:msg_087c8522f7648a6e016ae2d12ec72881989af3bfb7fe5307cb",
+        "position": 28
+      },
+      "summaryChars": 1608,
+      "summaryBytesUtf8": 1612,
+      "markdownBytesUtf8": 2803,
+      "jsonPrettyBytesUtf8": 2932,
+      "markdownSHA256": "bee1610b5641724f5d0f784743f328b449404cbd2c9d00ae8703e7ea1f43ce7b",
+      "jsonSHA256": "9b93c9805482c6c7b13962f5897e0bbba9797b4bd7c812e110f466165d1f85da",
+      "captureExit": 1
+    },
+    {
+      "case": "B",
+      "fields": [
+        {
+          "field": "revision",
+          "value": "7942389f8d9368b18f52c37d3df99e3b4f0ac278",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "within terminal summary / patch prefix",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "patch",
+          "value": "136fdd2b740137e886d09362dea28354241b24d7",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "within terminal summary / patch prefix",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "task",
+          "value": "Review bounded #169 help regression",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "task",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "nextAction",
+          "value": "Inspect pinned CLI patch; independently confirm pre-Commander wrapper dispatch before separately scoping a production fix.",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "nextAction",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "blockers",
+          "value": "run --help contract is defective; green characterization is not acceptance.",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "within terminal summary / patch prefix",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "limits",
+          "value": "Complete #169 coverage, full checks, exact-head CI, activation and comparability NOT verified by producer.",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "within terminal summary / patch prefix",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        },
+        {
+          "field": "reference",
+          "value": "https://github.com/redxzeta/runtrail/issues/169",
+          "direct": "terminal final plus GitHub canonical snapshot",
+          "markdown": "generated canonical field",
+          "capture": "evidence-ref",
+          "transportOutcome": "PRODUCT_REJECTED before delivery; facts unavailable to Runtrail reader"
+        }
+      ],
+      "source": {
+        "thread": {
+          "threadId": "thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3Ad036f23c-8c1e-4297-a95c-9aea575e4b85"
+        },
+        "recentRuns": [
+          {
+            "runId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A68d4cd88-b7f3-4a27-9453-23ced2453e10%253Adelegate-task%253Ad036f23c-8c1e-4297-a95c-9aea575e4b85:ordinal:1",
+            "status": "completed",
+            "completedAt": "2026-10-29T04:52:41.382Z"
+          }
+        ],
+        "selectedItem": "turn-item:provider:codex:native-item:msg_0a3f0d5b77fad481016ae2d1104be88198a5780001f99b6af7",
+        "position": 27
+      },
+      "summaryChars": 1709,
+      "summaryBytesUtf8": 1721,
+      "markdownBytesUtf8": 2863,
+      "jsonPrettyBytesUtf8": 2993,
+      "markdownSHA256": "0a3c5c97e7a7cc12a6a477c05c62ac462bcaee1b4f29f894a5f3f0c38c2167c4",
+      "jsonSHA256": "0e24111769216c6c3602bb37378b799a93ac7c6f934dbe49ea98b49be34941e6",
+      "captureExit": 1
+    }
+  ],
+  "caseHttpRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/prepare-work",
+      "requestBytes": 0,
+      "responseBytes": 1013,
+      "status": 200,
+      "elapsedMs": 41.96485500000003
+    },
+    {
+      "method": "GET",
+      "path": "/agent/context",
+      "requestBytes": 0,
+      "responseBytes": 380,
+      "status": 200,
+      "elapsedMs": 34.74764000000002
+    },
+    {
+      "method": "GET",
+      "path": "/handoffs",
+      "requestBytes": 0,
+      "responseBytes": 15,
+      "status": 200,
+      "elapsedMs": 3.639928999999995
+    },
+    {
+      "method": "GET",
+      "path": "/agent/prepare-work",
+      "requestBytes": 0,
+      "responseBytes": 1013,
+      "status": 200,
+      "elapsedMs": 29.001661000000013
+    },
+    {
+      "method": "GET",
+      "path": "/agent/context",
+      "requestBytes": 0,
+      "responseBytes": 380,
+      "status": 200,
+      "elapsedMs": 26.721952999999985
+    },
+    {
+      "method": "GET",
+      "path": "/handoffs",
+      "requestBytes": 0,
+      "responseBytes": 15,
+      "status": 200,
+      "elapsedMs": 3.1377140000000168
+    },
+    {
+      "method": "GET",
+      "path": "/agent/prepare-work",
+      "requestBytes": 0,
+      "responseBytes": 1013,
+      "status": 200,
+      "elapsedMs": 28.53611699999999
+    },
+    {
+      "method": "GET",
+      "path": "/agent/context",
+      "requestBytes": 0,
+      "responseBytes": 380,
+      "status": 200,
+      "elapsedMs": 21.69395499999996
+    },
+    {
+      "method": "GET",
+      "path": "/handoffs",
+      "requestBytes": 0,
+      "responseBytes": 15,
+      "status": 200,
+      "elapsedMs": 11.733812999999998
+    },
+    {
+      "method": "GET",
+      "path": "/agent/prepare-work",
+      "requestBytes": 0,
+      "responseBytes": 1013,
+      "status": 200,
+      "elapsedMs": 36.44148799999999
+    },
+    {
+      "method": "GET",
+      "path": "/agent/context",
+      "requestBytes": 0,
+      "responseBytes": 380,
+      "status": 200,
+      "elapsedMs": 30.04393799999997
+    },
+    {
+      "method": "GET",
+      "path": "/handoffs",
+      "requestBytes": 0,
+      "responseBytes": 15,
+      "status": 200,
+      "elapsedMs": 10.105963999999972
+    }
+  ],
+  "smoke": [
+    {
+      "route": "/health",
+      "auth": false,
+      "status": 200
+    },
+    {
+      "route": "/runs",
+      "auth": false,
+      "status": 401
+    },
+    {
+      "route": "/runs",
+      "auth": true,
+      "status": 200
+    }
+  ],
+  "outage": {
+    "kind": "real subprocess with intentionally unavailable recorder, regression evidence",
+    "exit": 7,
+    "executions": 1,
+    "elapsedMs": 936.878204,
+    "stdoutBytes": 517,
+    "stderrBytes": 94
+  },
+  "measurementLimits": {
+    "totalParentToolCount": null,
+    "sourcePreparationElapsed": null,
+    "authoringElapsed": null,
+    "setupElapsed": null,
+    "providerTokens": null,
+    "providerCost": null,
+    "readerCompletionBudget": "6 tools / 800 final words",
+    "discoveryAndWrappersCountedSeparately": true
+  }
+}
