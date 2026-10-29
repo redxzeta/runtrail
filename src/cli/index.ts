@@ -893,6 +893,27 @@ async function wrapRunFromArgv(args: string[]): Promise<void> {
       continue;
     }
 
+    if (value === "--help" || value === "-h") {
+      console.log(`Usage: rt run --source <source> --project <project> --task <task> [options] -- <command> [args...]
+
+Wrap a command in a Runtrail run.
+
+Options:
+  --source <source>  Run source
+  --project <project>  Project name
+  --task <task>  Task summary
+  --agent-name <agentName>  Logical agent name
+  --agent-model <agentModel>  Active model identifier
+  --workflow-id <workflowId>  Workflow identifier
+  --work-key <workKey>  External work identifier
+  --parent-run-id <parentRunId>  Parent run
+  --continued-from-run-id <continuedFromRunId>  Previous run
+  --category <category>  Run category
+  --tag <tag>  Run tag (repeatable)
+  -h, --help  Display help`);
+      return;
+    }
+
     if (
       value === "--source" ||
       value === "--project" ||
