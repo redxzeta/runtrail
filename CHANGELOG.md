@@ -1,3 +1,10 @@
+## [1.44.2](https://github.com/redxzeta/runtrail/compare/v1.44.1...v1.44.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* restore run wrapper help and update node server ([#223](https://github.com/redxzeta/runtrail/issues/223)) ([916ba1e](https://github.com/redxzeta/runtrail/commit/916ba1e441e2e6c4cdbc698a3fc3885fef4fcfc7))
+
 ## [1.44.1](https://github.com/redxzeta/runtrail/compare/v1.44.0...v1.44.1) (2026-10-28)
 
 
