@@ -1,0 +1,344 @@
+{
+  "phase": "post-fix",
+  "build": "1dca1291db24edd1eed5ba08ac22b1f3c84dee49",
+  "receipts": [
+    {
+      "case": "A",
+      "capture": {
+        "code": 0,
+        "stderr": "",
+        "durationMs": 1061.386529,
+        "stdoutBytes": 959,
+        "result": {
+          "schemaVersion": "1",
+          "status": "complete",
+          "confirmed": [
+            {
+              "stage": "run",
+              "id": "run_DgDBqmldSw_JIbcs"
+            },
+            {
+              "stage": "summary",
+              "id": "evt_9ts5xX6kyxQTJ0eX"
+            },
+            {
+              "stage": "handoff",
+              "id": "handoff_1Y403vsj3bjdvIUW"
+            }
+          ],
+          "resume": "none",
+          "semantics": "client_reported_unverified",
+          "plan": {
+            "clientRunId": "wi1:bf6a73c30e0346f3581e26093eaeb59cb768c570262874ca1ad5fabb2ce45439",
+            "summaryKey": "wi1:bf6a73c30e0346f3581e26093eaeb59cb768c570262874ca1ad5fabb2ce45439:summary",
+            "handoffKey": "wi1:bf6a73c30e0346f3581e26093eaeb59cb768c570262874ca1ad5fabb2ce45439:handoff",
+            "payloadHash": "8313b11df552a646ad176b7bfc4e236025255f016e25f9b6134deff11478859d",
+            "source": "work-import:t3:t3-code"
+          },
+          "envelopeSaved": true,
+          "retryEnvelope": false,
+          "captureNote": "Retain the original saved envelope. Retry with --retry; do not recapture after uncertain delivery."
+        }
+      },
+      "retry": {
+        "code": 0,
+        "stderr": "",
+        "durationMs": 922.7442000000001,
+        "stdoutBytes": 959,
+        "result": {
+          "schemaVersion": "1",
+          "status": "complete",
+          "confirmed": [
+            {
+              "stage": "run",
+              "id": "run_DgDBqmldSw_JIbcs"
+            },
+            {
+              "stage": "summary",
+              "id": "evt_9ts5xX6kyxQTJ0eX"
+            },
+            {
+              "stage": "handoff",
+              "id": "handoff_1Y403vsj3bjdvIUW"
+            }
+          ],
+          "resume": "none",
+          "semantics": "client_reported_unverified",
+          "plan": {
+            "clientRunId": "wi1:bf6a73c30e0346f3581e26093eaeb59cb768c570262874ca1ad5fabb2ce45439",
+            "summaryKey": "wi1:bf6a73c30e0346f3581e26093eaeb59cb768c570262874ca1ad5fabb2ce45439:summary",
+            "handoffKey": "wi1:bf6a73c30e0346f3581e26093eaeb59cb768c570262874ca1ad5fabb2ce45439:handoff",
+            "payloadHash": "8313b11df552a646ad176b7bfc4e236025255f016e25f9b6134deff11478859d",
+            "source": "work-import:t3:t3-code"
+          },
+          "envelopeSaved": false,
+          "retryEnvelope": true,
+          "captureNote": "Retain the original saved envelope. Retry with --retry; do not recapture after uncertain delivery."
+        }
+      },
+      "brief": {
+        "code": 0,
+        "stderr": "",
+        "durationMs": 1631.3305319999995,
+        "stdoutBytes": 10113,
+        "projection": {
+          "evidenceApplicability": "unknown",
+          "textClipped": true,
+          "report": {
+            "provenance": "client_reported",
+            "assurance": "unverified",
+            "evidenceApplicability": "unknown",
+            "source": {
+              "kind": "t3",
+              "system": "t3-code",
+              "threadId": "thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3A51d36b14-3d6d-4c9d-be86-b7fbd36344bf",
+              "runId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A68d4cd88-b7f3-4a27-9453-23ced2453e10%253Adelegate-task%253A51d36b14-3d6d-4c9d-be86-b7fbd36344bf:ordinal:1",
+              "ref": "t3-thread://v1/thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3A51d36b14-3d6d-4c9d-be86-b7fbd36344bf",
+              "observedAt": "2026-10-29T18:37:38.429Z",
+              "reportedStatus": "completed"
+            },
+            "workflowId": "github:redxzeta/runtrail#218:A",
+            "workKey": "github:redxzeta/runtrail#218:A",
+            "task": "Review bounded #172 outbox regression",
+            "summary": "Parent-pinned patch 136fdd2b740137e886d09362dea28354241b24d7 (producer tested uncommitted bytes). Task: #218 Case A / #172. Added one regression in `test/outbox.test.ts` covering persisted retries 1\u21922\u21923, unchanged neighboring bytes/counters, selective removal/quarantine, and Unix `0700`[path omitted] permissions. Disposable state cleaned up. No production edits or commits. Tested revision: `7942389f8d9368b18f52c37d3df99e3b4f0ac278` plus uncommitted test patch. Concurrent `test/cli.test.ts` edits were preserved. Commands/outcomes: - `pnpm exec vitest run test/outbox.test.ts`: PASS, 5 tests. - `pnpm exec vitest run test/outbox.test.ts test/cli.test.ts`: PASS, 33 tests before concurrent CLI additions. - `pnpm exec biome check test/outbox.test.ts`: initially failed formatting/import order; corrected with `pnpm exec biome check --write test/outbox.test.ts`; final check PASS. - `pnpm typecheck`, `pnpm build`, `git diff --check`: PASS. - `pnpm lint`: FAIL on concurrent CLI test formatting. - `pnpm test`: FAIL, 275 passed/1 failed; CLI `run --help` expected help but received required-options error. - Initial chained inspection stopped at missing `vitest.config.ts`; its test command did not execute. Blockers: broader validation failures outside owned file. NOT verified: full #172 acceptance, HTTP retry classification, complete diagnostic redaction, other platforms, exact-head CI, deployment/runtime activation. Reviewer next action: inspect and pin the outbox-only patch; independently verify CLI transient/permanent response handling and payload-free diagnostics before claiming #172 acceptance.",
+            "nextAction": "Inspect pinned outbox patch; independently verify CLI transient/permanent response handling and payload-free diagnostics before full #172 acceptance.",
+            "evidence": [
+              {
+                "kind": "other",
+                "ref": "t3-thread://v1/thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3A51d36b14-3d6d-4c9d-be86-b7fbd36344bf",
+                "summary": "Source-reported completion: 2026-10-29T04:53:09.428Z; not independent verification.",
+                "observedAt": "2026-10-29T18:37:38.429Z",
+                "provenance": "client_reported",
+                "outcome": "unknown",
+                "evidenceApplicability": "unknown"
+              },
+              {
+                "kind": "other",
+                "ref": "https://github.com/redxzeta/runtrail/issues/172",
+                "summary": "Caller-selected reference; outcome and applicability unknown.",
+                "observedAt": "2026-10-29T18:37:38.429Z",
+                "provenance": "client_reported",
+                "outcome": "unknown",
+                "evidenceApplicability": "unknown"
+              }
+            ]
+          }
+        }
+      },
+      "calls": [
+        {
+          "method": "GET",
+          "path": "/agent/prepare-work",
+          "requestBytes": 0,
+          "responseBytes": 1957,
+          "status": 200,
+          "durationMs": 17.70339899999999
+        },
+        {
+          "method": "GET",
+          "path": "/agent/context",
+          "requestBytes": 0,
+          "responseBytes": 7240,
+          "status": 200,
+          "durationMs": 38.11651500000062
+        },
+        {
+          "method": "GET",
+          "path": "/handoffs",
+          "requestBytes": 0,
+          "responseBytes": 5500,
+          "status": 200,
+          "durationMs": 5.299755000000005
+        }
+      ],
+      "counts": {
+        "agent_runs": 1,
+        "agent_events": 2,
+        "handoffs": 1,
+        "verification_evidence": 0
+      },
+      "envelopeBytes": 3341,
+      "source": {
+        "kind": "t3",
+        "system": "t3-code",
+        "threadId": "thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3A51d36b14-3d6d-4c9d-be86-b7fbd36344bf",
+        "runId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A68d4cd88-b7f3-4a27-9453-23ced2453e10%253Adelegate-task%253A51d36b14-3d6d-4c9d-be86-b7fbd36344bf:ordinal:1",
+        "ref": "t3-thread://v1/thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3A51d36b14-3d6d-4c9d-be86-b7fbd36344bf",
+        "observedAt": "2026-10-29T18:37:38.429Z",
+        "reportedStatus": "completed"
+      },
+      "summaryProjection": "whitespace-only; frozen raw exceeds 12 lines",
+      "rawSummaryAccepted": false,
+      "projectionExact": false
+    },
+    {
+      "case": "B",
+      "capture": {
+        "code": 0,
+        "stderr": "",
+        "durationMs": 1183.5571019999998,
+        "stdoutBytes": 959,
+        "result": {
+          "schemaVersion": "1",
+          "status": "complete",
+          "confirmed": [
+            {
+              "stage": "run",
+              "id": "run_FlbvQmSjd7LoBpdX"
+            },
+            {
+              "stage": "summary",
+              "id": "evt_qXV6psOn4BXcm7DH"
+            },
+            {
+              "stage": "handoff",
+              "id": "handoff_HaRb1UJP44dK9_cy"
+            }
+          ],
+          "resume": "none",
+          "semantics": "client_reported_unverified",
+          "plan": {
+            "clientRunId": "wi1:b8db125bbafeec4ee2df36256766464bc04dc60a6b94e6f96a20173bf66a415e",
+            "summaryKey": "wi1:b8db125bbafeec4ee2df36256766464bc04dc60a6b94e6f96a20173bf66a415e:summary",
+            "handoffKey": "wi1:b8db125bbafeec4ee2df36256766464bc04dc60a6b94e6f96a20173bf66a415e:handoff",
+            "payloadHash": "a7ccc548f7858cdfce460abefd232b90d312935f2cb757f54ab3d5be66612f5f",
+            "source": "work-import:t3:t3-code"
+          },
+          "envelopeSaved": true,
+          "retryEnvelope": false,
+          "captureNote": "Retain the original saved envelope. Retry with --retry; do not recapture after uncertain delivery."
+        }
+      },
+      "retry": {
+        "code": 0,
+        "stderr": "",
+        "durationMs": 1066.8681779999997,
+        "stdoutBytes": 959,
+        "result": {
+          "schemaVersion": "1",
+          "status": "complete",
+          "confirmed": [
+            {
+              "stage": "run",
+              "id": "run_FlbvQmSjd7LoBpdX"
+            },
+            {
+              "stage": "summary",
+              "id": "evt_qXV6psOn4BXcm7DH"
+            },
+            {
+              "stage": "handoff",
+              "id": "handoff_HaRb1UJP44dK9_cy"
+            }
+          ],
+          "resume": "none",
+          "semantics": "client_reported_unverified",
+          "plan": {
+            "clientRunId": "wi1:b8db125bbafeec4ee2df36256766464bc04dc60a6b94e6f96a20173bf66a415e",
+            "summaryKey": "wi1:b8db125bbafeec4ee2df36256766464bc04dc60a6b94e6f96a20173bf66a415e:summary",
+            "handoffKey": "wi1:b8db125bbafeec4ee2df36256766464bc04dc60a6b94e6f96a20173bf66a415e:handoff",
+            "payloadHash": "a7ccc548f7858cdfce460abefd232b90d312935f2cb757f54ab3d5be66612f5f",
+            "source": "work-import:t3:t3-code"
+          },
+          "envelopeSaved": false,
+          "retryEnvelope": true,
+          "captureNote": "Retain the original saved envelope. Retry with --retry; do not recapture after uncertain delivery."
+        }
+      },
+      "brief": {
+        "code": 0,
+        "stderr": "",
+        "durationMs": 1223.1355549999998,
+        "stdoutBytes": 10147,
+        "projection": {
+          "evidenceApplicability": "unknown",
+          "textClipped": true,
+          "report": {
+            "provenance": "client_reported",
+            "assurance": "unverified",
+            "evidenceApplicability": "unknown",
+            "source": {
+              "kind": "t3",
+              "system": "t3-code",
+              "threadId": "thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3Ad036f23c-8c1e-4297-a95c-9aea575e4b85",
+              "runId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A68d4cd88-b7f3-4a27-9453-23ced2453e10%253Adelegate-task%253Ad036f23c-8c1e-4297-a95c-9aea575e4b85:ordinal:1",
+              "ref": "t3-thread://v1/thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3Ad036f23c-8c1e-4297-a95c-9aea575e4b85",
+              "observedAt": "2026-10-29T18:37:42.030Z",
+              "reportedStatus": "completed"
+            },
+            "workflowId": "github:redxzeta/runtrail#218:B",
+            "workKey": "github:redxzeta/runtrail#218:B",
+            "task": "Review bounded #169 help regression",
+            "summary": "Parent-pinned patch 136fdd2b740137e886d09362dea28354241b24d7 (producer tested uncommitted bytes). Task: #218 Case B, bounded #169 CLI help tests. Only `test/cli.test.ts` edited; no production changes or commits. Tested revision: `7942389f8d9368b18f52c37d3df99e3b4f0ac278` plus uncommitted test patch. Commands/outcomes: - `pnpm exec vitest run test/cli.test.ts -t 'prints structural help offline without config'` \u2014 failed twice: 7 passed, 1 failed. `rt run --help` rejected with \u201cOptions --source, --project, and --task are required.\u201d - First spawn guard failed because ESM namespace exports cannot be spied on. Corrected using the mutable built-in export, with restoration. - `pnpm exec biome check test/cli.test.ts` \u2014 passed after formatting. - `git diff --check` \u2014 passed. - `pnpm exec vitest run test/cli.test.ts -t 'structural help|currently rejects run --help'` \u2014 passed: 8 tests, 28 skipped, 1.67s. Coverage: repeated structural help calls for root, context, prepare-work, run create, workflow packet, verification add and handoff accept; all seven critical option names. Missing config and zero fetch calls asserted. Separate test truthfully characterizes `run --help` rejection and proves zero spawn/fetch calls. Modified globals and built-in bindings restored. Blocker: `run --help` contract remains defective; green characterization does not establish help acceptance. NOT verified: complete #169 coverage, full lint/typecheck/test/build, CI, runtime activation or pilot comparability. Reviewer next action: inspect the exact uncommitted CLI test patch, rerun the final focused command, and independently confirm the pre-Commander wrapper dispatch before separately scoping a production fix.",
+            "nextAction": "Inspect pinned CLI patch; independently confirm pre-Commander wrapper dispatch before separately scoping a production fix.",
+            "evidence": [
+              {
+                "kind": "other",
+                "ref": "t3-thread://v1/thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3Ad036f23c-8c1e-4297-a95c-9aea575e4b85",
+                "summary": "Source-reported completion: 2026-10-29T04:52:41.382Z; not independent verification.",
+                "observedAt": "2026-10-29T18:37:42.030Z",
+                "provenance": "client_reported",
+                "outcome": "unknown",
+                "evidenceApplicability": "unknown"
+              },
+              {
+                "kind": "other",
+                "ref": "https://github.com/redxzeta/runtrail/issues/169",
+                "summary": "Caller-selected reference; outcome and applicability unknown.",
+                "observedAt": "2026-10-29T18:37:42.030Z",
+                "provenance": "client_reported",
+                "outcome": "unknown",
+                "evidenceApplicability": "unknown"
+              }
+            ]
+          }
+        }
+      },
+      "calls": [
+        {
+          "method": "GET",
+          "path": "/agent/prepare-work",
+          "requestBytes": 0,
+          "responseBytes": 1964,
+          "status": 200,
+          "durationMs": 14.937612000000627
+        },
+        {
+          "method": "GET",
+          "path": "/agent/context",
+          "requestBytes": 0,
+          "responseBytes": 7512,
+          "status": 200,
+          "durationMs": 10.500706000000719
+        },
+        {
+          "method": "GET",
+          "path": "/handoffs",
+          "requestBytes": 0,
+          "responseBytes": 5658,
+          "status": 200,
+          "durationMs": 1.6453390000006038
+        }
+      ],
+      "counts": {
+        "agent_runs": 2,
+        "agent_events": 4,
+        "handoffs": 2,
+        "verification_evidence": 0
+      },
+      "envelopeBytes": 3419,
+      "source": {
+        "kind": "t3",
+        "system": "t3-code",
+        "threadId": "thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3Ad036f23c-8c1e-4297-a95c-9aea575e4b85",
+        "runId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A68d4cd88-b7f3-4a27-9453-23ced2453e10%253Adelegate-task%253Ad036f23c-8c1e-4297-a95c-9aea575e4b85:ordinal:1",
+        "ref": "t3-thread://v1/thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3Ad036f23c-8c1e-4297-a95c-9aea575e4b85",
+        "observedAt": "2026-10-29T18:37:42.030Z",
+        "reportedStatus": "completed"
+      },
+      "summaryProjection": "whitespace-only; frozen raw exceeds 12 lines",
+      "rawSummaryAccepted": false,
+      "projectionExact": true
+    }
+  ]
+}
