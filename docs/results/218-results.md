@@ -142,7 +142,27 @@ The existing Biome schema-version notice is informational. Producer failures and
 initial acceptance failures remain in canonical facts; later green combined
 validation does not make help correct. An exploratory `pnpm conformance --help`
 failed because that flag is unsupported, before running conformance.
-Final checks/review/PR receipt are added below after execution. #169/#172/#215/#218
+Final validation and review receipt follows. #169/#172/#215/#218
 remain open. No production service, user config, firewall, runner or deployment
 was changed. Cleanup is limited to owned disposable resources. Rollback: revert
 the tests/docs PR; there are no behavior changes, migrations or activation steps.
+
+
+At report head `f8f5e7e722c939438dd2c2c17eb3d1b2837999da`, a new combined run
+passed lint, typecheck, **276 tests in 27 files** (59.06 seconds), build and
+`git diff --check`. Conformance passed all **19 checks**, cleanup passed.
+`pnpm audit --prod --json` exited 1 and reported **one moderate**
+`@hono/node-server` advisory, GHSA-rmxm-3fg6-px4f, installed 2.1.1, patched
+>=2.1.3. This is current inventory evidence, not exploitability or a dependency
+fix; the older zero-advisory report is historical.
+
+Independent Terra/high reviewed the complete diff and six actual reader activity
+timelines at `f8f5e7e`, found no concrete P1/P2 blockers, and confirmed the stated
+numerators and bounded recommendation. Its full-suite rerun was NOT_RUN.
+[PR #222](https://github.com/redxzeta/runtrail/pull/222) holds final exact-head CI,
+recheck and merge evidence. The final addition is this validation receipt only;
+no frozen input, reader result, test or production byte changed after review.
+Owned service termination was checked against its private token and checkout;
+its loopback listener stopped responding. Owned disposable DB/log/state/token
+files were deleted. Other worktrees and services were preserved. The current
+T3-bound worktree remains for inspection. No release or activation is requested.
