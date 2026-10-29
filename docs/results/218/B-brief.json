@@ -1,0 +1,164 @@
+{
+  "exit": 0,
+  "elapsedMs": 406.92980900000003,
+  "stdoutBytes": 3847,
+  "report": {
+    "schemaVersion": "1",
+    "project": "pilot-B",
+    "asOf": "2026-10-29T04:54:14.018Z",
+    "selectedRun": null,
+    "relevantRuns": [],
+    "recentEvents": [],
+    "effectiveDecisions": [],
+    "blockers": [],
+    "pendingHandoffs": [],
+    "conflicts": [],
+    "readiness": {
+      "status": "unknown",
+      "asOf": null,
+      "reasonCodes": [],
+      "findings": [],
+      "nextActions": []
+    },
+    "recommendations": [
+      {
+        "actionCode": "start_new_run",
+        "reasonCodes": ["no_conflicting_or_blocked_work"],
+        "targetRefs": [],
+        "requiresReread": false,
+        "asOf": "2026-10-29T04:54:14.018Z"
+      }
+    ],
+    "warnings": [],
+    "evidenceApplicability": "unknown",
+    "coverage": {
+      "limit": 5,
+      "atomic": false,
+      "context": {
+        "mode": "full",
+        "coverage": "unknown",
+        "scope": "project",
+        "projectMatches": true
+      },
+      "preparedMode": "full",
+      "nestedArraysBoundedBy": 5,
+      "importProvenance": {
+        "requests": 1,
+        "limit": 5,
+        "returned": 0,
+        "sourceTruncated": null,
+        "mayHaveMore": false,
+        "atomic": false,
+        "scope": "project_pending_handoffs"
+      },
+      "prepared": {
+        "relevantRuns": {
+          "limit": 5,
+          "count": 0,
+          "truncated": false
+        },
+        "workflowRuns": {
+          "limit": 5,
+          "count": 0,
+          "truncated": false
+        },
+        "conflicts": {
+          "limit": 5,
+          "count": 0,
+          "truncated": false
+        },
+        "pendingHandoffs": {
+          "limit": 5,
+          "count": 0,
+          "truncated": false
+        },
+        "openLoops": {
+          "limit": 5,
+          "count": 0,
+          "truncated": false
+        },
+        "effectiveDecisions": {
+          "limit": 5,
+          "count": 0,
+          "truncated": false
+        },
+        "recommendations": {
+          "limit": 5,
+          "count": 1,
+          "truncated": false
+        },
+        "warnings": {
+          "limit": 5,
+          "count": 0,
+          "truncated": false
+        }
+      },
+      "projection": {
+        "relevantRuns": {
+          "available": 0,
+          "returned": 0,
+          "omitted": 0,
+          "sourceTruncated": false
+        },
+        "recentEvents": {
+          "available": 0,
+          "returned": 0,
+          "omitted": 0,
+          "sourceTruncated": null
+        },
+        "effectiveDecisions": {
+          "available": 0,
+          "returned": 0,
+          "omitted": 0,
+          "sourceTruncated": false
+        },
+        "blockers": {
+          "available": 0,
+          "returned": 0,
+          "omitted": 0,
+          "sourceTruncated": false
+        },
+        "importHandoffs": {
+          "available": 0,
+          "returned": 0,
+          "omitted": 0,
+          "sourceTruncated": null
+        },
+        "pendingHandoffs": {
+          "available": 0,
+          "returned": 0,
+          "omitted": 0,
+          "sourceTruncated": false
+        },
+        "conflicts": {
+          "available": 0,
+          "returned": 0,
+          "omitted": 0,
+          "sourceTruncated": false
+        },
+        "recommendations": {
+          "available": 1,
+          "returned": 1,
+          "omitted": 0,
+          "sourceTruncated": false
+        },
+        "warnings": {
+          "available": 0,
+          "returned": 0,
+          "omitted": 0,
+          "sourceTruncated": false
+        }
+      }
+    },
+    "textClipped": false,
+    "unsafeSourceIdsOmitted": false,
+    "advisories": [
+      "Advisory observations only; reread source records before acting.",
+      "Prepare-work and context are separate bounded queries with different scopes, not an atomic snapshot.",
+      "Context has no full coverage metadata; omitted or empty history is not proof of idle work.",
+      "Completed run status does not establish verification or current applicability.",
+      "Evidence applicability is unknown: verification records do not bind revision or dirty worktree state.",
+      "Text is clipped when marked; machine paths and command details are omitted."
+    ]
+  }
+}
