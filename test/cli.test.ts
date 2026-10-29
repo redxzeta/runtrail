@@ -1,4 +1,6 @@
+import childProcess from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +21,95 @@ describe("cli", () => {
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
+
+  it.each([
+    { command: [], entries: ["Runtrail CLI", "prepare-work", "verification", "handoff"] },
+    { command: ["context"], entries: ["Fetch compact project context", "--cursor <cursor>"] },
+    {
+      command: ["prepare-work"],
+      entries: ["--work-key <workKey>", "--cursor <cursor>"]
+    },
+    {
+      command: ["run", "create"],
+      entries: [
+        "--agent-name <agentName>",
+        "--agent-model <agentModel>",
+        "--workflow-id <workflowId>"
+      ]
+    },
+    { command: ["workflow", "packet"], entries: ["--workflow-id <workflowId>"] },
+    { command: ["verification", "add"], entries: ["--support-json <json>"] },
+    { command: ["handoff", "accept"], entries: ["--expected-version <version>"] }
+  ])(
+    "prints structural help offline without config: $command",
+    async ({ command, entries }) => {
+      tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-help-"));
+      vi.stubEnv("RUNTRAIL_CONFIG", path.join(tempDir, "missing.yaml"));
+      vi.stubEnv("RUNTRAIL_URL", "");
+      vi.stubEnv("RUNTRAIL_TOKEN", "");
+      const fetchMock = vi.fn(async () => {
+        throw new Error("Help must not make HTTP requests");
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const output = captureOutput();
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      const exit = vi.spyOn(process, "exit").mockImplementation(() => {
+        throw new Error("Help must not exit the test process");
+      });
+      const previousExitCode = process.exitCode;
+
+      try {
+        // Repeat in one process to catch output or Commander state leaking between calls.
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          output.length = 0;
+          await expect(runCli(["node", "rt", ...command, "--help"])).rejects.toMatchObject({
+            code: "commander.helpDisplayed",
+            exitCode: 0
+          });
+          const help = output.join("");
+          expect(help).toMatch(/^Usage: rt\b/m);
+          for (const entry of entries) {
+            expect(help.split("\n").some((line) => line.trim().includes(entry))).toBe(true);
+          }
+          expect(fetchMock).not.toHaveBeenCalled();
+          expect(stderr).not.toHaveBeenCalled();
+          expect(exit).not.toHaveBeenCalled();
+          expect(process.exitCode).toBe(previousExitCode);
+        }
+      } finally {
+        process.exitCode = previousExitCode;
+      }
+    },
+    2000
+  );
+
+  it("currently rejects run --help before spawning or requesting instead of displaying help", async () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-run-help-"));
+    vi.stubEnv("RUNTRAIL_CONFIG", path.join(tempDir, "missing.yaml"));
+    const fetchMock = vi.fn(async () => {
+      throw new Error("Help must not make HTTP requests");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const spawn = vi.spyOn(childProcess, "spawn").mockImplementation(() => {
+      throw new Error("Help must not spawn a command");
+    });
+    syncBuiltinESMExports();
+    const output = captureOutput();
+    const previousExitCode = process.exitCode;
+    try {
+      await expect(runCli(["node", "rt", "run", "--help"])).rejects.toThrow(
+        "Options --source, --project, and --task are required"
+      );
+      expect(spawn).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(output).toEqual([]);
+      expect(process.exitCode).toBe(previousExitCode);
+    } finally {
+      spawn.mockRestore();
+      syncBuiltinESMExports();
+      process.exitCode = previousExitCode;
+    }
+  }, 2000);
 
   it("prints health response JSON", async () => {
     vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");

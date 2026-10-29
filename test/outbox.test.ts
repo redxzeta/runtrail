@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   statSync,
   writeFileSync
@@ -16,7 +17,8 @@ import {
   type OutboxRecord,
   quarantineOutbox,
   readPendingOutbox,
-  removeOutboxRecord
+  removeOutboxRecord,
+  updateOutboxRetry
 } from "../src/cli/outbox.js";
 
 let stateDir: string | undefined;
@@ -27,6 +29,65 @@ afterEach(() => {
 });
 
 describe("local outbox", () => {
+  it("preserves persisted retry counts, unrelated bytes and permissions through record transitions", () => {
+    stateDir = mkdtempSync(path.join(tmpdir(), "runtrail-outbox-"));
+    const env = { RUNTRAIL_STATE_DIR: stateDir };
+    const retrying = enqueueEvent({ clientRecordId: "retrying", note: "retry payload" }, env);
+    const rejected = enqueueEvent({ clientRecordId: "rejected", note: "rejected payload" }, env);
+    const unrelated = enqueueEvent({ clientRecordId: "unrelated", note: "untouched payload" }, env);
+    const pendingDir = path.join(stateDir, "outbox", "pending");
+    const retryFile = path.join(pendingDir, `${retrying.id}.json`);
+    const rejectedFile = path.join(pendingDir, `${rejected.id}.json`);
+    const unrelatedFile = path.join(pendingDir, `${unrelated.id}.json`);
+    const rejectedBytes = readFileSync(rejectedFile);
+    const unrelatedBytes = readFileSync(unrelatedFile);
+    const original = readPendingOutbox(env).valid.find(({ record }) => record.id === retrying.id);
+    expect(original).toBeDefined();
+
+    for (const retryCount of [1, 2, 3]) {
+      // Replay rereads persisted records on each invocation; do not reuse a stale object.
+      const current = readPendingOutbox(env).valid.find(({ record }) => record.id === retrying.id);
+      if (!current) throw new Error("Expected pending retry record");
+      updateOutboxRetry(current.file, current.record);
+      expect(
+        readPendingOutbox(env).valid.find(({ record }) => record.id === retrying.id)?.record
+      ).toEqual({ ...original?.record, retryCount });
+      expect(readFileSync(rejectedFile)).toEqual(rejectedBytes);
+      expect(readFileSync(unrelatedFile)).toEqual(unrelatedBytes);
+      expect(listPendingNames(env)).toEqual(
+        [retrying.id, rejected.id, unrelated.id].map((id) => `${id}.json`).sort()
+      );
+      expect(statSync(pendingDir).mode & 0o777).toBe(0o700);
+      for (const file of [retryFile, rejectedFile, unrelatedFile]) {
+        expect(statSync(file).mode & 0o777).toBe(0o600);
+      }
+    }
+
+    removeOutboxRecord(retryFile);
+    expect(existsSync(retryFile)).toBe(false);
+    expect(readFileSync(rejectedFile)).toEqual(rejectedBytes);
+    expect(readFileSync(unrelatedFile)).toEqual(unrelatedBytes);
+    expect(statSync(pendingDir).mode & 0o777).toBe(0o700);
+
+    quarantineOutbox(rejectedFile, "permanent_http_400", env);
+    const quarantineDir = path.join(stateDir, "outbox", "quarantine");
+    const quarantinedFile = path.join(quarantineDir, `${rejected.id}.json`);
+    const reasonFile = `${quarantinedFile}.reason`;
+    expect(readFileSync(quarantinedFile)).toEqual(rejectedBytes);
+    expect(readFileSync(reasonFile, "utf8")).toBe("permanent_http_400\n");
+    expect(readdirSync(quarantineDir).sort()).toEqual(
+      [`${rejected.id}.json`, `${rejected.id}.json.reason`].sort()
+    );
+    expect(listPendingNames(env)).toEqual([`${unrelated.id}.json`]);
+    expect(readFileSync(unrelatedFile)).toEqual(unrelatedBytes);
+    expect(listOutbox(env)).toEqual([unrelated]);
+    expect(statSync(pendingDir).mode & 0o777).toBe(0o700);
+    expect(statSync(quarantineDir).mode & 0o777).toBe(0o700);
+    for (const file of [unrelatedFile, quarantinedFile, reasonFile]) {
+      expect(statSync(file).mode & 0o777).toBe(0o600);
+    }
+  });
+
   it("stores only safe records with strict permissions and identifies malformed input", () => {
     stateDir = mkdtempSync(path.join(tmpdir(), "runtrail-outbox-"));
     const env = { RUNTRAIL_STATE_DIR: stateDir };
