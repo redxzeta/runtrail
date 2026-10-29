@@ -63,6 +63,14 @@ function safeReference(value: string): boolean {
   }
 }
 
+// Only gateway-observed identities. Never decode before matching: encoded
+// separators inside delegated IDs are literal parts of their canonical identity.
+const t3Uuid = "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}";
+const t3ThreadId = new RegExp(
+  `^(?:mcp:${t3Uuid}|thread:delegated-task:command%3Amcp%3A${t3Uuid}%3Adelegate-task%3A${t3Uuid})$`,
+  "i"
+);
+
 const reference = text(1000).refine(safeReference, "Unsupported or unsafe reference");
 const timestamp = z.string().datetime();
 const sourceSchema = z.strictObject({
@@ -108,7 +116,7 @@ export const workImportSchema = z
       const runPrefix = `run:thread:${encodeURIComponent(threadId)}:ordinal:`;
       if (
         system !== "t3-code" ||
-        !/^mcp:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(threadId) ||
+        !t3ThreadId.test(threadId) ||
         !runId.startsWith(runPrefix) ||
         !/^[1-9]\d*$/.test(runId.slice(runPrefix.length)) ||
         ref !== `t3-thread://v1/${threadId}`

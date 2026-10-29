@@ -121,6 +121,12 @@ describe("explicit workflow capture and fresh CLI continuation", () => {
           ]
         })
       );
+      const stale = await f.cli([...f.capture(), "--source-run", runId(3), "--dry-run"]);
+      expect(stale.json.status).toBe("invalid");
+      expect(existsSync(f.saved)).toBe(false);
+      expect(f.requests).toEqual([]);
+      const nonterminal = await f.cli([...f.capture(), "--source-run", runId(2), "--dry-run"]);
+      expect(nonterminal.json.status).toBe("invalid");
       const dry = await f.cli([...f.capture(), "--source-run", runId(1), "--dry-run"]);
       expect(dry.json.status).toBe("dry_run");
       expect(existsSync(f.saved)).toBe(false);

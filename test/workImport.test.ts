@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -242,6 +242,61 @@ describe("bounded work import", () => {
     ).toBe("invalid");
     expect(request).not.toHaveBeenCalled();
     expect(existsSync(state)).toBe(false);
+  });
+
+  it("accepts both frozen delegated identities and rejects malformed or uncorrelated sources before requests", async () => {
+    const request = vi.fn();
+    for (const name of ["A", "B"]) {
+      const facts = JSON.parse(readFileSync(`docs/results/218/${name}.json`, "utf8"));
+      const threadId = facts.source.thread.threadId as string;
+      const source = {
+        ...envelope().source,
+        kind: "t3" as const,
+        system: "t3-code",
+        threadId,
+        runId: facts.source.recentRuns[0].runId as string,
+        ref: `t3-thread://v1/${threadId}`
+      };
+      const input = { ...envelope(), source };
+      expect((await importWork(JSON.stringify(input), request, { dryRun: true })).status).toBe(
+        "dry_run"
+      );
+      const malformed = [
+        threadId.replace("68d4cd88-b7f3", "68d4cd88b-7f3"),
+        threadId.replaceAll("%3A", ":"),
+        threadId.replaceAll("%3A", "%253A"),
+        `${threadId}:extra`,
+        `prefix:${threadId}`,
+        `${threadId}/path`,
+        `${threadId}\n`,
+        threadId.replace("%3A", "%2F")
+      ];
+      for (const id of malformed) {
+        const invalid = {
+          ...source,
+          threadId: id,
+          runId: `run:thread:${encodeURIComponent(id)}:ordinal:1`,
+          ref: `t3-thread://v1/${id}`
+        };
+        expect(
+          (await importWork(JSON.stringify({ ...input, source: invalid }), request)).status
+        ).toBe("invalid");
+      }
+      for (const invalid of [
+        { ...source, ref: `${source.ref}:extra` },
+        { ...source, ref: source.ref.replaceAll("%3A", "%253A") },
+        { ...source, runId: source.runId.replace("ordinal:1", "ordinal:0") },
+        { ...source, runId: `${source.runId}:extra` },
+        { ...source, runId: source.runId.replace("%253A", "%3A") },
+        { ...source, runId: source.runId.replace("ordinal:1", "ordinal:01") },
+        { ...source, runId: "run:thread:mcp%3Aaaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:ordinal:1" },
+        { ...source, reportedStatus: "running" }
+      ])
+        expect(
+          (await importWork(JSON.stringify({ ...input, source: invalid }), request)).status
+        ).toBe("invalid");
+    }
+    expect(request).not.toHaveBeenCalled();
   });
 
   it("delivers through authenticated HTTP, deduplicates and preserves unverified evidence/provenance", async () => {

@@ -1,0 +1,54 @@
+{
+  "phase": "baseline",
+  "receipts": [
+    {
+      "case": "A",
+      "raw": {
+        "code": 1,
+        "stdout": "{\n  \"schemaVersion\": \"1\",\n  \"status\": \"invalid\",\n  \"confirmed\": [],\n  \"envelopeSaved\": false,\n  \"error\": {\n    \"stage\": \"capture\",\n    \"code\": \"capture_rejected\",\n    \"message\": \"Capture rejected. Check bounded metadata, authored input, required flags and an unused writable save path.\",\n    \"deliveryUnknown\": false\n  },\n  \"resume\": \"fix_input\",\n  \"semantics\": \"client_reported_unverified\"\n}\n",
+        "stderr": "",
+        "durationMs": 297.36855499999996,
+        "stdoutBytes": 393
+      },
+      "bounded": {
+        "code": 1,
+        "stdout": "{\n  \"schemaVersion\": \"1\",\n  \"status\": \"invalid\",\n  \"confirmed\": [],\n  \"envelopeSaved\": false,\n  \"error\": {\n    \"stage\": \"capture\",\n    \"code\": \"capture_rejected\",\n    \"message\": \"Capture rejected. Check bounded metadata, authored input, required flags and an unused writable save path.\",\n    \"deliveryUnknown\": false\n  },\n  \"resume\": \"fix_input\",\n  \"semantics\": \"client_reported_unverified\"\n}\n",
+        "stderr": "",
+        "durationMs": 292.2180789999999,
+        "stdoutBytes": 393
+      },
+      "calls": [],
+      "counts": {
+        "agent_runs": 0,
+        "agent_events": 0,
+        "handoffs": 0,
+        "verification_evidence": 0
+      }
+    },
+    {
+      "case": "B",
+      "raw": {
+        "code": 1,
+        "stdout": "{\n  \"schemaVersion\": \"1\",\n  \"status\": \"invalid\",\n  \"confirmed\": [],\n  \"envelopeSaved\": false,\n  \"error\": {\n    \"stage\": \"capture\",\n    \"code\": \"capture_rejected\",\n    \"message\": \"Capture rejected. Check bounded metadata, authored input, required flags and an unused writable save path.\",\n    \"deliveryUnknown\": false\n  },\n  \"resume\": \"fix_input\",\n  \"semantics\": \"client_reported_unverified\"\n}\n",
+        "stderr": "",
+        "durationMs": 304.572007,
+        "stdoutBytes": 393
+      },
+      "bounded": {
+        "code": 1,
+        "stdout": "{\n  \"schemaVersion\": \"1\",\n  \"status\": \"invalid\",\n  \"confirmed\": [],\n  \"envelopeSaved\": false,\n  \"error\": {\n    \"stage\": \"capture\",\n    \"code\": \"capture_rejected\",\n    \"message\": \"Capture rejected. Check bounded metadata, authored input, required flags and an unused writable save path.\",\n    \"deliveryUnknown\": false\n  },\n  \"resume\": \"fix_input\",\n  \"semantics\": \"client_reported_unverified\"\n}\n",
+        "stderr": "",
+        "durationMs": 317.9672760000001,
+        "stdoutBytes": 393
+      },
+      "calls": [],
+      "counts": {
+        "agent_runs": 0,
+        "agent_events": 0,
+        "handoffs": 0,
+        "verification_evidence": 0
+      }
+    }
+  ],
+  "build": "a2ceec9348d17243ee46be64831e8e837c18afbd"
+}

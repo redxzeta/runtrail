@@ -23,6 +23,16 @@ preparation. `selected-metadata.json` is a local file, not a URL:
 }
 ```
 
+Supported T3 thread identities are top-level `mcp:<UUID>` and the observed
+`thread:delegated-task:command%3Amcp%3A<UUID>%3Adelegate-task%3A<UUID>`.
+The run must be exactly `run:thread:${encodeURIComponent(threadId)}:ordinal:<positive integer>`
+and the reference exactly `t3-thread://v1/${threadId}`. Do not decode, rename,
+or substitute source identities. Capture, import-work and the example exporter
+all validate through the same importer contract. Bounds remain unchanged:
+authored summaries allow at most 1800 characters and 12 lines; explicitly
+project longer source reports into bounded authored text while retaining failures
+and limits. Old terminal observations are historical, never fresh validation.
+
 These are illustrative coordinates, not an actual source or check result. Inputs
 are regular JSON files of at most 16 KiB. Extra fields are rejected, not stripped.
 If selected metadata contains several runs, pass `--source-run` with the exact
