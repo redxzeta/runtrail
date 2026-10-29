@@ -83,33 +83,65 @@ describe("cli", () => {
     2000
   );
 
-  it("currently rejects run --help before spawning or requesting instead of displaying help", async () => {
-    tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-run-help-"));
-    vi.stubEnv("RUNTRAIL_CONFIG", path.join(tempDir, "missing.yaml"));
-    const fetchMock = vi.fn(async () => {
-      throw new Error("Help must not make HTTP requests");
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const spawn = vi.spyOn(childProcess, "spawn").mockImplementation(() => {
-      throw new Error("Help must not spawn a command");
-    });
-    syncBuiltinESMExports();
-    const output = captureOutput();
-    const previousExitCode = process.exitCode;
-    try {
-      await expect(runCli(["node", "rt", "run", "--help"])).rejects.toThrow(
-        "Options --source, --project, and --task are required"
-      );
-      expect(spawn).not.toHaveBeenCalled();
-      expect(fetchMock).not.toHaveBeenCalled();
-      expect(output).toEqual([]);
-      expect(process.exitCode).toBe(previousExitCode);
-    } finally {
-      spawn.mockRestore();
+  it.each(["--help", "-h"])(
+    "prints wrapper help offline for %s",
+    async (flag) => {
+      tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-run-help-"));
+      vi.stubEnv("RUNTRAIL_CONFIG", path.join(tempDir, "missing.yaml"));
+      const fetchMock = vi.fn(async () => {
+        throw new Error("Help must not make HTTP requests");
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const spawn = vi.spyOn(childProcess, "spawn").mockImplementation(() => {
+        throw new Error("Help must not spawn a command");
+      });
       syncBuiltinESMExports();
-      process.exitCode = previousExitCode;
-    }
-  }, 2000);
+      const output = captureOutput();
+      const previousExitCode = process.exitCode;
+      try {
+        await expect(runCli(["node", "rt", "run", flag])).resolves.toBeUndefined();
+        expect(spawn).not.toHaveBeenCalled();
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(output.join("\n")).toContain("Usage: rt run --source");
+        expect(process.exitCode).toBe(previousExitCode);
+      } finally {
+        spawn.mockRestore();
+        syncBuiltinESMExports();
+        process.exitCode = previousExitCode;
+      }
+    },
+    2000
+  );
+
+  it.each([false, true])("passes child help literally with separator=%s", async (separator) => {
+    const fetchMock = mockRunWrapperFetch();
+    tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-child-help-"));
+    vi.stubEnv("RUNTRAIL_LOG_DIR", tempDir);
+    const output = captureOutput();
+    await runCli([
+      "node",
+      "rt",
+      "run",
+      "--source",
+      "codex",
+      "--project",
+      "runtrail",
+      "--task",
+      "--help",
+      ...(separator ? ["--"] : []),
+      process.execPath,
+      "-e",
+      "process.stdout.write(process.argv[1])",
+      "--",
+      "--help"
+    ]);
+    expect(output.join("\n")).toContain("--help");
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(URL),
+      expect.objectContaining({ body: expect.stringContaining('"task":"--help"') })
+    );
+    expect(process.exitCode).toBe(0);
+  });
 
   it("prints health response JSON", async () => {
     vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");
