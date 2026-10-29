@@ -81,3 +81,27 @@ Rollback: revert the scoped production commits through a reviewed PR. No schema
 migration or activation is involved. Retain ordinary ledger records and immutable
 user envelopes. Cleanup is restricted to owned disposable replay resources;
 other worktrees and runtime/client configuration remain untouched.
+
+Combined candidate validation at `b2e332f6db57ed9a95248cdf238a0e1a26aa9249`
+passed frozen install, lint, typecheck, **280 tests in 27 files** (99.40 seconds),
+build, **19 conformance checks, cleanup passed**, production audit **zero
+reported advisories**, and diff-check. Registry inspection independently confirmed
+2.1.3 requires Node >=20, peer Hono ^4; SDK 1.32.0 accepts node-server
+^1.19.9 || ^2.0.5. The upstream advisory was read directly, not inferred from audit.
+
+Fresh Terra/high reviewed the complete baseline-to-combined diff and separate
+PR223 exact head with no P1/P2 findings, and verified reader answer-before-check
+order from supported activity. Its tests/install/audit/CI were NOT_RUN.
+PR223 merged with expected-head guard at
+`916ba1e441e2e6c4cdbc698a3fc3885fef4fcfc7`; six exact-head checks passed.
+Merging that current base produced `0a1bfd74552646586f01d879d8c28c0fde9ad9b3`
+with the **identical tree** as reviewed/tested `b2e332f`.
+
+The built combined candidate was then rechecked against the same frozen A/B
+logical facts, not scored as new cases (`221/combined.json`). Both captures,
+private envelopes, duplicate saved retries and GET-only briefs passed; the same
+A projection loss remains. Separate historical top-level positive control passed
+in its own project. Invalid source made zero requests/files/row changes. An
+unavailable-recorder command executed **once**, preserved exit **7**, and used
+only private temporary state. Health 200 and unauthenticated runs 401 were checked.
+These functional controls are not reader evidence or whole-path saving claims.

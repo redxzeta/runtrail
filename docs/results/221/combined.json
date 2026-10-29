@@ -1,0 +1,245 @@
+{
+  "phase": "combined",
+  "build": "0a1bfd74552646586f01d879d8c28c0fde9ad9b3",
+  "receipts": [
+    {
+      "case": "A",
+      "capture": {
+        "code": 0,
+        "durationMs": 556.0106519999999,
+        "stdoutBytes": 959,
+        "status": "complete",
+        "confirmed": [
+          {
+            "stage": "run",
+            "id": "run_J1VICl6qyCcOjN1y"
+          },
+          {
+            "stage": "summary",
+            "id": "evt_xgah5Hrk_Jm7nGUA"
+          },
+          {
+            "stage": "handoff",
+            "id": "handoff_As7sZmhewyGCtf8Z"
+          }
+        ]
+      },
+      "retry": {
+        "code": 0,
+        "durationMs": 608.396097,
+        "stdoutBytes": 959,
+        "status": "complete",
+        "confirmed": [
+          {
+            "stage": "run",
+            "id": "run_J1VICl6qyCcOjN1y"
+          },
+          {
+            "stage": "summary",
+            "id": "evt_xgah5Hrk_Jm7nGUA"
+          },
+          {
+            "stage": "handoff",
+            "id": "handoff_As7sZmhewyGCtf8Z"
+          }
+        ]
+      },
+      "brief": {
+        "code": 0,
+        "durationMs": 585.3493760000001,
+        "stdoutBytes": 10113,
+        "evidenceApplicability": "unknown",
+        "source": {
+          "kind": "t3",
+          "system": "t3-code",
+          "threadId": "thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3A51d36b14-3d6d-4c9d-be86-b7fbd36344bf",
+          "runId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A68d4cd88-b7f3-4a27-9453-23ced2453e10%253Adelegate-task%253A51d36b14-3d6d-4c9d-be86-b7fbd36344bf:ordinal:1",
+          "ref": "t3-thread://v1/thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3A51d36b14-3d6d-4c9d-be86-b7fbd36344bf",
+          "observedAt": "2026-10-29T18:43:45.984Z",
+          "reportedStatus": "completed"
+        }
+      },
+      "calls": [
+        {
+          "method": "GET",
+          "path": "/agent/prepare-work",
+          "requestBytes": 0,
+          "responseBytes": 1957,
+          "status": 200,
+          "durationMs": 14.263424000000214
+        },
+        {
+          "method": "GET",
+          "path": "/agent/context",
+          "requestBytes": 0,
+          "responseBytes": 7240,
+          "status": 200,
+          "durationMs": 11.435189000000264
+        },
+        {
+          "method": "GET",
+          "path": "/handoffs",
+          "requestBytes": 0,
+          "responseBytes": 5500,
+          "status": 200,
+          "durationMs": 3.419491999999991
+        }
+      ],
+      "counts": {
+        "agent_runs": 1,
+        "agent_events": 2,
+        "handoffs": 1,
+        "verification_evidence": 0
+      },
+      "envelopeBytes": 3341,
+      "summaryProjection": "whitespace-only; frozen raw exceeds 12 lines",
+      "rawSummaryAccepted": false,
+      "projectionExact": false
+    },
+    {
+      "case": "B",
+      "capture": {
+        "code": 0,
+        "durationMs": 584.9923219999996,
+        "stdoutBytes": 959,
+        "status": "complete",
+        "confirmed": [
+          {
+            "stage": "run",
+            "id": "run_SO1gnf_gSEzi4Fo-"
+          },
+          {
+            "stage": "summary",
+            "id": "evt_Tp-vsnt80hlazXt-"
+          },
+          {
+            "stage": "handoff",
+            "id": "handoff_fO0QwnZ6p5Tj_TAx"
+          }
+        ]
+      },
+      "retry": {
+        "code": 0,
+        "durationMs": 613.5474009999998,
+        "stdoutBytes": 959,
+        "status": "complete",
+        "confirmed": [
+          {
+            "stage": "run",
+            "id": "run_SO1gnf_gSEzi4Fo-"
+          },
+          {
+            "stage": "summary",
+            "id": "evt_Tp-vsnt80hlazXt-"
+          },
+          {
+            "stage": "handoff",
+            "id": "handoff_fO0QwnZ6p5Tj_TAx"
+          }
+        ]
+      },
+      "brief": {
+        "code": 0,
+        "durationMs": 614.7207210000001,
+        "stdoutBytes": 10147,
+        "evidenceApplicability": "unknown",
+        "source": {
+          "kind": "t3",
+          "system": "t3-code",
+          "threadId": "thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3Ad036f23c-8c1e-4297-a95c-9aea575e4b85",
+          "runId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A68d4cd88-b7f3-4a27-9453-23ced2453e10%253Adelegate-task%253Ad036f23c-8c1e-4297-a95c-9aea575e4b85:ordinal:1",
+          "ref": "t3-thread://v1/thread:delegated-task:command%3Amcp%3A68d4cd88-b7f3-4a27-9453-23ced2453e10%3Adelegate-task%3Ad036f23c-8c1e-4297-a95c-9aea575e4b85",
+          "observedAt": "2026-10-29T18:43:47.788Z",
+          "reportedStatus": "completed"
+        }
+      },
+      "calls": [
+        {
+          "method": "GET",
+          "path": "/agent/prepare-work",
+          "requestBytes": 0,
+          "responseBytes": 1964,
+          "status": 200,
+          "durationMs": 3.695854000000054
+        },
+        {
+          "method": "GET",
+          "path": "/agent/context",
+          "requestBytes": 0,
+          "responseBytes": 7512,
+          "status": 200,
+          "durationMs": 6.550053999999818
+        },
+        {
+          "method": "GET",
+          "path": "/handoffs",
+          "requestBytes": 0,
+          "responseBytes": 5658,
+          "status": 200,
+          "durationMs": 2.7926330000000235
+        }
+      ],
+      "counts": {
+        "agent_runs": 2,
+        "agent_events": 4,
+        "handoffs": 2,
+        "verification_evidence": 0
+      },
+      "envelopeBytes": 3419,
+      "summaryProjection": "whitespace-only; frozen raw exceeds 12 lines",
+      "rawSummaryAccepted": false,
+      "projectionExact": true
+    }
+  ],
+  "controls": {
+    "positive": {
+      "code": 0,
+      "durationMs": 681.9519770000002,
+      "stdoutBytes": 959,
+      "status": "complete",
+      "confirmed": [
+        {
+          "stage": "run",
+          "id": "run_uLFNlPRNxn9Xb1rD"
+        },
+        {
+          "stage": "summary",
+          "id": "evt_Cvi530HBFHB5Mmty"
+        },
+        {
+          "stage": "handoff",
+          "id": "handoff_eF6AYgp-zu2QR-7G"
+        }
+      ]
+    },
+    "invalid": {
+      "code": 1,
+      "durationMs": 422.9406630000003,
+      "stdoutBytes": 319,
+      "result": {
+        "schemaVersion": "1",
+        "status": "invalid",
+        "confirmed": [],
+        "envelopeSaved": false,
+        "error": {
+          "stage": "capture",
+          "code": "capture_rejected",
+          "message": "T3 thread/run identity mismatch.",
+          "deliveryUnknown": false
+        },
+        "resume": "fix_input",
+        "semantics": "client_reported_unverified"
+      }
+    },
+    "invalidZeroWrites": true,
+    "offline": {
+      "code": 7,
+      "durationMs": 715.4192309999999,
+      "stdoutBytes": 518,
+      "executions": 1
+    },
+    "health": 200,
+    "unauthenticated": 401
+  },
+  "note": "Combined functional recheck of the same A/B logical cases; no additional readers or pilot comparisons."
+}
