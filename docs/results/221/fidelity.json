@@ -1,0 +1,90 @@
+{
+  "base": "ee4ab5e161867d5f74c3b7fc9580580db405a24d",
+  "testedCommit": "2a209a34083a966675881dec2c01be151b9a9404",
+  "kind": "same-frozen-case-functional-replay",
+  "prospectiveCasesAdded": 0,
+  "receipts": [
+    {
+      "case": "A",
+      "confirmed": [
+        {
+          "stage": "run",
+          "id": "run_wbpCYeMrYTq8U2qd"
+        },
+        {
+          "stage": "summary",
+          "id": "evt_OUnDXn_t8SznCNNn"
+        },
+        {
+          "stage": "handoff",
+          "id": "handoff_pi8aemqpwycWl9mJ"
+        }
+      ],
+      "counts": {
+        "agent_runs": {
+          "n": 1
+        },
+        "agent_events": {
+          "n": 2
+        },
+        "handoffs": {
+          "n": 1
+        },
+        "verification_evidence": {
+          "n": 0
+        }
+      },
+      "summaryCharacters": 1603,
+      "exactSafeSummary": true,
+      "markdownEscapedSummary": true,
+      "requests": {
+        "post": 6,
+        "get": 6
+      },
+      "cliInvocations": 4,
+      "immutableEnvelope": true,
+      "readOnlyRows": true
+    },
+    {
+      "case": "B",
+      "confirmed": [
+        {
+          "stage": "run",
+          "id": "run_bjz5LQR_A6capnzN"
+        },
+        {
+          "stage": "summary",
+          "id": "evt_ou10PqtTWHabTrc8"
+        },
+        {
+          "stage": "handoff",
+          "id": "handoff_7camckq3LCGbY6ts"
+        }
+      ],
+      "counts": {
+        "agent_runs": {
+          "n": 1
+        },
+        "agent_events": {
+          "n": 2
+        },
+        "handoffs": {
+          "n": 1
+        },
+        "verification_evidence": {
+          "n": 0
+        }
+      },
+      "summaryCharacters": 1702,
+      "exactSafeSummary": true,
+      "markdownEscapedSummary": true,
+      "requests": {
+        "post": 6,
+        "get": 6
+      },
+      "cliInvocations": 4,
+      "immutableEnvelope": true,
+      "readOnlyRows": true
+    }
+  ]
+}
