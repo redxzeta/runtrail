@@ -1,5 +1,5 @@
 import childProcess from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -1489,6 +1489,66 @@ describe("cli", () => {
     }
     modes();
     expect(modeErrors).toEqual([]);
+  });
+
+  it.each([200, 503, 400])("retries only the selected record on HTTP %i", async (status) => {
+    tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-selected-"));
+    vi.stubEnv("RUNTRAIL_STATE_DIR", tempDir);
+    vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");
+    vi.stubEnv("RUNTRAIL_TOKEN", "");
+    const records = ["selected", "other"].map((key) =>
+      enqueueOutbox({
+        operation: "create_event",
+        path: "/events",
+        method: "POST",
+        payload: { clientRecordId: key, message: "private-payload" },
+        idempotencyKey: key
+      })
+    );
+    const pending = path.join(tempDir, "outbox", "pending");
+    const selected = path.join(pending, `${records[0]!.id}.json`);
+    const other = path.join(pending, `${records[1]!.id}.json`);
+    const malformed = path.join(pending, "malformed.json");
+    writeFileSync(malformed, "{private-malformed", { mode: 0o600 });
+    const selectedBytes = readFileSync(selected, "utf8");
+    const otherBytes = readFileSync(other, "utf8");
+    const output = captureOutput();
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ error: "private-payload" }), { status })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    for (const id of ["../private-payload", "invalid", "00000000-0000-4000-8000-000000000000"]) {
+      await expect(runCli(["node", "rt", "outbox", "retry", "--id", id])).rejects.toThrow(
+        /UUID|not found/
+      );
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(readFileSync(selected, "utf8")).toBe(selectedBytes);
+    await runCli(["node", "rt", "outbox", "retry", "--id", records[0]!.id]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(readFileSync(other, "utf8")).toBe(otherBytes);
+    expect(readFileSync(malformed, "utf8")).toBe("{private-malformed");
+    expect(statSync(pending).mode & 0o777).toBe(0o700);
+    expect(statSync(other).mode & 0o777).toBe(0o600);
+    if (status === 503) {
+      expect(JSON.parse(readFileSync(selected, "utf8"))).toEqual({
+        ...JSON.parse(selectedBytes),
+        retryCount: 1
+      });
+      expect(statSync(selected).mode & 0o777).toBe(0o600);
+    } else {
+      expect(existsSync(selected)).toBe(false);
+    }
+    if (status === 400) {
+      const quarantine = path.join(tempDir, "outbox", "quarantine");
+      const target = path.join(quarantine, `${records[0]!.id}.json`);
+      expect(readFileSync(target, "utf8")).toBe(selectedBytes);
+      expect(readFileSync(`${target}.reason`, "utf8")).toBe("permanent_http_400\n");
+      expect(statSync(quarantine).mode & 0o777).toBe(0o700);
+      expect(statSync(target).mode & 0o777).toBe(0o600);
+      expect(statSync(`${target}.reason`).mode & 0o777).toBe(0o600);
+    }
+    expect(output.join(" ")).not.toContain("private-payload");
   });
 
   it("queues transient idempotent writes and replays or quarantines them explicitly", async () => {

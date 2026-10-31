@@ -35,7 +35,8 @@ import {
   quarantineOutbox,
   readPendingOutbox,
   removeOutboxRecord,
-  updateOutboxRetry
+  updateOutboxRetry,
+  validateOutboxId
 } from "./outbox.js";
 import { formatReviewReport } from "./reviewReport.js";
 import { registerWorkflowCapture } from "./workflowCapture.js";
@@ -73,7 +74,8 @@ export async function runCli(argv = process.argv): Promise<void> {
   outbox
     .command("retry")
     .description("Replay queued writes")
-    .action(() => retryOutbox());
+    .option("--id <record-id>", "Replay one pending record")
+    .action((options: { id?: string }) => retryOutbox(true, options.id));
   program
     .command("sync")
     .description("Replay queued Runtrail writes")
@@ -364,8 +366,17 @@ async function showOutbox(): Promise<void> {
   });
 }
 
-async function retryOutbox(printResult = true): Promise<void> {
+async function retryOutbox(printResult = true, id?: string): Promise<void> {
+  if (id !== undefined) validateOutboxId(id);
   const pending = readPendingOutbox();
+  if (id !== undefined) {
+    pending.valid = pending.valid.filter(({ record }) => record.id === id);
+    if (pending.valid.length === 0)
+      throw new Error("Pending outbox record not found; inspect rt outbox list");
+    if (pending.valid.length !== 1)
+      throw new Error("Multiple pending records share this ID; inspect the outbox");
+    pending.malformed = [];
+  }
   const diagnostics: Array<{ id: string; reason: string }> = [];
   for (const malformed of pending.malformed) {
     quarantineOutbox(malformed.file, malformed.error);
