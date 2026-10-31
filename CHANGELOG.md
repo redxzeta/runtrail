@@ -1,3 +1,10 @@
+## [1.44.5](https://github.com/redxzeta/runtrail/compare/v1.44.4...v1.44.5) (2026-10-31)
+
+
+### Bug Fixes
+
+* keep replay quarantine reasons payload-free ([#227](https://github.com/redxzeta/runtrail/issues/227)) ([580cceb](https://github.com/redxzeta/runtrail/commit/580ccebf4cf375f7138968242d01711fe97f1045))
+
 ## [1.44.4](https://github.com/redxzeta/runtrail/compare/v1.44.3...v1.44.4) (2026-10-31)
 
 
