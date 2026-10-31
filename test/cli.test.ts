@@ -1,11 +1,11 @@
 import childProcess from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../src/cli/index.js";
-import { listOutbox, readPendingOutbox } from "../src/cli/outbox.js";
+import { enqueueOutbox, listOutbox, readPendingOutbox } from "../src/cli/outbox.js";
 import { computeEventHash } from "../src/shared/receipts.js";
 import type { AgentEvent } from "../src/shared/schemas.js";
 
@@ -1319,6 +1319,106 @@ describe("cli", () => {
       ),
       expect.any(Object)
     );
+  });
+
+  it("isolates each CLI replay transition across repeated and mixed outcomes", async () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-cli-replay-"));
+    vi.stubEnv("RUNTRAIL_STATE_DIR", tempDir);
+    vi.stubEnv("RUNTRAIL_URL", "http://runtrail.test");
+    vi.stubEnv("RUNTRAIL_TOKEN", "");
+    vi.useFakeTimers();
+    const records = ["A", "B", "C"].map((name, index) => {
+      vi.setSystemTime(new Date(Date.UTC(2026, 0, 1, 0, 0, index)));
+      return enqueueOutbox({
+        operation: "create_event",
+        path: "/events",
+        method: "POST",
+        payload: { clientRecordId: name, message: `private-payload-${name}` },
+        idempotencyKey: name
+      });
+    });
+    vi.useRealTimers();
+    const pending = path.join(tempDir, "outbox", "pending");
+    const quarantine = path.join(tempDir, "outbox", "quarantine");
+    const files = records.map(({ id }) => path.join(pending, `${id}.json`));
+    const rejected = path.join(quarantine, `${records[1]?.id}.json`);
+    const reason = `${rejected}.reason`;
+    const snapshot = () =>
+      files.map((file) => (existsSync(file) ? readFileSync(file, "utf8") : null));
+    const modes = () => {
+      if (process.platform === "win32") return;
+      expect(statSync(pending).mode & 0o777).toBe(0o700);
+      for (const file of files.filter(existsSync)) expect(statSync(file).mode & 0o777).toBe(0o600);
+      if (existsSync(quarantine)) {
+        expect(statSync(quarantine).mode & 0o777).toBe(0o700);
+        for (const file of [rejected, reason]) expect(statSync(file).mode & 0o777).toBe(0o600);
+      }
+    };
+    const modeErrors: unknown[] = [];
+    const observeModes = () => {
+      try {
+        modes();
+      } catch (error) {
+        modeErrors.push(error);
+      }
+    };
+    const output = captureOutput();
+    for (const count of [1, 2, 3]) {
+      const before = snapshot();
+      const observations: Array<Array<string | null>> = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          observations.push(snapshot());
+          return new Response("unavailable", { status: 503 });
+        })
+      );
+      await runCli(["node", "rt", "outbox", "retry"]);
+      expect(observations).toHaveLength(3);
+      const after = snapshot();
+      for (let i = 0; i < 3; i++) {
+        expect(JSON.parse(after[i] ?? "null").retryCount).toBe(count);
+        expect(JSON.parse(after[i] ?? "null")).toEqual({
+          ...JSON.parse(before[i] ?? "null"),
+          retryCount: count
+        });
+        expect(observations[i]).toEqual(before.map((bytes, j) => (j < i ? after[j] : bytes)));
+      }
+      modes();
+    }
+    const before = snapshot();
+    const observations: Array<Array<string | null>> = [];
+    const quarantineObservations: Array<string | null> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        observations.push(snapshot());
+        observeModes();
+        quarantineObservations.push(existsSync(rejected) ? readFileSync(rejected, "utf8") : null);
+        const status = [200, 400, 503][observations.length - 1] ?? 500;
+        return new Response(JSON.stringify({ error: "private-payload-B" }), { status });
+      })
+    );
+    await runCli(["node", "rt", "outbox", "retry"]);
+    expect(observations).toEqual([before, [null, before[1], before[2]], [null, null, before[2]]]);
+    expect(quarantineObservations).toEqual([null, null, before[1]]);
+    expect(readFileSync(rejected, "utf8")).toBe(before[1]);
+    expect(snapshot().slice(0, 2)).toEqual([null, null]);
+    expect(JSON.parse(snapshot()[2] ?? "null")).toEqual({
+      ...JSON.parse(before[2] ?? "null"),
+      retryCount: 4
+    });
+    expect(JSON.parse(output.at(-1) ?? "{}")).toEqual({
+      delivered: 1,
+      quarantined: 1,
+      remaining: 1,
+      diagnostics: [{ id: records[1]?.id, reason: "permanent_http_400" }]
+    });
+    for (const text of [...output, readFileSync(reason, "utf8")]) {
+      expect(text).not.toContain("private-payload-");
+    }
+    modes();
+    expect(modeErrors).toEqual([]);
   });
 
   it("queues transient idempotent writes and replays or quarantines them explicitly", async () => {
