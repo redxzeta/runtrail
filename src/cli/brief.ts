@@ -519,11 +519,18 @@ export function formatBrief(report: BriefReport): string {
 }
 
 function cleanText(value: string): string {
-  return value
-    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, " ")
-    .replace(/(?:[a-zA-Z]:[\\/]|\\\\)[^\s<>"']+|(?<![\w:])\/[^\s<>"']+/g, "[path omitted]")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    value
+      .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, " ")
+      // Only a complete, standalone backticked octal pair is permission notation.
+      // Path alternatives still consume prefixed paths before reaching a pair.
+      .replace(
+        /(?<![\w/\\`])(`0[0-7]{3}`\/`0[0-7]{3}`)(?![\w/\\`])|(?:[a-zA-Z]:[\\/]|\\\\)[^\s<>"']+|(?<![\w:])\/[^\s<>"']+/g,
+        (_match, permissions: string | undefined) => permissions ?? "[path omitted]"
+      )
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 function markdown(value: string): string {
