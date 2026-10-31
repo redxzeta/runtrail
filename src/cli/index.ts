@@ -388,7 +388,7 @@ async function retryOutbox(printResult = true): Promise<void> {
         Number(status) < 500 &&
         !["408", "429"].includes(status)
       ) {
-        quarantineOutbox(file, message);
+        quarantineOutbox(file, `permanent_http_${status}`);
         quarantined += 1;
         diagnostics.push({ id: record.id, reason: `permanent_http_${status}` });
       } else {
