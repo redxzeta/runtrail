@@ -185,8 +185,11 @@ describe("explicit workflow capture and fresh CLI continuation", () => {
             summaryCharacters: summary.length,
             exactSafeSummary: true,
             markdownEscapedSummary: true,
-            requests: { post: 6, get: f.requests.length },
-            cliInvocations: 4,
+            requests: {
+              post: deliveryRequests.filter((request) => request.startsWith("POST ")).length,
+              get: f.requests.filter((request) => request.startsWith("GET ")).length
+            },
+            cliInvocations: f.invocations(),
             immutableEnvelope: true,
             readOnlyRows: true
           })
@@ -349,6 +352,7 @@ async function disposable() {
   migrate(db);
   const app = createApp({ config, db });
   const requests: string[] = [];
+  let cliInvocations = 0;
   let fault: { endpoint: string; after: boolean } | undefined;
   const source = path.join(directory, "source.json");
   const saved = path.join(directory, "envelope.json");
@@ -429,7 +433,9 @@ async function disposable() {
         ])
       );
     },
+    invocations: () => cliInvocations,
     cli(args: string[]) {
+      cliInvocations += 1;
       return execute(args, env);
     },
     async close() {
