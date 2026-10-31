@@ -93,6 +93,111 @@ describe("explicit workflow capture and fresh CLI continuation", () => {
     }
   }, 60_000);
 
+  it.each(["A", "B"])(
+    "replays frozen #221 Case %s with complete safe summary fidelity",
+    async (name) => {
+      const facts = JSON.parse(readFileSync(`docs/results/218/${name}.json`, "utf8"));
+      const summary = facts.summary.replace(/\s+/g, " ").trim();
+      const f = await disposable();
+      try {
+        writeFileSync(
+          f.source,
+          JSON.stringify({
+            thread: facts.source.thread,
+            recentRuns: facts.source.recentRuns
+          }),
+          { mode: 0o600 }
+        );
+        const args = f.capture();
+        for (const [flag, value] of [
+          ["--task", facts.task],
+          ["--summary", summary],
+          ["--next-action", facts.nextAction]
+        ])
+          args[args.indexOf(flag) + 1] = value;
+        args.push("--evidence-ref", facts.reference);
+        const captured = await f.cli(args);
+        expect(captured.code).toBe(0);
+        expect(f.requests).toEqual(["POST /runs", "POST /events", "POST /handoffs"]);
+        const raw = readFileSync(f.saved, "utf8");
+        const envelope = JSON.parse(raw);
+        expect(envelope.summary).toBe(summary);
+        expect(envelope.source.threadId).toBe(facts.source.thread.threadId);
+        expect(envelope.source.runId).toBe(facts.source.recentRuns[0].runId);
+        expect(envelope.evidence[0].summary).toContain(facts.source.recentRuns[0].completedAt);
+        expect(statSync(f.directory).mode & 0o777).toBe(0o700);
+        expect(statSync(f.saved).mode & 0o777).toBe(0o600);
+        const counts = f.counts();
+        const retry = await f.cli(["workflow", "capture", "--retry", f.saved]);
+        expect(retry.json.confirmed).toEqual(captured.json.confirmed);
+        expect(f.counts()).toEqual(counts);
+        const before = f.rows();
+        f.requests.length = 0;
+        const briefArgs = [
+          "brief",
+          "--project",
+          "workflow-test",
+          "--work-key",
+          workKey,
+          "--import-provenance"
+        ];
+        const json = await f.cli([...briefArgs, "--json"]);
+        const markdown = await f.cli(briefArgs);
+        expect(json.code).toBe(0);
+        expect(markdown.code).toBe(0);
+        const report = json.json.pendingHandoffs[0].clientReport?.report;
+        expect(report).toMatchObject({
+          source: envelope.source,
+          task: facts.task,
+          summary,
+          nextAction: facts.nextAction,
+          assurance: "unverified",
+          evidenceApplicability: "unknown"
+        });
+        const escaped = summary
+          .replace(/[\\`*_{}[\]()#+.!|:~=-]/g, "\\$&")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        expect(markdown.stdout).toContain(escaped);
+        expect(summary).toContain("Blocker");
+        expect(summary).toContain("NOT verified");
+        expect(json.json.textClipped).toBe(true); // ordinary short projections remain bounded
+        expect(f.requests).toEqual([
+          "GET /agent/prepare-work",
+          "GET /agent/context",
+          "GET /handoffs",
+          "GET /agent/prepare-work",
+          "GET /agent/context",
+          "GET /handoffs"
+        ]);
+        expect(f.rows()).toEqual(before);
+        expect(readFileSync(f.saved, "utf8")).toBe(raw);
+        for (const output of [json.stdout, markdown.stdout]) {
+          expect(output).not.toContain(f.directory);
+          expect(output).not.toContain(f.token);
+        }
+        console.info(
+          JSON.stringify({
+            case: name,
+            confirmed: captured.json.confirmed,
+            counts,
+            summaryCharacters: summary.length,
+            exactSafeSummary: true,
+            markdownEscapedSummary: true,
+            requests: { post: 6, get: f.requests.length },
+            cliInvocations: 4,
+            immutableEnvelope: true,
+            readOnlyRows: true
+          })
+        );
+      } finally {
+        await f.close();
+      }
+    },
+    60_000
+  );
+
   it("rejects ambiguity, running/unsafe/raw inputs and overwrite; dry-run makes zero requests or files", async () => {
     const f = await disposable();
     try {
@@ -135,6 +240,10 @@ describe("explicit workflow capture and fresh CLI continuation", () => {
         "db_password=do-not-store-this",
         f.token,
         "/home/private/checkout",
+        "`/0600`",
+        '"/secret/file"',
+        "`C:\\private\\file`",
+        "`\\\\server\\share\\file`",
         "assistant: transcript",
         "x".repeat(1801)
       ]) {
@@ -306,6 +415,11 @@ async function disposable() {
         "--save",
         file
       ];
+    },
+    rows() {
+      return ["agent_runs", "agent_events", "handoffs", "verification_evidence"].map((table) =>
+        db.prepare(`SELECT * FROM ${table} ORDER BY id`).all()
+      );
     },
     counts() {
       return Object.fromEntries(

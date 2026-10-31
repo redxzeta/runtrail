@@ -466,6 +466,35 @@ describe("daily work brief", () => {
     expect(report.recentEvents[2].runId).toBe("anotherwork");
   });
 
+  it("preserves backticked POSIX permission pairs without exempting numeric paths", () => {
+    const { prepared, context } = fixture();
+    const permissions = "Unix `0700`/`0600` permissions.";
+    context.recent_runs[0].summary = permissions;
+    const report = buildBrief(prepared, context, 20);
+    expect(report.relevantRuns[0].summary).toBe(permissions);
+    expect(formatBrief(report)).toContain("Unix \\`0700\\`/\\`0600\\` permissions\\.");
+    for (const sensitive of [
+      "/0600",
+      "`/0700`",
+      '"/secret/file"',
+      "'/secret/file'",
+      "`/secret/file`",
+      "C:\\private\\file",
+      "`C:\\private\\file`",
+      "\\\\server\\share\\file",
+      "`\\\\server\\share\\file`",
+      "/`0700`/`0600`",
+      "C:/`0700`/`0600`",
+      "`0700`/`0600`/private"
+    ]) {
+      context.recent_runs[0].summary = sensitive;
+      const negative = buildBrief(prepared, context, 20);
+      expect(negative.relevantRuns[0].summary).toContain("[path omitted]");
+      expect(JSON.stringify(negative)).not.toContain(sensitive);
+      expect(formatBrief(negative)).not.toContain(sensitive);
+    }
+  });
+
   it("omits private fields and control characters, redacts machine paths, and cannot forge Markdown structure", () => {
     const { prepared, context } = fixture();
     const hostile = `\n# Forged\r\n[click](javascript:alert(1)) <script>bad</script> ${String.fromCharCode(27)}[31m\u202e`;
