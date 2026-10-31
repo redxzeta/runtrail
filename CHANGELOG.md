@@ -1,3 +1,10 @@
+## [1.44.4](https://github.com/redxzeta/runtrail/compare/v1.44.3...v1.44.4) (2026-10-31)
+
+
+### Bug Fixes
+
+* **brief:** preserve POSIX permission pairs in import provenance ([#225](https://github.com/redxzeta/runtrail/issues/225)) ([e17935b](https://github.com/redxzeta/runtrail/commit/e17935b26d55a3b4c56372268ec10599ce3d345b))
+
 ## [1.44.3](https://github.com/redxzeta/runtrail/compare/v1.44.2...v1.44.3) (2026-10-29)
 
 
