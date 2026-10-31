@@ -131,6 +131,8 @@ describe("explicit workflow capture and fresh CLI continuation", () => {
         const retry = await f.cli(["workflow", "capture", "--retry", f.saved]);
         expect(retry.json.confirmed).toEqual(captured.json.confirmed);
         expect(f.counts()).toEqual(counts);
+        const deliveryRequests = [...f.requests];
+        expect(deliveryRequests.filter((request) => request.startsWith("POST "))).toHaveLength(6);
         const before = f.rows();
         f.requests.length = 0;
         const briefArgs = [
