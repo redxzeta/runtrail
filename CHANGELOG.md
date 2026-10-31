@@ -1,3 +1,10 @@
+# [1.45.0](https://github.com/redxzeta/runtrail/compare/v1.44.5...v1.45.0) (2026-10-31)
+
+
+### Features
+
+* **outbox:** retry one pending record by ID ([#229](https://github.com/redxzeta/runtrail/issues/229)) ([4327b38](https://github.com/redxzeta/runtrail/commit/4327b38dff724d1788bcf648ccfc80e82743d1e7))
+
 ## [1.44.5](https://github.com/redxzeta/runtrail/compare/v1.44.4...v1.44.5) (2026-10-31)
 
 
