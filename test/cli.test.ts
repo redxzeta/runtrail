@@ -23,12 +23,53 @@ describe("cli", () => {
   });
 
   it.each([
-    { command: [], entries: ["Runtrail CLI", "prepare-work", "verification", "handoff"] },
+    {
+      command: [],
+      entries: [
+        "Runtrail CLI",
+        "capabilities",
+        "run",
+        "runs",
+        "context",
+        "prepare-work",
+        "workflow",
+        "verification",
+        "outbox",
+        "loop",
+        "decision",
+        "handoff",
+        "export",
+        "verify"
+      ]
+    },
+    {
+      command: ["capabilities"],
+      entries: ["Discover supported Runtrail protocol capabilities", "--json"]
+    },
+    { command: ["runs"], entries: ["Manage run lifecycle recovery", "close-stale"] },
     { command: ["context"], entries: ["Fetch compact project context", "--cursor <cursor>"] },
     {
       command: ["prepare-work"],
-      entries: ["--work-key <workKey>", "--cursor <cursor>"]
+      entries: [
+        "Fetch deterministic continuation guidance",
+        "--work-key <workKey>",
+        "--cursor <cursor>"
+      ]
     },
+    { command: ["workflow"], entries: ["Inspect workflow state", "readiness", "packet"] },
+    { command: ["verification"], entries: ["Manage verification evidence", "add"] },
+    { command: ["outbox"], entries: ["Inspect and replay queued writes", "list", "retry"] },
+    { command: ["loop"], entries: ["Manage open loops", "add", "resolve"] },
+    { command: ["decision"], entries: ["Manage decisions", "add", "list", "get"] },
+    {
+      command: ["handoff"],
+      entries: ["Manage handoffs", "create", "pending", "accept", "decline", "complete", "expire"]
+    },
+    {
+      command: ["export"],
+      entries: ["Export Markdown summaries", "daily", "project", "decisions", "open-loops"]
+    },
+    { command: ["verify"], entries: ["Verify tamper-evident receipts", "run"] },
     {
       command: ["run", "create"],
       entries: [
@@ -67,9 +108,20 @@ describe("cli", () => {
             exitCode: 0
           });
           const help = output.join("");
-          expect(help).toMatch(/^Usage: rt\b/m);
+          expect(help.split(" [options]")[0]).toBe(
+            `Usage: rt${command.length ? ` ${command.join(" ")}` : ""}`
+          );
           for (const entry of entries) {
-            expect(help.split("\n").some((line) => line.trim().includes(entry))).toBe(true);
+            expect(
+              help
+                .split("\n")
+                .some(
+                  (line) =>
+                    line.trim().startsWith(entry) &&
+                    (line.trim().length === entry.length ||
+                      /\s/.test(line.trim()[entry.length] ?? ""))
+                )
+            ).toBe(true);
           }
           expect(fetchMock).not.toHaveBeenCalled();
           expect(stderr).not.toHaveBeenCalled();
@@ -88,6 +140,8 @@ describe("cli", () => {
     async (flag) => {
       tempDir = mkdtempSync(path.join(tmpdir(), "runtrail-run-help-"));
       vi.stubEnv("RUNTRAIL_CONFIG", path.join(tempDir, "missing.yaml"));
+      vi.stubEnv("RUNTRAIL_URL", "");
+      vi.stubEnv("RUNTRAIL_TOKEN", "");
       const fetchMock = vi.fn(async () => {
         throw new Error("Help must not make HTTP requests");
       });
@@ -97,13 +151,29 @@ describe("cli", () => {
       });
       syncBuiltinESMExports();
       const output = captureOutput();
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      const exit = vi.spyOn(process, "exit").mockImplementation(() => {
+        throw new Error("Help must not exit the test process");
+      });
       const previousExitCode = process.exitCode;
       try {
-        await expect(runCli(["node", "rt", "run", flag])).resolves.toBeUndefined();
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          output.length = 0;
+          await expect(runCli(["node", "rt", "run", flag])).resolves.toBeUndefined();
+          const help = output.join("\n");
+          expect(help).toContain("Usage: rt run --source");
+          expect(help).toContain("Wrap a command in a Runtrail run.");
+          for (const option of ["--agent-name", "--agent-model", "--workflow-id", "--work-key"]) {
+            expect(help.split("\n").some((line) => line.trim().startsWith(`${option} <`))).toBe(
+              true
+            );
+          }
+          expect(process.exitCode).toBe(previousExitCode);
+        }
         expect(spawn).not.toHaveBeenCalled();
         expect(fetchMock).not.toHaveBeenCalled();
-        expect(output.join("\n")).toContain("Usage: rt run --source");
-        expect(process.exitCode).toBe(previousExitCode);
+        expect(stderr).not.toHaveBeenCalled();
+        expect(exit).not.toHaveBeenCalled();
       } finally {
         spawn.mockRestore();
         syncBuiltinESMExports();
