@@ -67,6 +67,12 @@ export function listOutbox(env: NodeJS.ProcessEnv = process.env): OutboxSummary[
   return readRecords("pending", env).valid.map(({ record }) => summarize(record));
 }
 
+export function validateOutboxId(id: string): void {
+  if (!outboxRecordSchema.shape.id.safeParse(id).success) {
+    throw new Error("Invalid outbox record ID; provide a valid UUID from rt outbox list");
+  }
+}
+
 export function readPendingOutbox(env: NodeJS.ProcessEnv = process.env): {
   valid: Array<{ file: string; record: OutboxRecord }>;
   malformed: Array<{ file: string; error: string }>;
